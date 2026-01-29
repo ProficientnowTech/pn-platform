@@ -262,10 +262,15 @@ check_applications_health() {
 		# some transient states (CRD registering / apiserver cache) it can be null.
 		# Always coalesce to [] to avoid jq "Cannot iterate over null".
 		local total_apps synced_apps healthy_apps progressing_apps
-		total_apps=$(echo "$apps_data" | jq -r '(.items // []) | length')
-		synced_apps=$(echo "$apps_data" | jq -r '[((.items // [])[]) | select(.status.sync.status? == "Synced")] | length')
-		healthy_apps=$(echo "$apps_data" | jq -r '[((.items // [])[]) | select(.status.health.status? == "Healthy")] | length')
-		progressing_apps=$(echo "$apps_data" | jq -r '[((.items // [])[]) | select((.status.sync.status? == "OutOfSync") or (.status.operationState.phase? == "Running"))] | length')
+		total_apps=$(echo "$apps_data" | jq -r '(.items // []) | length' | head -1 | tr -d '\n')
+		synced_apps=$(echo "$apps_data" | jq -r '[((.items // [])[]) | select(.status.sync.status? == "Synced")] | length' | head -1 | tr -d '\n')
+		healthy_apps=$(echo "$apps_data" | jq -r '[((.items // [])[]) | select(.status.health.status? == "Healthy")] | length' | head -1 | tr -d '\n')
+		progressing_apps=$(echo "$apps_data" | jq -r '[((.items // [])[]) | select((.status.sync.status? == "OutOfSync") or (.status.operationState.phase? == "Running"))] | length' | head -1 | tr -d '\n')
+		# Ensure we have valid integers (default to 0 if empty)
+		total_apps=${total_apps:-0}
+		synced_apps=${synced_apps:-0}
+		healthy_apps=${healthy_apps:-0}
+		progressing_apps=${progressing_apps:-0}
 
 		# Build status line
 		local status_line="${BLUE}[${attempt}/${max_attempts}]${NC} Apps:${total_apps} ${GREEN}✓:${healthy_apps}/${synced_apps}${NC}"

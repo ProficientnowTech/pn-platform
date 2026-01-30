@@ -57,7 +57,7 @@ build:
     - name: apicurio-converters
       artifacts:
         - type: tgz
-          url: https://repo1.maven.org/maven2/io/apicurio/apicurio-registry-distro-connect-converter/2.6.8.Final/apicurio-registry-distro-connect-converter-2.6.8.Final-converter.tar.gz
+          url: https://repo1.maven.org/maven2/io/apicurio/apicurio-registry-distro-connect-converter/2.6.13/apicurio-registry-distro-connect-converter-2.6.13-converter.tar.gz
 
 ## Resource allocation
 resources:

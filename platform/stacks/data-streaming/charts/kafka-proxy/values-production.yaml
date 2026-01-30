@@ -13,7 +13,7 @@ schemaValidation:
   filterName: record-validation
 
   apicurio:
-    registryUrl: http://apicurio-registry.apicurio-registry.svc.prod-ap-south-2a.local:8080/apis/registry/v2
+    registryUrl: http://apicurio-registry-apicurio-registry.apicurio-registry.svc.prod-ap-south-2a.local:8080/apis/registry/v2
 
   # Add validated topics here as they are onboarded
   # Example:

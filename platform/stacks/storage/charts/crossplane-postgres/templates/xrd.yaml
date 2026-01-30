@@ -1,0 +1,263 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xpostgresclusters.database.pnats.cloud
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  group: database.pnats.cloud
+  names:
+    kind: XPostgresCluster
+    plural: xpostgresclusters
+  claimNames:
+    kind: PostgresCluster
+    plural: postgresclusters
+
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - teamId
+                - clusterName
+              properties:
+                # Cluster identification
+                teamId:
+                  type: string
+                  description: Team ID for the cluster (used as prefix in naming)
+                  pattern: "^[a-z][a-z0-9-]*$"
+
+                clusterName:
+                  type: string
+                  description: Name of the PostgreSQL cluster
+                  pattern: "^[a-z][a-z0-9-]*$"
+
+                # PostgreSQL version
+                postgresVersion:
+                  type: string
+                  description: PostgreSQL major version
+                  default: "16"
+                  enum: ["14", "15", "16", "17"]
+
+                # Cluster sizing
+                numberOfInstances:
+                  type: integer
+                  description: Number of PostgreSQL instances (replicas)
+                  default: 2
+                  minimum: 1
+                  maximum: 10
+
+                # Storage
+                storage:
+                  type: object
+                  properties:
+                    size:
+                      type: string
+                      description: Storage size (e.g., 10Gi, 100Gi)
+                      default: "10Gi"
+                    storageClass:
+                      type: string
+                      description: Storage class for PVCs
+                      default: "app-blk-ssd-repl"
+
+                # Resources
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: "250m"
+                        memory:
+                          type: string
+                          default: "512Mi"
+                    limits:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: "2"
+                        memory:
+                          type: string
+                          default: "2Gi"
+
+                # Users configuration
+                users:
+                  type: array
+                  description: List of database users to create
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        description: Username
+                      options:
+                        type: array
+                        description: User options (SUPERUSER, CREATEDB, REPLICATION, etc.)
+                        items:
+                          type: string
+                          enum:
+                            - SUPERUSER
+                            - CREATEDB
+                            - CREATEROLE
+                            - INHERIT
+                            - LOGIN
+                            - REPLICATION
+                            - BYPASSRLS
+
+                # Databases configuration
+                databases:
+                  type: object
+                  description: "Map of database names to owner usernames"
+                  additionalProperties:
+                    type: string
+
+                # Connection Pooler (PgBouncer)
+                connectionPooler:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                      description: Enable PgBouncer connection pooler
+                    mode:
+                      type: string
+                      default: "transaction"
+                      description: Pooling mode
+                      enum: ["session", "transaction", "statement"]
+                    numberOfInstances:
+                      type: integer
+                      default: 2
+                      description: Number of pooler instances
+                    resources:
+                      type: object
+                      properties:
+                        requests:
+                          type: object
+                          properties:
+                            cpu:
+                              type: string
+                              default: "250m"
+                            memory:
+                              type: string
+                              default: "128Mi"
+                        limits:
+                          type: object
+                          properties:
+                            cpu:
+                              type: string
+                              default: "1"
+                            memory:
+                              type: string
+                              default: "256Mi"
+
+                # Debezium / CDC support
+                debezium:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                      description: Enable Debezium CDC support (creates replication user and configures wal_level=logical)
+                    replicationUser:
+                      type: string
+                      default: "debezium"
+                      description: Username for Debezium replication
+
+                # Ingress configuration
+                ingress:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                      description: Enable ingress for external access
+
+                    # Pooler ingress (for application queries via PgBouncer)
+                    pooler:
+                      type: object
+                      properties:
+                        host:
+                          type: string
+                          description: Hostname for pooler access (e.g., mydb-pooler.pnats.cloud)
+                        annotations:
+                          type: object
+                          additionalProperties:
+                            type: string
+
+                    # Direct ingress (for migrations/Debezium, bypasses PgBouncer)
+                    direct:
+                      type: object
+                      properties:
+                        host:
+                          type: string
+                          description: Hostname for direct access (e.g., mydb-direct.pnats.cloud)
+                        annotations:
+                          type: object
+                          additionalProperties:
+                            type: string
+
+                    # TLS configuration
+                    tls:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        clusterIssuer:
+                          type: string
+                          default: "letsencrypt-production"
+
+                # PostgreSQL parameters
+                postgresParameters:
+                  type: object
+                  description: Additional PostgreSQL parameters
+                  additionalProperties:
+                    type: string
+
+            status:
+              type: object
+              properties:
+                clusterStatus:
+                  type: string
+                  description: Status of the PostgreSQL cluster
+                poolerEndpoint:
+                  type: string
+                  description: Internal endpoint for PgBouncer connection
+                directEndpoint:
+                  type: string
+                  description: Internal endpoint for direct PostgreSQL connection
+                secretName:
+                  type: string
+                  description: Name of the secret containing credentials
+
+      additionalPrinterColumns:
+        - name: Team
+          type: string
+          jsonPath: .spec.teamId
+        - name: Version
+          type: string
+          jsonPath: .spec.postgresVersion
+        - name: Instances
+          type: integer
+          jsonPath: .spec.numberOfInstances
+        - name: Pooler
+          type: boolean
+          jsonPath: .spec.connectionPooler.enabled
+        - name: Debezium
+          type: boolean
+          jsonPath: .spec.debezium.enabled
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

@@ -1,0 +1,112 @@
+# Crossplane PostgreSQL Cluster Configuration
+# Uses Zalando Postgres Operator via Crossplane provider-kubernetes
+
+# Provider configuration
+provider:
+  kubernetes:
+    # Name of the ProviderConfig for provider-kubernetes
+    # This should match an existing ProviderConfig in the cluster
+    configName: provider-kubernetes
+
+# Default values for PostgresCluster claims
+# These can be overridden per-claim
+defaults:
+  postgresVersion: "16"
+  numberOfInstances: 2
+
+  storage:
+    size: "10Gi"
+    storageClass: "app-blk-ssd-repl"
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+
+  connectionPooler:
+    enabled: true
+    mode: "transaction"
+    numberOfInstances: 2
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "128Mi"
+      limits:
+        cpu: "1"
+        memory: "256Mi"
+
+  debezium:
+    enabled: false
+    replicationUser: "debezium"
+
+  ingress:
+    enabled: false
+    tls:
+      enabled: true
+      clusterIssuer: "letsencrypt-production"
+
+# Example PostgresCluster claims (for documentation)
+# These are NOT deployed by this chart - use them as templates
+#
+# Example 1: Simple application database
+# ---
+# apiVersion: database.pnats.cloud/v1alpha1
+# kind: PostgresCluster
+# metadata:
+#   name: myapp-db
+#   namespace: myapp
+# spec:
+#   teamId: myteam
+#   clusterName: myapp
+#   postgresVersion: "16"
+#   numberOfInstances: 2
+#   storage:
+#     size: "50Gi"
+#   databases:
+#     myapp_production: myapp_user
+#   users:
+#     - name: myapp_user
+#       options: [LOGIN]
+#   connectionPooler:
+#     enabled: true
+#     mode: transaction
+#
+# Example 2: Database with Debezium CDC support
+# ---
+# apiVersion: database.pnats.cloud/v1alpha1
+# kind: PostgresCluster
+# metadata:
+#   name: orders-db
+#   namespace: orders
+# spec:
+#   teamId: platform
+#   clusterName: orders
+#   postgresVersion: "16"
+#   numberOfInstances: 3
+#   storage:
+#     size: "100Gi"
+#   databases:
+#     orders: orders_app
+#   users:
+#     - name: orders_app
+#       options: [LOGIN]
+#     - name: debezium
+#       options: [REPLICATION, LOGIN]
+#   debezium:
+#     enabled: true
+#     replicationUser: debezium
+#   connectionPooler:
+#     enabled: true
+#   ingress:
+#     enabled: true
+#     pooler:
+#       host: orders-pooler.pnats.cloud
+#     direct:
+#       host: orders-direct.pnats.cloud
+#   postgresParameters:
+#     wal_level: logical
+#     max_replication_slots: "10"
+#     max_wal_senders: "10"

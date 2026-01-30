@@ -1,0 +1,423 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xpostgrescluster-zalando
+  labels:
+    provider: zalando
+    crossplane.io/xrd: xpostgresclusters.database.pnats.cloud
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  compositeTypeRef:
+    apiVersion: database.pnats.cloud/v1alpha1
+    kind: XPostgresCluster
+
+  patchSets:
+    - name: common-metadata
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+  resources:
+    # =========================================================================
+    # Zalando PostgreSQL Cluster
+    # =========================================================================
+    - name: postgresql-cluster
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: acid.zalan.do/v1
+              kind: postgresql
+              metadata:
+                name: ""
+                namespace: ""
+              spec:
+                teamId: ""
+                numberOfInstances: 2
+                postgresql:
+                  version: "16"
+                  parameters:
+                    # Performance tuning
+                    max_connections: "200"
+                    shared_buffers: "256MB"
+                    effective_cache_size: "768MB"
+                    maintenance_work_mem: "128MB"
+                    checkpoint_completion_target: "0.9"
+                    wal_buffers: "16MB"
+                    default_statistics_target: "100"
+                    random_page_cost: "1.1"
+                    effective_io_concurrency: "200"
+                    work_mem: "8MB"
+                    min_wal_size: "1GB"
+                    max_wal_size: "4GB"
+
+                volume:
+                  size: "10Gi"
+                  storageClass: "app-blk-ssd-repl"
+
+                resources:
+                  requests:
+                    cpu: "250m"
+                    memory: "512Mi"
+                  limits:
+                    cpu: "2"
+                    memory: "2Gi"
+
+                # Users and databases will be patched
+                users: {}
+                databases: {}
+
+                # Connection pooler (PgBouncer)
+                enableConnectionPooler: true
+                connectionPooler:
+                  mode: transaction
+                  numberOfInstances: 2
+                  resources:
+                    requests:
+                      cpu: "250m"
+                      memory: "128Mi"
+                    limits:
+                      cpu: "1"
+                      memory: "256Mi"
+
+                # Disable default load balancers - we create custom ones
+                enableMasterLoadBalancer: false
+                enableReplicaLoadBalancer: false
+
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        # Cluster name: <teamId>-<clusterName>
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s"
+          toFieldPath: metadata.name
+
+        # Namespace from claim
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+        # Team ID
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.teamId
+          toFieldPath: spec.forProvider.manifest.spec.teamId
+
+        # PostgreSQL version
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.postgresVersion
+          toFieldPath: spec.forProvider.manifest.spec.postgresql.version
+
+        # Number of instances
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.numberOfInstances
+          toFieldPath: spec.forProvider.manifest.spec.numberOfInstances
+
+        # Storage
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.storage.size
+          toFieldPath: spec.forProvider.manifest.spec.volume.size
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.storage.storageClass
+          toFieldPath: spec.forProvider.manifest.spec.volume.storageClass
+
+        # Resources
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.resources.requests.cpu
+          toFieldPath: spec.forProvider.manifest.spec.resources.requests.cpu
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.resources.requests.memory
+          toFieldPath: spec.forProvider.manifest.spec.resources.requests.memory
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.resources.limits.cpu
+          toFieldPath: spec.forProvider.manifest.spec.resources.limits.cpu
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.resources.limits.memory
+          toFieldPath: spec.forProvider.manifest.spec.resources.limits.memory
+
+        # Users - patched from spec
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.users
+          toFieldPath: spec.forProvider.manifest.spec.users
+          policy:
+            fromFieldPath: Optional
+
+        # Databases
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.databases
+          toFieldPath: spec.forProvider.manifest.spec.databases
+          policy:
+            fromFieldPath: Optional
+
+        # Connection pooler settings
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.enabled
+          toFieldPath: spec.forProvider.manifest.spec.enableConnectionPooler
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.mode
+          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.mode
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.numberOfInstances
+          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.numberOfInstances
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.resources.requests.cpu
+          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.requests.cpu
+          policy:
+            fromFieldPath: Optional
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.resources.requests.memory
+          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.requests.memory
+          policy:
+            fromFieldPath: Optional
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.resources.limits.cpu
+          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.limits.cpu
+          policy:
+            fromFieldPath: Optional
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.connectionPooler.resources.limits.memory
+          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.limits.memory
+          policy:
+            fromFieldPath: Optional
+
+        # Additional PostgreSQL parameters (merged)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.postgresParameters
+          toFieldPath: spec.forProvider.manifest.spec.postgresql.parameters
+          policy:
+            fromFieldPath: Optional
+            mergeOptions:
+              keepMapValues: true
+
+        # Write status back
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.manifest.status.PostgresClusterStatus
+          toFieldPath: status.clusterStatus
+          policy:
+            fromFieldPath: Optional
+
+    # =========================================================================
+    # LoadBalancer Service for PgBouncer (Connection Pooler)
+    # For application queries - connects to PgBouncer pods
+    # =========================================================================
+    - name: service-pooler-lb
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: ""
+                namespace: ""
+                labels:
+                  app.kubernetes.io/component: pooler-lb
+                annotations:
+                  external-dns.alpha.kubernetes.io/hostname: ""
+              spec:
+                type: LoadBalancer
+                ports:
+                  - name: pgbouncer
+                    port: 5432
+                    targetPort: 5432
+                    protocol: TCP
+                selector:
+                  application: ""
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        # Only create when ingress.enabled=true
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.ingress.enabled
+          toFieldPath: metadata.annotations["skip-composition"]
+          transforms:
+            - type: convert
+              convert:
+                toType: string
+            - type: match
+              match:
+                patterns:
+                  - type: literal
+                    literal: "false"
+                    result: "true"
+                fallbackValue: "false"
+
+        # Service name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-pooler-lb"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-pooler-lb"
+          toFieldPath: metadata.name
+
+        # Namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+        # External DNS hostname for pooler
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.ingress.pooler.host
+          toFieldPath: spec.forProvider.manifest.metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          policy:
+            fromFieldPath: Optional
+
+        # Selector: application=<teamId>-<clusterName>-pooler
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-pooler"
+          toFieldPath: spec.forProvider.manifest.spec.selector.application
+
+        # Write endpoint to status
+        - type: ToCompositeFieldPath
+          fromFieldPath: spec.forProvider.manifest.metadata.name
+          toFieldPath: status.poolerEndpoint
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s:5432"
+
+    # =========================================================================
+    # LoadBalancer Service for Direct PostgreSQL Connection
+    # For migrations, schema changes, and Debezium CDC
+    # Bypasses PgBouncer - connects directly to master pod
+    # =========================================================================
+    - name: service-direct-lb
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: ""
+                namespace: ""
+                labels:
+                  app.kubernetes.io/component: direct-lb
+                annotations:
+                  external-dns.alpha.kubernetes.io/hostname: ""
+              spec:
+                type: LoadBalancer
+                ports:
+                  - name: postgresql
+                    port: 5432
+                    targetPort: 5432
+                    protocol: TCP
+                selector:
+                  application: ""
+                  spilo-role: master
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        # Only create when ingress.enabled=true
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.ingress.enabled
+          toFieldPath: metadata.annotations["skip-composition"]
+          transforms:
+            - type: convert
+              convert:
+                toType: string
+            - type: match
+              match:
+                patterns:
+                  - type: literal
+                    literal: "false"
+                    result: "true"
+                fallbackValue: "false"
+
+        # Service name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-direct-lb"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-direct-lb"
+          toFieldPath: metadata.name
+
+        # Namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+        # External DNS hostname for direct connection
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.ingress.direct.host
+          toFieldPath: spec.forProvider.manifest.metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          policy:
+            fromFieldPath: Optional
+
+        # Selector: application=<teamId>-<clusterName>, spilo-role=master
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s"
+          toFieldPath: spec.forProvider.manifest.spec.selector.application
+
+        # Write endpoint to status
+        - type: ToCompositeFieldPath
+          fromFieldPath: spec.forProvider.manifest.metadata.name
+          toFieldPath: status.directEndpoint
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s:5432"

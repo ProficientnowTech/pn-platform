@@ -1,0 +1,14 @@
+apiVersion: v2
+name: crossplane-postgres
+description: Crossplane XRD and Composition for Zalando Postgres clusters with PgBouncer and Debezium support
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - crossplane
+  - postgres
+  - zalando
+  - pgbouncer
+  - debezium
+maintainers:
+  - name: Platform Team

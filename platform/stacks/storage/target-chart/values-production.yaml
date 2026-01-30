@@ -53,6 +53,30 @@ applications:
   - ServerSideApply=true
   - Replace=true
 
+- name: crossplane-postgres
+  annotations:
+    argocd.argoproj.io/sync-wave: '5'
+  sources:
+  - repoURL: https://github.com/ProficientnowTech/pn-infra.git
+    targetRevision: v2
+    path: platform/stacks/storage/charts/crossplane-postgres
+  destinationNamespaceOverwrite: crossplane-system
+  syncOptions:
+  - ServerSideApply=true
+  - CreateNamespace=false
+  - RespectIgnoreDifferences=true
+  ignoreDifferences:
+  - group: apiextensions.crossplane.io
+    kind: CompositeResourceDefinition
+    jqPathExpressions:
+    - .status
+    - .metadata.annotations
+  - group: apiextensions.crossplane.io
+    kind: Composition
+    jqPathExpressions:
+    - .status
+    - .metadata.annotations
+
 # - name: stackgres-postgres-operator
 #   annotations:
 #     argocd.argoproj.io/sync-wave: '0'

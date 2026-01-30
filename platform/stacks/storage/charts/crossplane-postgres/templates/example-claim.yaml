@@ -1,0 +1,60 @@
+{{- if .Values.exampleClaim }}
+{{- if .Values.exampleClaim.enabled }}
+# Example PostgresCluster claim for testing
+# This creates a minimal PostgreSQL cluster with Debezium support
+apiVersion: database.pnats.cloud/v1alpha1
+kind: PostgresCluster
+metadata:
+  name: {{ .Values.exampleClaim.name | default "example-db" }}
+  namespace: {{ .Values.exampleClaim.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "crossplane-postgres.labels" . | nindent 4 }}
+spec:
+  teamId: {{ .Values.exampleClaim.teamId | default "example" }}
+  clusterName: {{ .Values.exampleClaim.clusterName | default "test" }}
+  postgresVersion: {{ .Values.exampleClaim.postgresVersion | default "16" | quote }}
+  numberOfInstances: {{ .Values.exampleClaim.numberOfInstances | default 2 }}
+
+  storage:
+    size: {{ .Values.exampleClaim.storage.size | default "10Gi" | quote }}
+    storageClass: {{ .Values.exampleClaim.storage.storageClass | default "app-blk-ssd-repl" | quote }}
+
+  {{- if .Values.exampleClaim.databases }}
+  databases:
+    {{- toYaml .Values.exampleClaim.databases | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.exampleClaim.users }}
+  users:
+    {{- toYaml .Values.exampleClaim.users | nindent 4 }}
+  {{- end }}
+
+  connectionPooler:
+    enabled: {{ .Values.exampleClaim.connectionPooler.enabled | default true }}
+    mode: {{ .Values.exampleClaim.connectionPooler.mode | default "transaction" | quote }}
+    numberOfInstances: {{ .Values.exampleClaim.connectionPooler.numberOfInstances | default 2 }}
+
+  debezium:
+    enabled: {{ .Values.exampleClaim.debezium.enabled | default false }}
+    replicationUser: {{ .Values.exampleClaim.debezium.replicationUser | default "debezium" | quote }}
+
+  {{- if .Values.exampleClaim.ingress }}
+  {{- if .Values.exampleClaim.ingress.enabled }}
+  ingress:
+    enabled: true
+    pooler:
+      host: {{ .Values.exampleClaim.ingress.pooler.host | quote }}
+    direct:
+      host: {{ .Values.exampleClaim.ingress.direct.host | quote }}
+    tls:
+      enabled: {{ .Values.exampleClaim.ingress.tls.enabled | default true }}
+      clusterIssuer: {{ .Values.exampleClaim.ingress.tls.clusterIssuer | default "letsencrypt-production" | quote }}
+  {{- end }}
+  {{- end }}
+
+  {{- if .Values.exampleClaim.postgresParameters }}
+  postgresParameters:
+    {{- toYaml .Values.exampleClaim.postgresParameters | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

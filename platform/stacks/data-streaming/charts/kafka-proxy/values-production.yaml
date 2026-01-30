@@ -8,8 +8,10 @@ tls:
       group: cert-manager.io
 
 # Production Schema Validation Configuration
+# NOTE: RecordValidation filter is in preview status (Kroxylicious 0.18.0) and
+# causes "Exception instantiating filter" errors. Disabled until stable.
 schemaValidation:
-  enabled: true
+  enabled: false
   filterName: record-validation
 
   apicurio:

@@ -110,3 +110,16 @@ connectors:
 ## Image pull secrets for built images
 imagePullSecrets:
   - name: harbor-registry-credentials
+
+## Network Policy Configuration
+## Allow additional namespaces/pods to access Kafka Connect REST API
+networkPolicy:
+  additionalPeers:
+    # Allow Kafka UI to access Connect REST API
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kafka-ui
+    # Allow monitoring namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring

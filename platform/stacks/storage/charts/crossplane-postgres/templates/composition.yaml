@@ -13,13 +13,6 @@ spec:
     apiVersion: database.pnats.cloud/v1alpha1
     kind: XPostgresCluster
 
-  patchSets:
-    - name: common-metadata
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
-
   resources:
     # =========================================================================
     # Zalando PostgreSQL Cluster

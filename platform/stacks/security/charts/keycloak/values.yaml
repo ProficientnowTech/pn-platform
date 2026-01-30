@@ -95,12 +95,11 @@ keycloak:
     value: "keycloak.pnats.cloud"
   - name: KC_HOSTNAME_STRICT
     value: "false"
-  - name: KC_HOSTNAME_STRICT_BACKCHANNEL
-    value: "false"
 
-  # Proxy settings - edge mode for TLS termination at ingress
-  - name: KC_PROXY_HEADERS
-    value: "xforwarded"
+  # Proxy mode - 'edge' for TLS termination at reverse proxy/ingress
+  # This tells Keycloak to trust X-Forwarded headers and set secure cookies
+  - name: KC_PROXY
+    value: "edge"
 
   - name: KC_HTTP_ENABLED
     value: "true"
@@ -120,8 +119,8 @@ keycloak:
   # HTTP mode (behind ingress TLS)
   httpEnabled: false
 
-  # Proxy headers from ingress
-  proxyHeaders: "xforwarded"
+  # Proxy configuration is handled via KC_PROXY=edge in extraEnvVars
+  # This enables proper cookie handling behind reverse proxy
 
   # Cache
   cache:
@@ -143,6 +142,10 @@ keycloak:
       cert-manager.io/cluster-issuer: letsencrypt-production
       external-dns.alpha.kubernetes.io/ttl: "60"
       nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+      # Override X-Frame-Options for Keycloak admin console (uses iframes)
+      nginx.ingress.kubernetes.io/configuration-snippet: |
+        more_set_headers "X-Frame-Options: SAMEORIGIN";
+        more_set_headers "Content-Security-Policy: frame-src 'self'; frame-ancestors 'self'; object-src 'none';";
     tls: true
 
   # Network policy

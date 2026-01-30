@@ -2,14 +2,8 @@
 ## Production values for Debezium Operator
 
 debezium-operator:
-  # Production replicas for HA
-  replicas: 2
+  # Production image
+  image: "quay.io/debezium/operator:3.4.0"
 
-  # Production resource allocation
-  resources:
-    requests:
-      cpu: 200m
-      memory: 384Mi
-    limits:
-      cpu: 1000m
-      memory: 768Mi
+  # Watch all namespaces
+  watchNamespaces: "JOSDK_ALL_NAMESPACES"

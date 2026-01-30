@@ -13,785 +13,419 @@ spec:
     apiVersion: database.pnats.cloud/v1alpha1
     kind: XPostgresCluster
 
-  resources:
-    # =========================================================================
-    # Zalando PostgreSQL Cluster
-    # =========================================================================
-    - name: postgresql-cluster
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: acid.zalan.do/v1
-              kind: postgresql
-              metadata:
-                name: ""
-                namespace: ""
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          # =========================================================================
+          # Zalando PostgreSQL Cluster
+          # =========================================================================
+          - name: postgresql-cluster
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
               spec:
-                teamId: ""
-                numberOfInstances: 2
-                postgresql:
-                  version: "16"
-                  parameters:
-                    # Performance tuning
-                    max_connections: "200"
-                    shared_buffers: "256MB"
-                    effective_cache_size: "768MB"
-                    maintenance_work_mem: "128MB"
-                    checkpoint_completion_target: "0.9"
-                    wal_buffers: "16MB"
-                    default_statistics_target: "100"
-                    random_page_cost: "1.1"
-                    effective_io_concurrency: "200"
-                    work_mem: "8MB"
-                    min_wal_size: "1GB"
-                    max_wal_size: "4GB"
+                forProvider:
+                  manifest:
+                    apiVersion: acid.zalan.do/v1
+                    kind: postgresql
+                    metadata:
+                      name: ""
+                      namespace: ""
+                    spec:
+                      teamId: ""
+                      numberOfInstances: 2
+                      postgresql:
+                        version: "16"
+                        parameters:
+                          max_connections: "200"
+                          shared_buffers: "256MB"
+                          effective_cache_size: "768MB"
+                          maintenance_work_mem: "128MB"
+                          checkpoint_completion_target: "0.9"
+                          wal_buffers: "16MB"
+                          default_statistics_target: "100"
+                          random_page_cost: "1.1"
+                          effective_io_concurrency: "200"
+                          work_mem: "8MB"
+                          min_wal_size: "1GB"
+                          max_wal_size: "4GB"
 
-                volume:
-                  size: "10Gi"
-                  storageClass: "app-blk-ssd-repl"
+                      volume:
+                        size: "10Gi"
+                        storageClass: "app-blk-ssd-repl"
 
-                resources:
-                  requests:
-                    cpu: "250m"
-                    memory: "512Mi"
-                  limits:
-                    cpu: "2"
-                    memory: "2Gi"
+                      resources:
+                        requests:
+                          cpu: "250m"
+                          memory: "512Mi"
+                        limits:
+                          cpu: "2"
+                          memory: "2Gi"
 
-                # Users and databases will be patched
-                users: {}
-                databases: {}
+                      users: {}
+                      databases: {}
 
-                # Connection pooler (PgBouncer)
-                enableConnectionPooler: true
-                connectionPooler:
-                  mode: transaction
-                  numberOfInstances: 2
-                  resources:
-                    requests:
-                      cpu: "250m"
-                      memory: "128Mi"
-                    limits:
-                      cpu: "1"
-                      memory: "256Mi"
+                      enableConnectionPooler: true
+                      connectionPooler:
+                        mode: transaction
+                        numberOfInstances: 2
+                        resources:
+                          requests:
+                            cpu: "250m"
+                            memory: "128Mi"
+                          limits:
+                            cpu: "1"
+                            memory: "256Mi"
 
-                # Disable default load balancers - we create custom ones
-                enableMasterLoadBalancer: false
-                enableReplicaLoadBalancer: false
+                      enableMasterLoadBalancer: false
+                      enableReplicaLoadBalancer: false
 
-                # WAL-G backup configuration (patched when backup.enabled=true)
-                # podEnvironmentSecret: "" # Set via patch
+                providerConfigRef:
+                  name: provider-kubernetes
+            patches:
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s"
+                toFieldPath: spec.forProvider.manifest.metadata.name
 
-          providerConfigRef:
-            name: provider-kubernetes
-      patches:
-        # Cluster name: <teamId>-<clusterName>
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s"
-          toFieldPath: spec.forProvider.manifest.metadata.name
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s"
+                toFieldPath: metadata.name
 
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s"
-          toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
 
-        # Namespace from claim
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.teamId
+                toFieldPath: spec.forProvider.manifest.spec.teamId
 
-        # Team ID
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.teamId
-          toFieldPath: spec.forProvider.manifest.spec.teamId
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.postgresVersion
+                toFieldPath: spec.forProvider.manifest.spec.postgresql.version
 
-        # PostgreSQL version
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.postgresVersion
-          toFieldPath: spec.forProvider.manifest.spec.postgresql.version
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.numberOfInstances
+                toFieldPath: spec.forProvider.manifest.spec.numberOfInstances
 
-        # Number of instances
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.numberOfInstances
-          toFieldPath: spec.forProvider.manifest.spec.numberOfInstances
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.storage.size
+                toFieldPath: spec.forProvider.manifest.spec.volume.size
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.storage.storageClass
+                toFieldPath: spec.forProvider.manifest.spec.volume.storageClass
 
-        # Storage
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.storage.size
-          toFieldPath: spec.forProvider.manifest.spec.volume.size
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.storage.storageClass
-          toFieldPath: spec.forProvider.manifest.spec.volume.storageClass
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.resources.requests.cpu
+                toFieldPath: spec.forProvider.manifest.spec.resources.requests.cpu
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.resources.requests.memory
+                toFieldPath: spec.forProvider.manifest.spec.resources.requests.memory
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.resources.limits.cpu
+                toFieldPath: spec.forProvider.manifest.spec.resources.limits.cpu
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.resources.limits.memory
+                toFieldPath: spec.forProvider.manifest.spec.resources.limits.memory
 
-        # Resources
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.resources.requests.cpu
-          toFieldPath: spec.forProvider.manifest.spec.resources.requests.cpu
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.resources.requests.memory
-          toFieldPath: spec.forProvider.manifest.spec.resources.requests.memory
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.resources.limits.cpu
-          toFieldPath: spec.forProvider.manifest.spec.resources.limits.cpu
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.resources.limits.memory
-          toFieldPath: spec.forProvider.manifest.spec.resources.limits.memory
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.users
+                toFieldPath: spec.forProvider.manifest.spec.users
+                policy:
+                  fromFieldPath: Optional
 
-        # Users - patched from spec
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.users
-          toFieldPath: spec.forProvider.manifest.spec.users
-          policy:
-            fromFieldPath: Optional
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.databases
+                toFieldPath: spec.forProvider.manifest.spec.databases
+                policy:
+                  fromFieldPath: Optional
 
-        # Databases
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.databases
-          toFieldPath: spec.forProvider.manifest.spec.databases
-          policy:
-            fromFieldPath: Optional
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.connectionPooler.enabled
+                toFieldPath: spec.forProvider.manifest.spec.enableConnectionPooler
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.connectionPooler.mode
+                toFieldPath: spec.forProvider.manifest.spec.connectionPooler.mode
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.connectionPooler.numberOfInstances
+                toFieldPath: spec.forProvider.manifest.spec.connectionPooler.numberOfInstances
 
-        # Connection pooler settings
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.enabled
-          toFieldPath: spec.forProvider.manifest.spec.enableConnectionPooler
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.mode
-          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.mode
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.numberOfInstances
-          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.numberOfInstances
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.resources.requests.cpu
-          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.requests.cpu
-          policy:
-            fromFieldPath: Optional
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.resources.requests.memory
-          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.requests.memory
-          policy:
-            fromFieldPath: Optional
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.resources.limits.cpu
-          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.limits.cpu
-          policy:
-            fromFieldPath: Optional
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.connectionPooler.resources.limits.memory
-          toFieldPath: spec.forProvider.manifest.spec.connectionPooler.resources.limits.memory
-          policy:
-            fromFieldPath: Optional
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.postgresParameters
+                toFieldPath: spec.forProvider.manifest.spec.postgresql.parameters
+                policy:
+                  fromFieldPath: Optional
+                  mergeOptions:
+                    keepMapValues: true
 
-        # Additional PostgreSQL parameters (merged)
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.postgresParameters
-          toFieldPath: spec.forProvider.manifest.spec.postgresql.parameters
-          policy:
-            fromFieldPath: Optional
-            mergeOptions:
-              keepMapValues: true
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.manifest.status.PostgresClusterStatus
+                toFieldPath: status.clusterStatus
+                policy:
+                  fromFieldPath: Optional
 
-        # Write status back
-        - type: ToCompositeFieldPath
-          fromFieldPath: status.atProvider.manifest.status.PostgresClusterStatus
-          toFieldPath: status.clusterStatus
-          policy:
-            fromFieldPath: Optional
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s.%s.credentials.postgresql.acid.zalan.do"
+                toFieldPath: status.secretName
 
-        # Write secret name to status
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s.%s.credentials.postgresql.acid.zalan.do"
-          toFieldPath: status.secretName
-
-    # =========================================================================
-    # LoadBalancer Service for PgBouncer (Connection Pooler)
-    # For application queries - connects to PgBouncer pods
-    # =========================================================================
-    - name: service-pooler-lb
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: v1
-              kind: Service
-              metadata:
-                name: ""
-                namespace: ""
-                labels:
-                  app.kubernetes.io/component: pooler-lb
-                annotations:
-                  external-dns.alpha.kubernetes.io/hostname: ""
+          # =========================================================================
+          # LoadBalancer Service for PgBouncer (Connection Pooler)
+          # =========================================================================
+          - name: service-pooler-lb
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
               spec:
-                type: LoadBalancer
-                ports:
-                  - name: pgbouncer
-                    port: 5432
-                    targetPort: 5432
-                    protocol: TCP
-                selector:
-                  application: ""
-          providerConfigRef:
-            name: provider-kubernetes
-      patches:
-        # Only create when ingress.enabled=true
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.ingress.enabled
-          toFieldPath: metadata.annotations["skip-composition"]
-          transforms:
-            - type: convert
-              convert:
-                toType: string
-            - type: match
-              match:
-                patterns:
-                  - type: literal
-                    literal: "false"
-                    result: "true"
-                fallbackValue: "false"
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                      name: ""
+                      namespace: ""
+                      labels:
+                        app.kubernetes.io/component: pooler-lb
+                      annotations:
+                        external-dns.alpha.kubernetes.io/hostname: ""
+                    spec:
+                      type: LoadBalancer
+                      ports:
+                        - name: pgbouncer
+                          port: 5432
+                          targetPort: 5432
+                          protocol: TCP
+                      selector:
+                        application: ""
+                providerConfigRef:
+                  name: provider-kubernetes
+            patches:
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-pooler-lb"
+                toFieldPath: spec.forProvider.manifest.metadata.name
 
-        # Service name
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-pooler-lb"
-          toFieldPath: spec.forProvider.manifest.metadata.name
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-pooler-lb"
+                toFieldPath: metadata.name
 
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-pooler-lb"
-          toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
 
-        # Namespace
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.ingress.pooler.host
+                toFieldPath: spec.forProvider.manifest.metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+                policy:
+                  fromFieldPath: Optional
 
-        # External DNS hostname for pooler
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.ingress.pooler.host
-          toFieldPath: spec.forProvider.manifest.metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
-          policy:
-            fromFieldPath: Optional
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-pooler"
+                toFieldPath: spec.forProvider.manifest.spec.selector.application
 
-        # Selector: application=<teamId>-<clusterName>-pooler
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-pooler"
-          toFieldPath: spec.forProvider.manifest.spec.selector.application
+              - type: ToCompositeFieldPath
+                fromFieldPath: spec.forProvider.manifest.metadata.name
+                toFieldPath: status.poolerEndpoint
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s:5432"
 
-        # Write endpoint to status
-        - type: ToCompositeFieldPath
-          fromFieldPath: spec.forProvider.manifest.metadata.name
-          toFieldPath: status.poolerEndpoint
-          transforms:
-            - type: string
-              string:
-                type: Format
-                fmt: "%s:5432"
-
-    # =========================================================================
-    # LoadBalancer Service for Direct PostgreSQL Connection
-    # For migrations, schema changes, and Debezium CDC
-    # Bypasses PgBouncer - connects directly to master pod
-    # =========================================================================
-    - name: service-direct-lb
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: v1
-              kind: Service
-              metadata:
-                name: ""
-                namespace: ""
-                labels:
-                  app.kubernetes.io/component: direct-lb
-                annotations:
-                  external-dns.alpha.kubernetes.io/hostname: ""
+          # =========================================================================
+          # LoadBalancer Service for Direct PostgreSQL Connection
+          # =========================================================================
+          - name: service-direct-lb
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
               spec:
-                type: LoadBalancer
-                ports:
-                  - name: postgresql
-                    port: 5432
-                    targetPort: 5432
-                    protocol: TCP
-                selector:
-                  application: ""
-                  spilo-role: master
-          providerConfigRef:
-            name: provider-kubernetes
-      patches:
-        # Only create when ingress.enabled=true
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.ingress.enabled
-          toFieldPath: metadata.annotations["skip-composition"]
-          transforms:
-            - type: convert
-              convert:
-                toType: string
-            - type: match
-              match:
-                patterns:
-                  - type: literal
-                    literal: "false"
-                    result: "true"
-                fallbackValue: "false"
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                      name: ""
+                      namespace: ""
+                      labels:
+                        app.kubernetes.io/component: direct-lb
+                      annotations:
+                        external-dns.alpha.kubernetes.io/hostname: ""
+                    spec:
+                      type: LoadBalancer
+                      ports:
+                        - name: postgresql
+                          port: 5432
+                          targetPort: 5432
+                          protocol: TCP
+                      selector:
+                        application: ""
+                        spilo-role: master
+                providerConfigRef:
+                  name: provider-kubernetes
+            patches:
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-direct-lb"
+                toFieldPath: spec.forProvider.manifest.metadata.name
 
-        # Service name
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-direct-lb"
-          toFieldPath: spec.forProvider.manifest.metadata.name
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-direct-lb"
+                toFieldPath: metadata.name
 
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-direct-lb"
-          toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
 
-        # Namespace
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.ingress.direct.host
+                toFieldPath: spec.forProvider.manifest.metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+                policy:
+                  fromFieldPath: Optional
 
-        # External DNS hostname for direct connection
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.ingress.direct.host
-          toFieldPath: spec.forProvider.manifest.metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
-          policy:
-            fromFieldPath: Optional
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s"
+                toFieldPath: spec.forProvider.manifest.spec.selector.application
 
-        # Selector: application=<teamId>-<clusterName>, spilo-role=master
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s"
-          toFieldPath: spec.forProvider.manifest.spec.selector.application
+              - type: ToCompositeFieldPath
+                fromFieldPath: spec.forProvider.manifest.metadata.name
+                toFieldPath: status.directEndpoint
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s:5432"
 
-        # Write endpoint to status
-        - type: ToCompositeFieldPath
-          fromFieldPath: spec.forProvider.manifest.metadata.name
-          toFieldPath: status.directEndpoint
-          transforms:
-            - type: string
-              string:
-                type: Format
-                fmt: "%s:5432"
-
-    # =========================================================================
-    # ObjectBucketClaim for WAL-G PITR Backups
-    # Creates an S3-compatible bucket in Ceph for continuous archiving
-    # =========================================================================
-    - name: backup-bucket
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: objectbucket.io/v1alpha1
-              kind: ObjectBucketClaim
-              metadata:
-                name: ""
-                namespace: ""
-                labels:
-                  app.kubernetes.io/component: wal-backup
+          # =========================================================================
+          # ObjectBucketClaim for WAL-G PITR Backups
+          # =========================================================================
+          - name: backup-bucket
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
               spec:
-                generateBucketName: ""
-                storageClassName: "app-obj-s3"
-                additionalConfig:
-                  maxSize: "100Gi"
-          providerConfigRef:
-            name: provider-kubernetes
-      patches:
-        # Only create when backup.enabled=true (skip when false)
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.backup.enabled
-          toFieldPath: metadata.annotations["skip-composition"]
-          transforms:
-            - type: convert
-              convert:
-                toType: string
-            - type: match
-              match:
-                patterns:
-                  - type: literal
-                    literal: "false"
-                    result: "true"
-                fallbackValue: "false"
+                forProvider:
+                  manifest:
+                    apiVersion: objectbucket.io/v1alpha1
+                    kind: ObjectBucketClaim
+                    metadata:
+                      name: ""
+                      namespace: ""
+                      labels:
+                        app.kubernetes.io/component: wal-backup
+                    spec:
+                      generateBucketName: ""
+                      storageClassName: "app-obj-s3"
+                      additionalConfig:
+                        maxSize: "100Gi"
+                providerConfigRef:
+                  name: provider-kubernetes
+            patches:
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-wal-backup"
+                toFieldPath: spec.forProvider.manifest.metadata.name
 
-        # OBC name
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.metadata.name
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-wal-backup"
+                toFieldPath: metadata.name
 
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
 
-        # Namespace
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
+              - type: CombineFromComposite
+                combine:
+                  variables:
+                    - fromFieldPath: spec.teamId
+                    - fromFieldPath: spec.clusterName
+                  strategy: string
+                  string:
+                    fmt: "%s-%s-wal"
+                toFieldPath: spec.forProvider.manifest.spec.generateBucketName
 
-        # Bucket name prefix
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal"
-          toFieldPath: spec.forProvider.manifest.spec.generateBucketName
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.backup.storageClass
+                toFieldPath: spec.forProvider.manifest.spec.storageClassName
+                policy:
+                  fromFieldPath: Optional
 
-        # Storage class
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.backup.storageClass
-          toFieldPath: spec.forProvider.manifest.spec.storageClassName
-          policy:
-            fromFieldPath: Optional
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.backup.maxSize
+                toFieldPath: spec.forProvider.manifest.spec.additionalConfig.maxSize
+                policy:
+                  fromFieldPath: Optional
 
-        # Max size
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.backup.maxSize
-          toFieldPath: spec.forProvider.manifest.spec.additionalConfig.maxSize
-          policy:
-            fromFieldPath: Optional
-
-        # Write bucket name to status (OBC creates a secret with same name)
-        - type: ToCompositeFieldPath
-          fromFieldPath: spec.forProvider.manifest.metadata.name
-          toFieldPath: status.backupBucket
-        - type: ToCompositeFieldPath
-          fromFieldPath: spec.forProvider.manifest.metadata.name
-          toFieldPath: status.backupSecretName
-
-    # =========================================================================
-    # SecretStore for reading OBC credentials (namespace-scoped)
-    # Allows ExternalSecret to read from Kubernetes secrets
-    # =========================================================================
-    - name: backup-secret-store
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: external-secrets.io/v1beta1
-              kind: SecretStore
-              metadata:
-                name: ""
-                namespace: ""
-                labels:
-                  app.kubernetes.io/component: wal-backup-store
-              spec:
-                provider:
-                  kubernetes:
-                    remoteNamespace: ""
-                    server:
-                      caProvider:
-                        type: ConfigMap
-                        name: kube-root-ca.crt
-                        key: ca.crt
-                    auth:
-                      serviceAccount:
-                        name: default
-          providerConfigRef:
-            name: provider-kubernetes
-      patches:
-        # Only create when backup.enabled=true
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.backup.enabled
-          toFieldPath: metadata.annotations["skip-composition"]
-          transforms:
-            - type: convert
-              convert:
-                toType: string
-            - type: match
-              match:
-                patterns:
-                  - type: literal
-                    literal: "false"
-                    result: "true"
-                fallbackValue: "false"
-
-        # SecretStore name
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-obc-store"
-          toFieldPath: spec.forProvider.manifest.metadata.name
-
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-obc-store"
-          toFieldPath: metadata.name
-
-        # Namespace
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.spec.provider.kubernetes.remoteNamespace
-
-    # =========================================================================
-    # ExternalSecret for WAL-G S3 Credentials
-    # Transforms OBC secret format to WAL-G environment variables
-    # =========================================================================
-    - name: backup-walg-credentials
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: external-secrets.io/v1beta1
-              kind: ExternalSecret
-              metadata:
-                name: ""
-                namespace: ""
-                labels:
-                  app.kubernetes.io/component: wal-backup-credentials
-              spec:
-                refreshInterval: 1h
-                secretStoreRef:
-                  name: ""
-                  kind: SecretStore
-                target:
-                  name: ""
-                  creationPolicy: Owner
-                  template:
-                    engineVersion: v2
-                    data:
-                      # WAL-G required environment variables
-                      AWS_ACCESS_KEY_ID: '{{ "{{" }} .awsAccessKeyId {{ "}}" }}'
-                      AWS_SECRET_ACCESS_KEY: '{{ "{{" }} .awsSecretAccessKey {{ "}}" }}'
-                      AWS_ENDPOINT: 'https://{{ "{{" }} .bucketHost {{ "}}" }}:{{ "{{" }} .bucketPort {{ "}}" }}'
-                      AWS_REGION: '{{ "{{" }} .bucketRegion | default "us-east-1" {{ "}}" }}'
-                      AWS_S3_FORCE_PATH_STYLE: "true"
-                      WALG_S3_PREFIX: 's3://{{ "{{" }} .bucketName {{ "}}" }}'
-                      # Spilo/WAL-G backup configuration
-                      USE_WALG_BACKUP: "true"
-                      USE_WALG_RESTORE: "true"
-                      WALG_DISABLE_S3_SSE: "true"
-                data:
-                  - secretKey: awsAccessKeyId
-                    remoteRef:
-                      key: ""
-                      property: AWS_ACCESS_KEY_ID
-                  - secretKey: awsSecretAccessKey
-                    remoteRef:
-                      key: ""
-                      property: AWS_SECRET_ACCESS_KEY
-                  - secretKey: bucketHost
-                    remoteRef:
-                      key: ""
-                      property: BUCKET_HOST
-                  - secretKey: bucketPort
-                    remoteRef:
-                      key: ""
-                      property: BUCKET_PORT
-                  - secretKey: bucketName
-                    remoteRef:
-                      key: ""
-                      property: BUCKET_NAME
-                  - secretKey: bucketRegion
-                    remoteRef:
-                      key: ""
-                      property: BUCKET_REGION
-          providerConfigRef:
-            name: provider-kubernetes
-      patches:
-        # Only create when backup.enabled=true
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.backup.enabled
-          toFieldPath: metadata.annotations["skip-composition"]
-          transforms:
-            - type: convert
-              convert:
-                toType: string
-            - type: match
-              match:
-                patterns:
-                  - type: literal
-                    literal: "false"
-                    result: "true"
-                fallbackValue: "false"
-
-        # ExternalSecret resource name
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-walg-credentials-es"
-          toFieldPath: spec.forProvider.manifest.metadata.name
-
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-walg-credentials-es"
-          toFieldPath: metadata.name
-
-        # Namespace
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
-          toFieldPath: spec.forProvider.manifest.metadata.namespace
-
-        # SecretStore reference
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-obc-store"
-          toFieldPath: spec.forProvider.manifest.spec.secretStoreRef.name
-
-        # Target secret name (for WAL-G)
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-walg-credentials"
-          toFieldPath: spec.forProvider.manifest.spec.target.name
-
-        # Source secret name (OBC creates secret with same name as OBC)
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.spec.data[0].remoteRef.key
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.spec.data[1].remoteRef.key
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.spec.data[2].remoteRef.key
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.spec.data[3].remoteRef.key
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.spec.data[4].remoteRef.key
-        - type: CombineFromComposite
-          combine:
-            variables:
-              - fromFieldPath: spec.teamId
-              - fromFieldPath: spec.clusterName
-            strategy: string
-            string:
-              fmt: "%s-%s-wal-backup"
-          toFieldPath: spec.forProvider.manifest.spec.data[5].remoteRef.key
+              - type: ToCompositeFieldPath
+                fromFieldPath: spec.forProvider.manifest.metadata.name
+                toFieldPath: status.backupBucket
+              - type: ToCompositeFieldPath
+                fromFieldPath: spec.forProvider.manifest.metadata.name
+                toFieldPath: status.backupSecretName

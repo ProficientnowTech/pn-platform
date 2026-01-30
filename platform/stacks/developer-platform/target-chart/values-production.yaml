@@ -26,6 +26,8 @@ applications:
   syncOptions:
   - CreateNamespace=true
   - ServerSideApply=true
+  # Replace=true needed because kubebb Helm chart has managedFields baked into CRD templates
+  - Replace=true
 
 - name: tekton-dashboard
   annotations:

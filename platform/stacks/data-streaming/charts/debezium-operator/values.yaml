@@ -1,0 +1,47 @@
+---
+## Debezium Operator Configuration
+## Manages DebeziumServer custom resources for Change Data Capture
+
+debezium-operator:
+  # Operator replicas
+  replicas: 1
+
+  # Operator image configuration
+  image:
+    repository: quay.io/debezium/operator
+    tag: ""  # Uses appVersion by default
+    pullPolicy: IfNotPresent
+
+  # Resource limits for the operator
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Pod security context
+  podSecurityContext: {}
+
+  # Container security context
+  securityContext: {}
+
+  # Node selector for operator pods
+  nodeSelector: {}
+
+  # Tolerations for operator pods
+  tolerations: []
+
+  # Affinity rules for operator pods
+  affinity: {}
+
+  # Service account configuration
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+  # RBAC configuration
+  rbac:
+    create: true

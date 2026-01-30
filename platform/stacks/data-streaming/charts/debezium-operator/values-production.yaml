@@ -1,0 +1,15 @@
+---
+## Production values for Debezium Operator
+
+debezium-operator:
+  # Production replicas for HA
+  replicas: 2
+
+  # Production resource allocation
+  resources:
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    limits:
+      cpu: 1000m
+      memory: 768Mi

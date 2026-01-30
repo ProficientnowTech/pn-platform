@@ -51,6 +51,33 @@ applications:
     - /spec/conversion
     - /spec/versions
 
+- name: debezium-operator
+  project: data-streaming
+  sources:
+  - repoURL: https://github.com/ProficientnowTech/pn-infra.git
+    targetRevision: v2
+    path: platform/stacks/data-streaming/charts/debezium-operator
+    helm:
+      valueFiles:
+      - values-production.yaml
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+  destinationNamespaceOverwrite: debezium
+  syncOptions:
+  - ServerSideApply=true
+  - CreateNamespace=true
+  ignoreDifferences:
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+    jsonPointers:
+    - /status
+    - /metadata/annotations
+    - /metadata/creationTimestamp
+    - /metadata/generation
+    - /metadata/resourceVersion
+    - /metadata/uid
+    - /metadata/managedFields
+
 - name: kafka-cluster
   project: data-streaming
   sources:

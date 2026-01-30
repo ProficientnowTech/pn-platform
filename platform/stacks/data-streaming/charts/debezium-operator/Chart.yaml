@@ -1,0 +1,33 @@
+apiVersion: v2
+name: pn-debezium-operator
+description: Debezium Operator for Change Data Capture on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "3.4.0"
+
+keywords:
+- data-streaming
+- cdc
+- debezium
+- change-data-capture
+
+maintainers:
+- name: Platform Team
+  email: snoorullah@proficientnowtech.com
+
+annotations:
+  platform.pnats.cloud/category: data-streaming
+  platform.pnats.cloud/component: debezium
+  platform.pnats.cloud/docs: 'https://debezium.io/documentation/reference/stable/operations/debezium-operator.html'
+  platform.pnats.cloud/deploys: 'debezium-operator'
+  platform.pnats.cloud/resource-type: Operator
+  platform.pnats.cloud/dependencies: '["strimzi-kafka-operator"]'
+
+labels:
+  platform.pnats.cloud/component: debezium
+  platform.pnats.cloud/component-category: data-streaming
+
+dependencies:
+- name: debezium-operator
+  version: 3.4.0
+  repository: https://charts.debezium.io

@@ -638,12 +638,12 @@ spec:
                     engineVersion: v2
                     data:
                       # WAL-G required environment variables
-                      AWS_ACCESS_KEY_ID: "{{ .awsAccessKeyId }}"
-                      AWS_SECRET_ACCESS_KEY: "{{ .awsSecretAccessKey }}"
-                      AWS_ENDPOINT: "https://{{ .bucketHost }}:{{ .bucketPort }}"
-                      AWS_REGION: "{{ .bucketRegion | default \"us-east-1\" }}"
+                      AWS_ACCESS_KEY_ID: '{{ "{{" }} .awsAccessKeyId {{ "}}" }}'
+                      AWS_SECRET_ACCESS_KEY: '{{ "{{" }} .awsSecretAccessKey {{ "}}" }}'
+                      AWS_ENDPOINT: 'https://{{ "{{" }} .bucketHost {{ "}}" }}:{{ "{{" }} .bucketPort {{ "}}" }}'
+                      AWS_REGION: '{{ "{{" }} .bucketRegion | default "us-east-1" {{ "}}" }}'
                       AWS_S3_FORCE_PATH_STYLE: "true"
-                      WALG_S3_PREFIX: "s3://{{ .bucketName }}"
+                      WALG_S3_PREFIX: 's3://{{ "{{" }} .bucketName {{ "}}" }}'
                       # Spilo/WAL-G backup configuration
                       USE_WALG_BACKUP: "true"
                       USE_WALG_RESTORE: "true"

@@ -108,7 +108,7 @@ backstage:
       locations:
       # PostgreSQL Cluster Template - Crossplane/Zalando with PgBouncer & Debezium
       - type: url
-        target: https://github.com/ProficientnowTech/pn-infra/blob/v2/platform/stacks/developer-platform/charts/backstage/templates/postgres-cluster/template.yaml
+        target: https://github.com/ProficientnowTech/pn-infra/blob/v2/platform/stacks/developer-platform/charts/backstage/scaffolder-templates/postgres-cluster/template.yaml
         rules:
         - allow: [ Template ]
       # Infrastructure catalog

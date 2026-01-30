@@ -88,15 +88,10 @@ backstage:
 
     auth:
       environment: production
-      # Guest auth enabled temporarily until Keycloak realm 'platform' is created
-      # Remove guest provider once OIDC is properly configured
-      allowGuestAccess: true
       providers:
-        guest:
-          dangerouslyAllowOutsideDevelopment: true
         oidc:
           production:
-            metadataUrl: https://keycloak.pnats.cloud/realms/platform/.well-known/openid-configuration
+            metadataUrl: https://keycloak.pnats.cloud/realms/pcp/.well-known/openid-configuration
             clientId: backstage
             clientSecret: ${KEYCLOAK_CLIENT_SECRET}
             prompt: auto

@@ -338,7 +338,7 @@ clients:
 - name: backstage
   enabled: true
   clientId: backstage
-  displayName: "Backstage"
+  displayName: "Backstage Developer Portal"
   description: "Developer portal and service catalog"
   publicClient: false
   protocol: openid-connect
@@ -350,13 +350,13 @@ clients:
   serviceAccountsEnabled: false
 
   # URLs
-  rootUrl: "https://backstage.pnats.cloud"
-  baseUrl: "https://backstage.pnats.cloud"
+  rootUrl: "https://developers.pnats.cloud"
+  baseUrl: "https://developers.pnats.cloud"
   redirectUris:
-  - "https://backstage.pnats.cloud/api/auth/oidc/handler/frame"
+  - "https://developers.pnats.cloud/api/auth/oidc/handler/frame"
   webOrigins:
-  - "https://backstage.pnats.cloud"
-  adminUrl: "https://backstage.pnats.cloud"
+  - "https://developers.pnats.cloud"
+  adminUrl: "https://developers.pnats.cloud"
 
   # Scopes
   fullScopeAllowed: true

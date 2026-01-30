@@ -1,0 +1,18 @@
+{{- if .Values.objectBucket.enabled }}
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: {{ .Values.objectBucket.name | default "harbor-registry" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: harbor
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: storage
+spec:
+  generateBucketName: {{ .Values.objectBucket.generateName | default false }}
+  bucketName: {{ .Values.objectBucket.bucketName | default "harbor" }}
+  storageClassName: {{ .Values.objectBucket.storageClassName | default "app-obj-s3" }}
+  additionalConfig:
+    maxObjects: "{{ .Values.objectBucket.maxObjects | default 1000000 }}"
+    maxSize: "{{ .Values.objectBucket.maxSize | default "100G" }}"
+{{- end }}

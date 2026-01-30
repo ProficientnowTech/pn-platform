@@ -18,7 +18,7 @@ kafka-ui:
         - name: pn-kafka
           bootstrapServers: pn-kafka-kafka-bootstrap.strimzi-kafka-operator.svc.prod-ap-south-2a.local:9092
           # Apicurio Schema Registry integration
-          schemaRegistry: http://pn-apicurio-registry.apicurio-registry.svc.prod-ap-south-2a.local:8080/apis/registry/v2
+          schemaRegistry: http://apicurio-registry-apicurio-registry.apicurio-registry.svc.prod-ap-south-2a.local:8080/apis/ccompat/v7
           # Kafka Connect integration
           kafkaConnect:
             - name: pn-kafka-connect

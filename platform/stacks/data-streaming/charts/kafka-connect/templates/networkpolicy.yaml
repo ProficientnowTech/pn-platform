@@ -1,0 +1,26 @@
+{{- if .Values.networkPolicy }}
+{{- if .Values.networkPolicy.additionalPeers }}
+# Additional NetworkPolicy to allow external access to Kafka Connect REST API
+# This supplements the default Strimzi-managed NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}-allow-external
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/cluster: {{ include "kafka-connect.fullname" . }}
+      strimzi.io/kind: KafkaConnect
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- toYaml .Values.networkPolicy.additionalPeers | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: 8083
+{{- end }}
+{{- end }}

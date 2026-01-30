@@ -47,11 +47,3 @@ spec:
       imagePullSecrets:
         {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       {{- end }}
-
-  # Network policy peers - allow Kafka UI to access Connect REST API (port 8083)
-  {{- if .Values.networkPolicy }}
-  {{- if .Values.networkPolicy.additionalPeers }}
-  networkPolicyPeers:
-    {{- toYaml .Values.networkPolicy.additionalPeers | nindent 4 }}
-  {{- end }}
-  {{- end }}

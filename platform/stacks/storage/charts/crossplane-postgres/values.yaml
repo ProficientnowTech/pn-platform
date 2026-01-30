@@ -48,6 +48,44 @@ defaults:
       enabled: true
       clusterIssuer: "letsencrypt-production"
 
+  # Backup configuration (WAL-G to Ceph S3)
+  backup:
+    enabled: true
+    retentionDays: 7
+    schedule: "0 2 * * *"
+    storageClass: "app-obj-s3"
+    maxSize: "100Gi"
+
+# Example claim for testing (disabled by default)
+exampleClaim:
+  enabled: false
+  name: "example-db"
+  teamId: "example"
+  clusterName: "test"
+  postgresVersion: "16"
+  numberOfInstances: 2
+  storage:
+    size: "10Gi"
+    storageClass: "app-blk-ssd-repl"
+  databases:
+    example_db: example_user
+  users:
+    example_user:
+      - LOGIN
+  connectionPooler:
+    enabled: true
+    mode: "transaction"
+    numberOfInstances: 2
+  debezium:
+    enabled: false
+    replicationUser: "debezium"
+  backup:
+    enabled: true
+    retentionDays: 7
+    schedule: "0 2 * * *"
+    storageClass: "app-obj-s3"
+    maxSize: "100Gi"
+
 # Example PostgresCluster claims (for documentation)
 # These are NOT deployed by this chart - use them as templates
 #
@@ -73,6 +111,10 @@ defaults:
 #   connectionPooler:
 #     enabled: true
 #     mode: transaction
+#   backup:
+#     enabled: true
+#     retentionDays: 14
+#     maxSize: "200Gi"
 #
 # Example 2: Database with Debezium CDC support
 # ---
@@ -110,3 +152,8 @@ defaults:
 #     wal_level: logical
 #     max_replication_slots: "10"
 #     max_wal_senders: "10"
+#   backup:
+#     enabled: true
+#     retentionDays: 30
+#     schedule: "0 1 * * *"
+#     maxSize: "500Gi"

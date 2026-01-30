@@ -106,18 +106,16 @@ backstage:
       rules:
       - allow: [ Component, System, API, Resource, Location, Template ]
       locations:
+      # PostgreSQL Cluster Template - Crossplane/Zalando with PgBouncer & Debezium
       - type: url
-        target: https://github.com/pnats-cloud/pn-infra/blob/main/backstage/templates/cluster-template.yaml
+        target: https://github.com/ProficientnowTech/pn-infra/blob/v2/platform/stacks/developer-platform/charts/backstage/templates/postgres-cluster/template.yaml
         rules:
         - allow: [ Template ]
+      # Infrastructure catalog
       - type: url
-        target: https://github.com/pnats-cloud/pn-infra/blob/main/backstage/templates/database-template.yaml
+        target: https://github.com/ProficientnowTech/pn-infra/blob/v2/platform/stacks/developer-platform/charts/backstage/catalog/infrastructure.yaml
         rules:
-        - allow: [ Template ]
-      - type: url
-        target: https://github.com/pnats-cloud/pn-infra/blob/main/backstage/catalog/infrastructure.yaml
-        rules:
-        - allow: [ Resource ]
+        - allow: [ Resource, Component, System ]
 
     integrations:
       github:

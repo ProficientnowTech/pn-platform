@@ -1,0 +1,326 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: postgres-cluster
+  title: PostgreSQL Database Cluster
+  description: |
+    Create a production-ready PostgreSQL cluster with PgBouncer connection pooling,
+    configurable users/databases, and optional Debezium CDC support for event streaming.
+  tags:
+    - database
+    - postgresql
+    - crossplane
+    - zalando
+    - debezium
+    - recommended
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  owner: platform-team
+  type: database
+
+  parameters:
+    - title: Cluster Configuration
+      required:
+        - teamId
+        - clusterName
+        - namespace
+      properties:
+        teamId:
+          title: Team ID
+          type: string
+          description: Your team identifier (lowercase, alphanumeric with hyphens)
+          pattern: "^[a-z][a-z0-9-]*$"
+          ui:autofocus: true
+          ui:help: "Example: platform, orders, payments"
+
+        clusterName:
+          title: Cluster Name
+          type: string
+          description: Name for this database cluster (lowercase, alphanumeric with hyphens)
+          pattern: "^[a-z][a-z0-9-]*$"
+          ui:help: "Example: main, orders, analytics"
+
+        namespace:
+          title: Namespace
+          type: string
+          description: Kubernetes namespace where the cluster will be created
+          ui:help: "The namespace must already exist"
+
+        postgresVersion:
+          title: PostgreSQL Version
+          type: string
+          description: PostgreSQL major version
+          default: "16"
+          enum:
+            - "14"
+            - "15"
+            - "16"
+            - "17"
+          enumNames:
+            - "PostgreSQL 14 (LTS)"
+            - "PostgreSQL 15"
+            - "PostgreSQL 16 (Recommended)"
+            - "PostgreSQL 17 (Latest)"
+
+    - title: Sizing & Storage
+      properties:
+        numberOfInstances:
+          title: Number of Instances
+          type: integer
+          description: Number of PostgreSQL replicas (1 = standalone, 2+ = HA with streaming replication)
+          default: 2
+          minimum: 1
+          maximum: 5
+
+        storageSize:
+          title: Storage Size
+          type: string
+          description: Persistent volume size for each instance
+          default: "20Gi"
+          enum:
+            - "10Gi"
+            - "20Gi"
+            - "50Gi"
+            - "100Gi"
+            - "200Gi"
+            - "500Gi"
+
+        resourcePreset:
+          title: Resource Preset
+          type: string
+          description: CPU and memory allocation preset
+          default: small
+          enum:
+            - small
+            - medium
+            - large
+            - xlarge
+          enumNames:
+            - "Small (250m CPU, 512Mi RAM)"
+            - "Medium (500m CPU, 1Gi RAM)"
+            - "Large (1 CPU, 2Gi RAM)"
+            - "XLarge (2 CPU, 4Gi RAM)"
+
+    - title: Databases & Users
+      properties:
+        databases:
+          title: Databases
+          type: array
+          description: Databases to create in this cluster
+          minItems: 1
+          items:
+            type: object
+            required:
+              - name
+              - owner
+            properties:
+              name:
+                title: Database Name
+                type: string
+                pattern: "^[a-z][a-z0-9_]*$"
+              owner:
+                title: Owner Username
+                type: string
+                pattern: "^[a-z][a-z0-9_]*$"
+
+        additionalUsers:
+          title: Additional Users
+          type: array
+          description: Additional database users (owners are created automatically)
+          default: []
+          items:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                title: Username
+                type: string
+                pattern: "^[a-z][a-z0-9_]*$"
+              superuser:
+                title: Superuser
+                type: boolean
+                default: false
+
+    - title: Connection Pooling
+      properties:
+        enablePooler:
+          title: Enable PgBouncer Connection Pooler
+          type: boolean
+          description: PgBouncer provides connection pooling for better performance
+          default: true
+
+        poolerMode:
+          title: Pooling Mode
+          type: string
+          description: Connection pooling strategy
+          default: transaction
+          enum:
+            - session
+            - transaction
+            - statement
+          enumNames:
+            - "Session - One connection per client session"
+            - "Transaction - One connection per transaction (recommended)"
+            - "Statement - One connection per statement (most aggressive)"
+
+    - title: CDC & Event Streaming
+      properties:
+        enableDebezium:
+          title: Enable Debezium CDC Support
+          type: boolean
+          description: Configure for Change Data Capture with Debezium (enables logical replication)
+          default: false
+
+        debeziumUser:
+          title: Debezium Replication User
+          type: string
+          description: Username for Debezium connector
+          default: debezium
+          pattern: "^[a-z][a-z0-9_]*$"
+
+    - title: External Access
+      properties:
+        enableIngress:
+          title: Enable External Access
+          type: boolean
+          description: Create LoadBalancer services with DNS entries
+          default: false
+
+        poolerHost:
+          title: Pooler Hostname
+          type: string
+          description: DNS hostname for PgBouncer access (e.g., mydb-pooler.pnats.cloud)
+
+        directHost:
+          title: Direct Connection Hostname
+          type: string
+          description: DNS hostname for direct PostgreSQL access (for migrations/Debezium)
+
+    - title: Backup Configuration
+      properties:
+        enableBackup:
+          title: Enable PITR Backups
+          type: boolean
+          description: Enable Point-in-Time Recovery backups to Ceph object storage (WAL-G)
+          default: true
+
+        backupRetentionDays:
+          title: Backup Retention Days
+          type: integer
+          description: Number of days to retain backup data
+          default: 7
+          minimum: 1
+          maximum: 365
+
+        backupSchedule:
+          title: Full Backup Schedule
+          type: string
+          description: Cron schedule for full backups
+          default: "0 2 * * *"
+          ui:help: "Default: 2 AM daily. Format: minute hour day month weekday"
+
+        backupMaxSize:
+          title: Maximum Backup Size
+          type: string
+          description: Maximum size for the backup bucket
+          default: "100Gi"
+          enum:
+            - "50Gi"
+            - "100Gi"
+            - "250Gi"
+            - "500Gi"
+            - "1Ti"
+
+  steps:
+    - id: fetch-template
+      name: Generate PostgresCluster Manifest
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: ./generated
+        values:
+          teamId: ${{ parameters.teamId }}
+          clusterName: ${{ parameters.clusterName }}
+          namespace: ${{ parameters.namespace }}
+          postgresVersion: ${{ parameters.postgresVersion }}
+          numberOfInstances: ${{ parameters.numberOfInstances }}
+          storageSize: ${{ parameters.storageSize }}
+          resourcePreset: ${{ parameters.resourcePreset }}
+          databases: ${{ parameters.databases }}
+          additionalUsers: ${{ parameters.additionalUsers | default([], true) }}
+          enablePooler: ${{ parameters.enablePooler }}
+          poolerMode: ${{ parameters.poolerMode }}
+          enableDebezium: ${{ parameters.enableDebezium }}
+          debeziumUser: ${{ parameters.debeziumUser | default("debezium", true) }}
+          enableIngress: ${{ parameters.enableIngress }}
+          poolerHost: ${{ parameters.poolerHost | default("", true) }}
+          directHost: ${{ parameters.directHost | default("", true) }}
+          enableBackup: ${{ parameters.enableBackup }}
+          backupRetentionDays: ${{ parameters.backupRetentionDays | default(7, true) }}
+          backupSchedule: ${{ parameters.backupSchedule | default("0 2 * * *", true) }}
+          backupMaxSize: ${{ parameters.backupMaxSize | default("100Gi", true) }}
+
+    - id: publish
+      name: Create Pull Request
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=ProficientnowTech&repo=pn-infra
+        branchName: db/${{ parameters.teamId }}-${{ parameters.clusterName }}
+        title: "feat(database): Create PostgreSQL cluster ${{ parameters.teamId }}-${{ parameters.clusterName }}"
+        description: |
+          ## PostgreSQL Cluster Request
+
+          **Requested by:** Backstage Developer Portal
+
+          ### Configuration
+
+          | Setting | Value |
+          |---------|-------|
+          | Team | `${{ parameters.teamId }}` |
+          | Cluster | `${{ parameters.clusterName }}` |
+          | Namespace | `${{ parameters.namespace }}` |
+          | Version | PostgreSQL ${{ parameters.postgresVersion }} |
+          | Instances | ${{ parameters.numberOfInstances }} |
+          | Storage | ${{ parameters.storageSize }} per instance |
+          | Resources | ${{ parameters.resourcePreset }} |
+          | Connection Pooler | ${{ parameters.enablePooler }} (${{ parameters.poolerMode }} mode) |
+          | Debezium CDC | ${{ parameters.enableDebezium }} |
+          | External Access | ${{ parameters.enableIngress }} |
+          | PITR Backups | ${{ parameters.enableBackup }} |
+          | Backup Retention | ${{ parameters.backupRetentionDays }} days |
+
+          ### Connection Endpoints (after deployment)
+
+          **Internal (within cluster):**
+          - Pooler: `${{ parameters.teamId }}-${{ parameters.clusterName }}-pooler.${{ parameters.namespace }}.svc:5432`
+          - Direct: `${{ parameters.teamId }}-${{ parameters.clusterName }}.${{ parameters.namespace }}.svc:5432`
+
+          {% if parameters.enableIngress %}
+          **External:**
+          - Pooler: `${{ parameters.poolerHost }}:5432`
+          - Direct: `${{ parameters.directHost }}:5432`
+          {% endif %}
+
+          ---
+          *Generated via [Backstage Developer Portal](https://developers.pnats.cloud)*
+        sourcePath: ./generated
+        targetPath: platform/applications/databases/${{ parameters.namespace }}
+
+  output:
+    links:
+      - title: View Pull Request
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: ArgoCD - Storage Stack
+        url: https://argocd.pnats.cloud/applications/storage
+    text:
+      - title: Next Steps
+        content: |
+          1. Review and merge the pull request
+          2. ArgoCD will automatically deploy the cluster
+          3. Find credentials in secret: `${{ parameters.teamId }}.${{ parameters.clusterName }}.credentials.postgresql.acid.zalan.do`
+          {% if parameters.enableBackup %}
+          4. Backup bucket: `${{ parameters.teamId }}-${{ parameters.clusterName }}-wal-backup`
+          5. WAL-G credentials secret: `${{ parameters.teamId }}-${{ parameters.clusterName }}-walg-credentials`
+          {% endif %}

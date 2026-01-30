@@ -226,6 +226,31 @@ spec:
                   additionalProperties:
                     type: string
 
+                # Backup configuration (PITR with WAL-G to Ceph S3)
+                backup:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                      description: Enable PITR backups to Ceph object storage
+                    retentionDays:
+                      type: integer
+                      default: 7
+                      description: Number of days to retain backups
+                    schedule:
+                      type: string
+                      default: "0 2 * * *"
+                      description: Cron schedule for full backups (default 2 AM daily)
+                    storageClass:
+                      type: string
+                      default: "app-obj-s3"
+                      description: Storage class for backup bucket
+                    maxSize:
+                      type: string
+                      default: "100Gi"
+                      description: Maximum size for backup bucket
+
             status:
               type: object
               properties:
@@ -241,6 +266,12 @@ spec:
                 secretName:
                   type: string
                   description: Name of the secret containing credentials
+                backupBucket:
+                  type: string
+                  description: Name of the backup bucket
+                backupSecretName:
+                  type: string
+                  description: Name of the secret containing S3 credentials for backups
 
       additionalPrinterColumns:
         - name: Team
@@ -255,6 +286,9 @@ spec:
         - name: Pooler
           type: boolean
           jsonPath: .spec.connectionPooler.enabled
+        - name: Backup
+          type: boolean
+          jsonPath: .spec.backup.enabled
         - name: Debezium
           type: boolean
           jsonPath: .spec.debezium.enabled

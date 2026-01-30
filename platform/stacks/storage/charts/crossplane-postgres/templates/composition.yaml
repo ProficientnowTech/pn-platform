@@ -89,6 +89,9 @@ spec:
                 enableMasterLoadBalancer: false
                 enableReplicaLoadBalancer: false
 
+                # WAL-G backup configuration (patched when backup.enabled=true)
+                # podEnvironmentSecret: "" # Set via patch
+
           providerConfigRef:
             name: provider-kubernetes
       patches:
@@ -215,6 +218,17 @@ spec:
           toFieldPath: status.clusterStatus
           policy:
             fromFieldPath: Optional
+
+        # Write secret name to status
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s.%s.credentials.postgresql.acid.zalan.do"
+          toFieldPath: status.secretName
 
     # =========================================================================
     # LoadBalancer Service for PgBouncer (Connection Pooler)
@@ -421,3 +435,370 @@ spec:
               string:
                 type: Format
                 fmt: "%s:5432"
+
+    # =========================================================================
+    # ObjectBucketClaim for WAL-G PITR Backups
+    # Creates an S3-compatible bucket in Ceph for continuous archiving
+    # =========================================================================
+    - name: backup-bucket
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: objectbucket.io/v1alpha1
+              kind: ObjectBucketClaim
+              metadata:
+                name: ""
+                namespace: ""
+                labels:
+                  app.kubernetes.io/component: wal-backup
+              spec:
+                generateBucketName: ""
+                storageClassName: "app-obj-s3"
+                additionalConfig:
+                  maxSize: "100Gi"
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        # Only create when backup.enabled=true (skip when false)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.backup.enabled
+          toFieldPath: metadata.annotations["skip-composition"]
+          transforms:
+            - type: convert
+              convert:
+                toType: string
+            - type: match
+              match:
+                patterns:
+                  - type: literal
+                    literal: "false"
+                    result: "true"
+                fallbackValue: "false"
+
+        # OBC name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: metadata.name
+
+        # Namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+        # Bucket name prefix
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal"
+          toFieldPath: spec.forProvider.manifest.spec.generateBucketName
+
+        # Storage class
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.backup.storageClass
+          toFieldPath: spec.forProvider.manifest.spec.storageClassName
+          policy:
+            fromFieldPath: Optional
+
+        # Max size
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.backup.maxSize
+          toFieldPath: spec.forProvider.manifest.spec.additionalConfig.maxSize
+          policy:
+            fromFieldPath: Optional
+
+        # Write bucket name to status (OBC creates a secret with same name)
+        - type: ToCompositeFieldPath
+          fromFieldPath: spec.forProvider.manifest.metadata.name
+          toFieldPath: status.backupBucket
+        - type: ToCompositeFieldPath
+          fromFieldPath: spec.forProvider.manifest.metadata.name
+          toFieldPath: status.backupSecretName
+
+    # =========================================================================
+    # SecretStore for reading OBC credentials (namespace-scoped)
+    # Allows ExternalSecret to read from Kubernetes secrets
+    # =========================================================================
+    - name: backup-secret-store
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: external-secrets.io/v1beta1
+              kind: SecretStore
+              metadata:
+                name: ""
+                namespace: ""
+                labels:
+                  app.kubernetes.io/component: wal-backup-store
+              spec:
+                provider:
+                  kubernetes:
+                    remoteNamespace: ""
+                    server:
+                      caProvider:
+                        type: ConfigMap
+                        name: kube-root-ca.crt
+                        key: ca.crt
+                    auth:
+                      serviceAccount:
+                        name: default
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        # Only create when backup.enabled=true
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.backup.enabled
+          toFieldPath: metadata.annotations["skip-composition"]
+          transforms:
+            - type: convert
+              convert:
+                toType: string
+            - type: match
+              match:
+                patterns:
+                  - type: literal
+                    literal: "false"
+                    result: "true"
+                fallbackValue: "false"
+
+        # SecretStore name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-obc-store"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-obc-store"
+          toFieldPath: metadata.name
+
+        # Namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.spec.provider.kubernetes.remoteNamespace
+
+    # =========================================================================
+    # ExternalSecret for WAL-G S3 Credentials
+    # Transforms OBC secret format to WAL-G environment variables
+    # =========================================================================
+    - name: backup-walg-credentials
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: external-secrets.io/v1beta1
+              kind: ExternalSecret
+              metadata:
+                name: ""
+                namespace: ""
+                labels:
+                  app.kubernetes.io/component: wal-backup-credentials
+              spec:
+                refreshInterval: 1h
+                secretStoreRef:
+                  name: ""
+                  kind: SecretStore
+                target:
+                  name: ""
+                  creationPolicy: Owner
+                  template:
+                    engineVersion: v2
+                    data:
+                      # WAL-G required environment variables
+                      AWS_ACCESS_KEY_ID: "{{ .awsAccessKeyId }}"
+                      AWS_SECRET_ACCESS_KEY: "{{ .awsSecretAccessKey }}"
+                      AWS_ENDPOINT: "https://{{ .bucketHost }}:{{ .bucketPort }}"
+                      AWS_REGION: "{{ .bucketRegion | default \"us-east-1\" }}"
+                      AWS_S3_FORCE_PATH_STYLE: "true"
+                      WALG_S3_PREFIX: "s3://{{ .bucketName }}"
+                      # Spilo/WAL-G backup configuration
+                      USE_WALG_BACKUP: "true"
+                      USE_WALG_RESTORE: "true"
+                      WALG_DISABLE_S3_SSE: "true"
+                data:
+                  - secretKey: awsAccessKeyId
+                    remoteRef:
+                      key: ""
+                      property: AWS_ACCESS_KEY_ID
+                  - secretKey: awsSecretAccessKey
+                    remoteRef:
+                      key: ""
+                      property: AWS_SECRET_ACCESS_KEY
+                  - secretKey: bucketHost
+                    remoteRef:
+                      key: ""
+                      property: BUCKET_HOST
+                  - secretKey: bucketPort
+                    remoteRef:
+                      key: ""
+                      property: BUCKET_PORT
+                  - secretKey: bucketName
+                    remoteRef:
+                      key: ""
+                      property: BUCKET_NAME
+                  - secretKey: bucketRegion
+                    remoteRef:
+                      key: ""
+                      property: BUCKET_REGION
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        # Only create when backup.enabled=true
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.backup.enabled
+          toFieldPath: metadata.annotations["skip-composition"]
+          transforms:
+            - type: convert
+              convert:
+                toType: string
+            - type: match
+              match:
+                patterns:
+                  - type: literal
+                    literal: "false"
+                    result: "true"
+                fallbackValue: "false"
+
+        # ExternalSecret resource name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-walg-credentials-es"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-walg-credentials-es"
+          toFieldPath: metadata.name
+
+        # Namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels["crossplane.io/claim-namespace"]
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+        # SecretStore reference
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-obc-store"
+          toFieldPath: spec.forProvider.manifest.spec.secretStoreRef.name
+
+        # Target secret name (for WAL-G)
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-walg-credentials"
+          toFieldPath: spec.forProvider.manifest.spec.target.name
+
+        # Source secret name (OBC creates secret with same name as OBC)
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.spec.data[0].remoteRef.key
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.spec.data[1].remoteRef.key
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.spec.data[2].remoteRef.key
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.spec.data[3].remoteRef.key
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.spec.data[4].remoteRef.key
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.teamId
+              - fromFieldPath: spec.clusterName
+            strategy: string
+            string:
+              fmt: "%s-%s-wal-backup"
+          toFieldPath: spec.forProvider.manifest.spec.data[5].remoteRef.key

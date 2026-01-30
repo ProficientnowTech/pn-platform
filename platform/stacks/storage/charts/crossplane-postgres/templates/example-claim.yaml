@@ -56,5 +56,15 @@ spec:
   postgresParameters:
     {{- toYaml .Values.exampleClaim.postgresParameters | nindent 4 }}
   {{- end }}
+
+  # Backup configuration (WAL-G to Ceph S3)
+  backup:
+    enabled: {{ .Values.exampleClaim.backup.enabled | default true }}
+    {{- if .Values.exampleClaim.backup.enabled | default true }}
+    retentionDays: {{ .Values.exampleClaim.backup.retentionDays | default 7 }}
+    schedule: {{ .Values.exampleClaim.backup.schedule | default "0 2 * * *" | quote }}
+    storageClass: {{ .Values.exampleClaim.backup.storageClass | default "app-obj-s3" | quote }}
+    maxSize: {{ .Values.exampleClaim.backup.maxSize | default "100Gi" | quote }}
+    {{- end }}
 {{- end }}
 {{- end }}

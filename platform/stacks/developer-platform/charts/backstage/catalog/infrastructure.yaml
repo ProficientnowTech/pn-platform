@@ -1,0 +1,215 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: platform-infrastructure
+  title: Platform Infrastructure
+  description: Core platform infrastructure services and databases
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - infrastructure
+    - platform
+  links:
+    - url: https://argocd.pnats.cloud
+      title: ArgoCD Dashboard
+      icon: dashboard
+    - url: https://grafana.pnats.cloud
+      title: Grafana Monitoring
+      icon: dashboard
+spec:
+  owner: platform-team
+  domain: infrastructure
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: zalando-postgres-operator
+  title: Zalando PostgreSQL Operator
+  description: |
+    Kubernetes operator for managing PostgreSQL clusters with high availability,
+    connection pooling (PgBouncer), and automated failover.
+  annotations:
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=postgres-operator
+  tags:
+    - database
+    - postgresql
+    - operator
+  links:
+    - url: https://postgres-ui.pnats.cloud
+      title: Postgres Operator UI
+      icon: dashboard
+    - url: https://github.com/zalando/postgres-operator
+      title: Documentation
+      icon: docs
+spec:
+  type: database-operator
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: crossplane-postgres-xrd
+  title: PostgreSQL Cluster (Crossplane)
+  description: |
+    Crossplane CompositeResourceDefinition for self-service PostgreSQL clusters.
+    Supports PgBouncer connection pooling, configurable users/databases,
+    and Debezium CDC integration.
+  tags:
+    - database
+    - postgresql
+    - crossplane
+    - self-service
+spec:
+  type: crossplane-xrd
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+  dependsOn:
+    - resource:zalando-postgres-operator
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: kafka-cluster
+  title: Apache Kafka Cluster
+  description: |
+    Strimzi-managed Apache Kafka cluster for event streaming and messaging.
+    Includes Kroxylicious proxy for external access with TLS.
+  annotations:
+    backstage.io/kubernetes-label-selector: strimzi.io/cluster=pn-kafka
+  tags:
+    - messaging
+    - kafka
+    - streaming
+  links:
+    - url: https://kafka-ui.pnats.cloud
+      title: Kafka UI
+      icon: dashboard
+    - url: kafka.pnats.cloud:9083
+      title: Bootstrap Server (External)
+      icon: link
+spec:
+  type: message-broker
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: kafka-connect
+  title: Kafka Connect
+  description: |
+    Strimzi Kafka Connect cluster with Debezium CDC connectors
+    and S3 sink connectors for data integration.
+  tags:
+    - kafka
+    - cdc
+    - debezium
+    - integration
+spec:
+  type: integration-service
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+  dependsOn:
+    - resource:kafka-cluster
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: apicurio-registry
+  title: Apicurio Schema Registry
+  description: |
+    Schema registry for Kafka message schemas.
+    Supports Avro, JSON Schema, and Protobuf.
+  tags:
+    - schema-registry
+    - kafka
+    - avro
+  links:
+    - url: https://kafka-ui.pnats.cloud/ui/clusters/pn-kafka/schemas
+      title: Schema Registry UI
+      icon: dashboard
+spec:
+  type: schema-registry
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: harbor-registry
+  title: Harbor Container Registry
+  description: |
+    Enterprise container registry with vulnerability scanning,
+    image signing, and replication.
+  tags:
+    - registry
+    - containers
+    - security
+  links:
+    - url: https://registry.pnats.cloud
+      title: Harbor UI
+      icon: dashboard
+spec:
+  type: container-registry
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: vault
+  title: HashiCorp Vault
+  description: |
+    Secrets management and encryption service.
+    Integrated with Kubernetes via External Secrets Operator.
+  tags:
+    - security
+    - secrets
+    - vault
+  links:
+    - url: https://vault.pnats.cloud
+      title: Vault UI
+      icon: dashboard
+spec:
+  type: secrets-manager
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: keycloak
+  title: Keycloak Identity Provider
+  description: |
+    Identity and access management service.
+    Provides SSO, OAuth2, and OIDC for platform services.
+  tags:
+    - security
+    - identity
+    - sso
+  links:
+    - url: https://keycloak.pnats.cloud
+      title: Keycloak Admin Console
+      icon: dashboard
+spec:
+  type: identity-provider
+  owner: platform-team
+  system: platform-infrastructure
+  lifecycle: production

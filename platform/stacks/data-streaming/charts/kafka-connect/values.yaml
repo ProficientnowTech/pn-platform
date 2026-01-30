@@ -37,7 +37,7 @@ build:
   output:
     # Push to Harbor registry
     type: docker
-    image: harbor.pnats.cloud/platform/kafka-connect:latest
+    image: registry.pnats.cloud/platform/kafka-connect:latest
     pushSecret: harbor-registry-credentials
 
   plugins:

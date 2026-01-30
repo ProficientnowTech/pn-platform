@@ -18,7 +18,7 @@ build:
   enabled: true
   output:
     type: docker
-    image: harbor.pnats.cloud/platform/kafka-connect:v0.1.0
+    image: registry.pnats.cloud/platform/kafka-connect:v0.1.0
     pushSecret: harbor-registry-credentials
 
 # Production connectors would be configured here

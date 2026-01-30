@@ -90,8 +90,18 @@ keycloak:
   - name: KC_PRODUCTION
     value: "true"
 
+  # Hostname configuration for reverse proxy
+  - name: KC_HOSTNAME
+    value: "keycloak.pnats.cloud"
   - name: KC_HOSTNAME_STRICT
     value: "false"
+  - name: KC_HOSTNAME_STRICT_BACKCHANNEL
+    value: "false"
+
+  # Proxy settings - edge mode for TLS termination at ingress
+  - name: KC_PROXY_HEADERS
+    value: "xforwarded"
+
   - name: KC_HTTP_ENABLED
     value: "true"
 

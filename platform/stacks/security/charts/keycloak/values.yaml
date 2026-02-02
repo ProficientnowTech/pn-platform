@@ -86,20 +86,18 @@ keycloak:
 
   # Additional Keycloak Environment Variables
   extraEnvVars:
-  # Enable production mode to prevent thread blocking
-  - name: KC_PRODUCTION
-    value: "true"
-
-  # Hostname configuration for reverse proxy
-  - name: KC_HOSTNAME
-    value: "keycloak.pnats.cloud"
+  # Keycloak 26+ hostname v2 configuration for reverse proxy
+  # Use full URL to ensure HTTPS is recognized
+  - name: KC_HOSTNAME_URL
+    value: "https://keycloak.pnats.cloud"
+  - name: KC_HOSTNAME_ADMIN_URL
+    value: "https://keycloak.pnats.cloud"
   - name: KC_HOSTNAME_STRICT
     value: "false"
 
-  # Proxy mode - 'edge' for TLS termination at reverse proxy/ingress
-  # This tells Keycloak to trust X-Forwarded headers and set secure cookies
-  - name: KC_PROXY
-    value: "edge"
+  # Proxy headers - tells Keycloak to trust X-Forwarded-* headers from ingress
+  - name: KC_PROXY_HEADERS
+    value: "xforwarded"
 
   - name: KC_HTTP_ENABLED
     value: "true"
@@ -108,8 +106,9 @@ keycloak:
     value: "20"
   - name: VERTX_EVENT_LOOP_POOL_SIZE
     value: "8"
-  # Production mode
-  # production: true
+
+  # Production mode - REQUIRED for production deployments
+  production: true
   replicaCount: 2
 
   # HTTP-only for now (TLS termination at ingress)

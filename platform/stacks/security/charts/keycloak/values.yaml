@@ -107,8 +107,9 @@ keycloak:
   - name: VERTX_EVENT_LOOP_POOL_SIZE
     value: "8"
 
-  # Production mode - REQUIRED for production deployments
-  production: true
+  # Production mode is handled by hostname settings above
+  # Don't enable Bitnami's production: true as it requires internal TLS
+  # which conflicts with ingress TLS termination
   replicaCount: 2
 
   # HTTP-only for now (TLS termination at ingress)

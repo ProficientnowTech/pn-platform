@@ -107,10 +107,10 @@ An operational model where Git serves as the source of truth for infrastructure 
 A package of Kubernetes resource templates. Used to define application deployments and associated resources.
 
 **Managed Resource**
-A Crossplane custom resource representing an external resource (Harbor project, etc.). Crossplane reconciles managed resources with target systems.
+A Crossplane custom resource representing an external resource (registry project, database schema, etc.). Crossplane reconciles managed resources with target systems.
 
 **Provider**
-A Crossplane component that implements resource management for a specific system (Harbor provider, Vault provider, etc.).
+A Crossplane component that implements resource management for a specific system (registry provider, Vault provider, etc.).
 
 **ProviderConfig**
 A Crossplane resource specifying connection parameters for a provider, including credentials.
@@ -120,17 +120,20 @@ The process of comparing declared state (in Git/Kubernetes) with actual state (i
 
 ### Application Terms
 
+**Container Registry**
+A service that stores and distributes container images, typically with features like vulnerability scanning and access control. Examples include Harbor and Docker Registry.
+
 **Developer Portal (Backstage)**
 The developer portal platform. Architecture is defined in RFC-DEVELOPER-PLATFORM. This RFC covers only the identity integration (Keycloak authentication).
 
-**Harbor**
-A container registry. Stores and distributes container images with vulnerability scanning and access control.
+**Package Registry**
+A service that hosts software packages (npm, Maven, etc.) and proxies public registries. Examples include Verdaccio and Nexus.
 
-**Robot Account**
-A service account in Harbor for automated access (CI/CD pipelines). Uses token authentication rather than OIDC.
+**Platform Application**
+Any web-based developer tool that integrates with the platform identity system. Examples include container registries, package registries, developer portals, and monitoring dashboards.
 
-**Verdaccio**
-An npm registry. Hosts private packages and proxies public registries.
+**Robot Account / Service Account**
+An account in a registry or application for automated access (CI/CD pipelines). Uses token authentication rather than OIDC.
 
 ---
 
@@ -182,10 +185,9 @@ All diagrams included in this RFC:
 | Developer Portal GitOps Integration | sequenceDiagram | §7.6.1 |
 | Standard Integration Model | flowchart | §8.1.1 |
 | Integration Lifecycle | stateDiagram-v2 | §8.1.3 |
-| Harbor Authentication Flow | sequenceDiagram | §8.2.1 |
-| Verdaccio Authentication Flow | sequenceDiagram | §8.3.1 |
-| Developer Portal Identity Integration | sequenceDiagram | §8.4.1 |
-| CI/CD Harbor Integration | sequenceDiagram | §8.2.6 |
+| OIDC Authentication Flow | sequenceDiagram | §8.2.1 |
+| Developer Portal Identity Integration | sequenceDiagram | §8.6.1 |
+| CI/CD Service Account Integration | sequenceDiagram | §8.8.1 |
 
 ---
 

@@ -124,7 +124,7 @@ Denial can originate from either system, and denial from either results in acces
 |--------------|---------------|
 | developer | Development actions even if in Platform-Developers group |
 | project-admin | Project administration even if in Project-Contributors group |
-| harbor-push | Image push even if in appropriate Azure AD group |
+| registry-push | Image/package push even if in appropriate Azure AD group |
 
 The AND logic means:
 - Absence of Azure AD group membership creates an impenetrable boundary—no Keycloak configuration can grant access
@@ -184,8 +184,8 @@ flowchart TB
         R1[developer]
         R2[operator]
         R3[team-alpha-member]
-        R4[harbor-user]
-        R5[verdaccio-publisher]
+        R4[registry-user]
+        R5[package-publisher]
     end
 
     G1 -->|maps to| R1
@@ -207,7 +207,7 @@ Platform-Developers → developer
 
 **Composite Mapping**: One Azure AD group maps to multiple Keycloak roles
 ```
-Platform-Operators → [operator, developer, harbor-admin]
+Platform-Operators → [operator, developer, registry-admin]
 ```
 
 **Conditional Mapping**: Mapping applies only when additional conditions are met
@@ -224,8 +224,8 @@ Keycloak roles exist at two scopes:
 - `operator` — Operational access across tools
 
 **Client Roles**: Apply only to specific clients
-- `harbor:project-admin` — Admin access within Harbor
-- `verdaccio:publisher` — Publish access within Verdaccio
+- `<app>:project-admin` — Admin access within an application
+- `<app>:publisher` — Publish access within a registry
 
 ### 5.3.4 Mapping Constraints
 
@@ -270,26 +270,35 @@ Applications implement authorization through standard patterns:
 
 ### 5.4.3 Application Permission Tables
 
-Each application defines its permission requirements:
+Each application defines its permission requirements. The following tables show generic patterns applicable to any platform application:
 
-**Harbor Permissions**:
+**Container Registry Permissions** (e.g., Harbor):
 
 | Action | Required Claim |
 |--------|----------------|
 | View public projects | (authenticated) |
-| View private projects | `resource_access.harbor.roles` contains `project-{name}-member` |
-| Push images | `resource_access.harbor.roles` contains `project-{name}-developer` |
-| Manage project | `resource_access.harbor.roles` contains `project-{name}-admin` |
-| System administration | `resource_access.harbor.roles` contains `harbor-admin` |
+| View private projects | `resource_access.<registry>.roles` contains `project-{name}-member` |
+| Push images | `resource_access.<registry>.roles` contains `project-{name}-developer` |
+| Manage project | `resource_access.<registry>.roles` contains `project-{name}-admin` |
+| System administration | `resource_access.<registry>.roles` contains `admin` |
 
-**Verdaccio Permissions**:
+**Package Registry Permissions** (e.g., Verdaccio):
 
 | Action | Required Claim |
 |--------|----------------|
 | Read public packages | (authenticated) |
 | Read scoped packages | `groups` contains scope-specific group |
-| Publish packages | `resource_access.verdaccio.roles` contains `publisher` |
-| Manage organization | `resource_access.verdaccio.roles` contains `org-{name}-admin` |
+| Publish packages | `resource_access.<registry>.roles` contains `publisher` |
+| Manage organization | `resource_access.<registry>.roles` contains `org-{name}-admin` |
+
+**Generic Application Permission Pattern**:
+
+| Action | Required Claim |
+|--------|----------------|
+| Basic access | (authenticated) |
+| Resource read | `resource_access.<app>.roles` contains `reader` |
+| Resource write | `resource_access.<app>.roles` contains `contributor` |
+| Resource admin | `resource_access.<app>.roles` contains `admin` |
 
 ### 5.4.4 Denial Handling
 

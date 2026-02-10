@@ -36,37 +36,88 @@ The distinction between "what exists" (GitOps) and "who has what" (administrativ
 
 ### 7.1.3 Repository Structure
 
-Identity-related configuration follows a structured repository layout:
+Identity-related configuration follows the platform stack-based layout:
 
 ```
-platform-config/
-├── apps/
-│   ├── harbor/
-│   │   ├── Chart.yaml
-│   │   ├── values.yaml
-│   │   └── templates/
-│   │       ├── deployment.yaml
-│   │       ├── external-secret.yaml
-│   │       └── crossplane-resources.yaml
-│   └── verdaccio/
-│       ├── Chart.yaml
-│       ├── values.yaml
-│       └── templates/
-│           ├── deployment.yaml
-│           ├── external-secret.yaml
-│           └── crossplane-resources.yaml
-├── identity/
-│   └── keycloak/
-│       ├── Chart.yaml
-│       ├── values.yaml
-│       └── templates/
-│           ├── realm.yaml
-│           ├── clients.yaml
-│           └── roles.yaml
-└── infrastructure/
-    ├── vault/
-    └── crossplane/
+platform/
+├── stacks/
+│   ├── security/                           # Identity & Security Stack
+│   │   ├── charts/
+│   │   │   ├── keycloak/                   # Identity Provider
+│   │   │   │   ├── Chart.yaml
+│   │   │   │   ├── values.yaml
+│   │   │   │   └── templates/
+│   │   │   │       ├── external-secret.yaml
+│   │   │   │       └── ingress.yaml
+│   │   │   ├── vault/                      # Secrets Management
+│   │   │   │   ├── Chart.yaml
+│   │   │   │   ├── values.yaml
+│   │   │   │   └── templates/
+│   │   │   ├── external-secrets/           # Secret Distribution
+│   │   │   ├── crossplane/                 # Infrastructure Automation
+│   │   │   ├── kyverno/                    # Policy Enforcement
+│   │   │   └── falco/                      # Runtime Security
+│   │   ├── target-chart/                   # Stack Orchestrator
+│   │   └── docs/
+│   │       └── DEPLOYMENT_ORDER.md
+│   │
+│   ├── developer-platform/                 # Developer Tools Stack
+│   │   ├── charts/
+│   │   │   ├── harbor/                     # Container Registry
+│   │   │   │   ├── Chart.yaml
+│   │   │   │   ├── values.yaml
+│   │   │   │   └── templates/
+│   │   │   │       ├── external-secret.yaml
+│   │   │   │       └── crossplane-resources.yaml
+│   │   │   ├── verdaccio/                  # NPM Registry
+│   │   │   ├── backstage/                  # Developer Portal
+│   │   │   └── tekton-dashboard/           # CI/CD Dashboard
+│   │   └── target-chart/
+│   │
+│   ├── infrastructure/                     # Core Infrastructure Stack
+│   │   ├── charts/
+│   │   │   ├── argocd/                     # GitOps Engine
+│   │   │   ├── cert-manager/               # TLS Certificates
+│   │   │   ├── ingress-nginx/              # Ingress Controller
+│   │   │   ├── metallb/                    # Load Balancer
+│   │   │   └── external-dns/               # DNS Management
+│   │   └── target-chart/
+│   │
+│   ├── monitoring/                         # Observability Stack
+│   │   └── charts/
+│   │       ├── prometheus/
+│   │       ├── grafana/
+│   │       └── loki/
+│   │
+│   └── platform-data/                      # Data Services Stack
+│       └── charts/
+│           ├── pg-clusters/
+│           ├── mongodb-clusters/
+│           └── kafka-clusters/
+│
+├── bootstrap/                              # Initial Setup
+│   ├── secrets/
+│   │   ├── specs/                          # Secret Specifications
+│   │   └── chart/                          # Secret Deployment Chart
+│   └── scripts/
+│
+├── environments/                           # Environment Configs
+│   └── development.yaml
+│
+└── stack-orchestrator/                     # Application Factory
+    ├── Chart.yaml
+    ├── values.yaml
+    └── values-development.yaml
 ```
+
+**Key Patterns**:
+
+| Pattern | Description |
+|---------|-------------|
+| Stack Organization | Related charts grouped into stacks (security, developer-platform, etc.) |
+| Target Chart | Each stack has a `target-chart/` that orchestrates deployment order |
+| Environment Values | `values-<env>.yaml` files provide environment-specific configuration |
+| Template Coupling | Crossplane resources templated within application charts |
 
 ### 7.1.4 Change Flow
 
@@ -108,15 +159,13 @@ flowchart TB
     end
 
     subgraph External
-        Harbor[Harbor API]
-        Verdaccio[Verdaccio API]
+        Target[Target System APIs]
     end
 
     MR -->|GitOps| CP
     CP -->|Uses| PC
     PC -->|Configures| P
-    P -->|Creates| Harbor
-    P -->|Creates| Verdaccio
+    P -->|Creates/Updates| Target
 ```
 
 ### 7.2.2 Provider Configuration
@@ -135,17 +184,17 @@ Credentials flow: Vault → ESO → Kubernetes Secret → ProviderConfig referen
 
 Crossplane managed resources follow consistent patterns:
 
-**Harbor Project Resource**:
+**Container Registry Project Resource**:
 - Defines project name and metadata
 - Specifies storage quota and limits
 - References ProviderConfig for authentication
 - Outputs project ID for dependent resources
 
-**Verdaccio Organization Resource**:
+**Package Registry Scope Resource**:
 - Defines organization/scope
 - Specifies access policies
 - References ProviderConfig for authentication
-- Outputs organization configuration
+- Outputs scope configuration
 
 ### 7.2.4 Composition Strategy
 
@@ -159,8 +208,8 @@ flowchart TB
 
     subgraph Composition
         COMP[Composition]
-        R1[Harbor Project]
-        R2[Harbor Robot Account]
+        R1[Registry Project]
+        R2[Service Account]
         R3[Vault Secret]
     end
 
@@ -171,7 +220,7 @@ flowchart TB
 ```
 
 Compositions bundle related resources:
-- A "project" composition creates Harbor project + robot account + Vault secret
+- A "project" composition creates registry project + service account + Vault secret
 - Single claim triggers creation of all required resources
 - Consistent resource creation across requests
 
@@ -189,18 +238,18 @@ application:
 
 identity:
   # Keycloak client configuration
-  clientId: "harbor"
+  clientId: "my-application"
   realm: "platform"
 
 secrets:
   # External Secrets configuration
-  vaultPath: "secret/platform/harbor"
+  vaultPath: "secret/platform/my-application"
   refreshInterval: "1h"
 
 crossplane:
   # Crossplane managed resources
   enabled: true
-  projects: []  # List of projects to create
+  resources: []  # List of resources to create
 ```
 
 This approach ensures:

@@ -75,178 +75,206 @@ stateDiagram-v2
 
 **Operational**: Monitor integration health, handle incidents
 
-## 8.2 Harbor Integration
+## 8.2 Authentication Integration
 
-### 8.2.1 Authentication Flow
+### 8.2.1 OIDC Authentication Flow
 
-Harbor authenticates users through Keycloak OIDC:
+Applications authenticate users through Keycloak OIDC:
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant H as Harbor
+    participant App as Application
     participant KC as Keycloak
     participant AAD as Azure AD
 
-    U->>H: Access Harbor UI
-    H->>KC: Redirect to Keycloak
+    U->>App: Access Application
+    App->>KC: Redirect to Keycloak
     KC->>AAD: Redirect to Azure AD
     U->>AAD: Authenticate
     AAD->>KC: ID Token
-    KC->>H: Access Token
-    H->>H: Create Session
-    H->>U: Harbor UI Access
+    KC->>App: Access Token
+    App->>App: Create Session
+    App->>U: Application Access
 ```
 
-### 8.2.2 Authorization Model
+### 8.2.2 Keycloak Client Configuration
 
-Harbor authorization maps Keycloak claims to Harbor permissions:
+Each application requires a Keycloak client with:
 
-| Keycloak Claim | Harbor Permission |
-|----------------|-------------------|
-| `groups` contains project group | Project member access |
-| `resource_access.harbor.roles` contains `developer` | Push/pull access |
-| `resource_access.harbor.roles` contains `admin` | Project administration |
-| `resource_access.harbor.roles` contains `harbor-admin` | System administration |
+| Setting | Description | Example |
+|---------|-------------|---------|
+| Client ID | Unique identifier for application | `my-application` |
+| Client Protocol | Authentication protocol | `openid-connect` |
+| Access Type | Confidential (with secret) or public | `confidential` |
+| Valid Redirect URIs | Allowed callback URLs | `https://app.example.com/callback` |
+| Token Claims | Claims included in tokens | Groups, roles, email |
 
-Harbor enforces these permissions through OIDC group-to-role mapping configured within Harbor.
+### 8.2.3 Token Claim Mapping
 
-### 8.2.3 Keycloak Client Configuration
+Keycloak tokens include claims for authorization decisions:
 
-Harbor requires a Keycloak client with:
+| Claim | Source | Purpose |
+|-------|--------|---------|
+| `sub` | Keycloak user ID | Unique user identifier |
+| `email` | Azure AD | User email address |
+| `groups` | Azure AD (via federation) | Group memberships |
+| `resource_access.<client>.roles` | Keycloak client roles | Application-specific roles |
+| `realm_access.roles` | Keycloak realm roles | Cross-application roles |
 
-| Setting | Value |
-|---------|-------|
-| Client ID | `harbor` |
-| Client Protocol | `openid-connect` |
-| Access Type | `confidential` |
-| Valid Redirect URIs | Harbor callback URLs |
-| Token Claims | Groups, roles, email |
+## 8.3 Authorization Integration
 
-### 8.2.4 Secret Requirements
+### 8.3.1 Authorization Model
 
-Harbor requires secrets distributed through ESO:
-
-| Secret | Vault Path | Purpose |
-|--------|------------|---------|
-| OIDC Client Secret | `secret/platform/harbor/oidc-client` | Keycloak authentication |
-| Database Credentials | `secret/platform/harbor/db-credentials` | PostgreSQL access |
-| Admin Password | `secret/platform/harbor/admin-password` | Initial admin setup |
-| Storage Credentials | `secret/platform/harbor/storage` | Object storage access |
-
-### 8.2.5 Crossplane Resources
-
-Harbor resources managed through Crossplane:
-
-**Harbor Projects**:
-- Created through Crossplane Harbor provider
-- Defined in Helm templates
-- Lifecycle tied to application deployment
-
-**Robot Accounts**:
-- Service accounts for CI/CD access
-- Credentials stored in Vault after creation
-- Scoped to specific projects
-
-### 8.2.6 CI/CD Integration
-
-CI/CD pipelines access Harbor through robot accounts:
+Applications derive permissions from Keycloak token claims:
 
 ```mermaid
-sequenceDiagram
-    participant CI as CI Pipeline
-    participant V as Vault
-    participant H as Harbor
+flowchart LR
+    subgraph AzureAD["Azure AD (Ceiling)"]
+        Groups[Group Memberships]
+    end
 
-    CI->>V: Retrieve Robot Credentials
-    V->>CI: Robot Token
-    CI->>H: Authenticate with Robot Token
-    H->>H: Validate Token
-    H->>CI: Access Granted
-    CI->>H: Push/Pull Images
+    subgraph Keycloak["Keycloak (Broker)"]
+        Roles[Client Roles]
+        Mappers[Protocol Mappers]
+    end
+
+    subgraph Application["Application"]
+        Perms[Permissions]
+    end
+
+    Groups -->|Federation| Mappers
+    Mappers -->|Token Claims| Roles
+    Roles -->|Mapped| Perms
 ```
 
-Robot accounts are not subject to OIDC authentication—they use direct token authentication suitable for automated systems.
+### 8.3.2 Role Mapping Pattern
 
-## 8.3 Verdaccio Integration
+Applications map Keycloak claims to internal permissions:
 
-### 8.3.1 Authentication Flow
+| Application Concept | Keycloak Source | Example Mapping |
+|---------------------|-----------------|-----------------|
+| Read Access | Group membership | `groups` contains `team-developers` |
+| Write Access | Client role | `resource_access.<client>.roles` contains `contributor` |
+| Admin Access | Client role | `resource_access.<client>.roles` contains `admin` |
+| Super Admin | Realm role | `realm_access.roles` contains `platform-admin` |
 
-Verdaccio authenticates users through Keycloak:
+### 8.3.3 Permission Inheritance
+
+Permissions follow a hierarchical model:
+
+```
+Azure AD Group Membership (Ceiling)
+    └── Keycloak Realm Role
+        └── Keycloak Client Role
+            └── Application Permission
+```
+
+Applications MUST NOT grant permissions that exceed what the user's Azure AD groups permit.
+
+## 8.4 Secrets Integration
+
+### 8.4.1 Secret Distribution Pattern
+
+Secrets flow from Vault to applications through ESO:
 
 ```mermaid
-sequenceDiagram
-    participant U as User
-    participant V as Verdaccio
-    participant KC as Keycloak
-
-    U->>V: npm login
-    V->>KC: Redirect to Keycloak
-    U->>KC: Authenticate
-    KC->>V: Access Token
-    V->>U: npm Token
+flowchart LR
+    V[Vault] -->|PushSecret| ESO[External Secrets Operator]
+    ESO -->|Creates| K8s[Kubernetes Secret]
+    K8s -->|Mounted| App[Application Pod]
 ```
 
-For web UI access, standard OIDC redirect flow applies. For CLI access, Verdaccio issues npm-compatible tokens after OIDC authentication.
+### 8.4.2 Common Secret Types
 
-### 8.3.2 Authorization Model
+Applications typically require these secret categories:
 
-Verdaccio authorization maps Keycloak claims to package permissions:
+| Secret Type | Vault Path Pattern | Purpose |
+|-------------|-------------------|---------|
+| OIDC Client Secret | `secret/platform/<app>/oidc-client` | Keycloak authentication |
+| Database Credentials | `secret/platform/<app>/db-credentials` | Database access |
+| API Keys | `secret/platform/<app>/api-keys` | External service access |
+| TLS Certificates | `secret/platform/<app>/tls` | HTTPS termination |
+| Service Tokens | `secret/platform/<app>/service-token` | Inter-service auth |
 
-| Keycloak Claim | Verdaccio Permission |
-|----------------|---------------------|
-| `groups` contains scope group | Read packages in scope |
-| `resource_access.verdaccio.roles` contains `publisher` | Publish packages |
-| `resource_access.verdaccio.roles` contains `org-admin` | Manage organization |
+### 8.4.3 ExternalSecret Configuration
 
-### 8.3.3 Keycloak Client Configuration
+Each application defines ExternalSecret resources in its Helm chart:
 
-Verdaccio requires a Keycloak client with:
+```yaml
+# Conceptual structure (not actual implementation)
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Release.Name }}-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: {{ .Release.Name }}-secrets
+  data:
+    - secretKey: oidc-client-secret
+      remoteRef:
+        key: secret/platform/{{ .Values.application.name }}/oidc-client
+        property: client_secret
+```
 
-| Setting | Value |
-|---------|-------|
-| Client ID | `verdaccio` |
-| Client Protocol | `openid-connect` |
-| Access Type | `confidential` |
-| Valid Redirect URIs | Verdaccio callback URLs |
-| Token Claims | Groups, roles |
+## 8.5 Crossplane Resource Integration
 
-### 8.3.4 Secret Requirements
+### 8.5.1 Managed Resource Pattern
 
-Verdaccio requires secrets distributed through ESO:
+Applications requiring external resources use Crossplane:
 
-| Secret | Vault Path | Purpose |
-|--------|------------|---------|
-| OIDC Client Secret | `secret/platform/verdaccio/oidc-client` | Keycloak authentication |
-| Storage Credentials | `secret/platform/verdaccio/storage` | Package storage access |
-| JWT Secret | `secret/platform/verdaccio/jwt-secret` | Token signing |
+```mermaid
+flowchart TB
+    subgraph Git
+        MR[Managed Resource YAML]
+    end
 
-### 8.3.5 Crossplane Resources
+    subgraph Cluster
+        CP[Crossplane]
+        PC[ProviderConfig]
+        P[Provider]
+    end
 
-Verdaccio resources managed through Crossplane:
+    subgraph External
+        Target[Target System API]
+    end
 
-**Organizations/Scopes**:
-- Package scopes for team/project isolation
-- Access policies tied to Keycloak groups
-- Lifecycle managed through GitOps
+    MR -->|GitOps| CP
+    CP -->|Uses| PC
+    PC -->|Configures| P
+    P -->|Creates/Updates| Target
+```
 
-### 8.3.6 Package Scope Model
+### 8.5.2 Common Resource Types
 
-Packages are organized by scope aligned with organizational structure:
+| Resource Category | Examples | Provider Type |
+|-------------------|----------|---------------|
+| Registry Resources | Projects, robot accounts | Container Registry Provider |
+| Package Resources | Scopes, organizations | Package Registry Provider |
+| Database Resources | Schemas, users | Database Provider (PostgreSQL, etc.) |
+| Cloud Resources | Storage, DNS | Cloud Provider (AWS/Azure/GCP) |
 
-| Scope | Access Group | Example Package |
-|-------|--------------|-----------------|
-| `@platform` | Platform-Developers | `@platform/common-utils` |
-| `@team-alpha` | Team-Alpha-Members | `@team-alpha/service-lib` |
-| `@shared` | All authenticated | `@shared/logging` |
+### 8.5.3 Template Coupling
 
-Scope access is enforced through Keycloak group membership—users can only access scopes their groups permit.
+Crossplane resources MUST be templated within application Helm charts:
 
-## 8.4 Developer Portal Integration (Reference: RFC-DEVELOPER-PLATFORM)
+**Key Principle**: Resource lifecycle tied to application lifecycle.
+
+This ensures:
+- Single values file controls both application and resources
+- Deletion of application removes associated resources
+- No orphaned resources in target systems
+- Clear ownership and responsibility
+
+## 8.6 Developer Portal Integration (Reference: RFC-DEVELOPER-PLATFORM)
 
 The developer portal (Backstage) integration is defined in RFC-DEVELOPER-PLATFORM (planned).
 
-### 8.4.1 Identity Integration Requirements
+### 8.6.1 Identity Integration Requirements
 
 This RFC establishes the identity integration requirements for the developer portal:
 
@@ -264,7 +292,7 @@ sequenceDiagram
     DP->>U: Portal Access
 ```
 
-### 8.4.2 Keycloak Client Requirements
+### 8.6.2 Keycloak Client Requirements
 
 The developer portal requires a Keycloak client:
 
@@ -276,26 +304,16 @@ The developer portal requires a Keycloak client:
 | Valid Redirect URIs | Portal callback URLs |
 | Token Claims | Groups, roles, permissions |
 
-### 8.4.3 Secret Requirements
-
-Developer portal secrets are managed per RFC-SECOPS-0001:
-
-| Secret | Vault Path | Purpose |
-|--------|------------|---------|
-| OIDC Client Secret | `secret/platform/developer-portal/oidc-client` | Keycloak authentication |
-
-Additional secrets (GitHub tokens, database credentials) are defined in RFC-DEVELOPER-PLATFORM.
-
-### 8.4.4 Authorization Model
+### 8.6.3 Authorization Model
 
 RFC-DEVELOPER-PLATFORM defines the capability-based authorization model where:
 - Keycloak token claims determine available UI elements and actions
 - Users see only what they can do (no runtime authorization blocking)
 - Authorization is enforced at the UI layer through visibility
 
-## 8.5 Extension Model
+## 8.7 Extension Model
 
-### 8.5.1 Adding New Applications
+### 8.7.1 Adding New Applications
 
 New applications follow the established integration pattern:
 
@@ -308,7 +326,7 @@ New applications follow the established integration pattern:
 7. **Configure Application**: Set up OIDC integration within the application
 8. **Validate Integration**: Test authentication and authorization flows
 
-### 8.5.2 Integration Checklist
+### 8.7.2 Integration Checklist
 
 | Requirement | Verification |
 |-------------|--------------|
@@ -320,7 +338,7 @@ New applications follow the established integration pattern:
 | Crossplane resources reconciling | Resources exist in target system |
 | GitOps configuration complete | All config committed to Git |
 
-### 8.5.3 Provider Development
+### 8.7.3 Provider Development
 
 When Crossplane providers don't exist for an application:
 
@@ -339,15 +357,47 @@ When Crossplane providers don't exist for an application:
 - Full control over resource management
 - Significant development investment
 
-### 8.5.4 Common Integration Challenges
+### 8.7.4 Common Integration Challenges
 
 | Challenge | Mitigation |
 |-----------|------------|
 | Application lacks OIDC support | Use OIDC proxy (OAuth2 Proxy) |
 | Application has incompatible token format | Configure Keycloak protocol mappers |
 | Application requires specific claims | Add custom claims through Keycloak |
-| No Crossplane provider exists | Use alternative approaches (8.5.3) |
+| No Crossplane provider exists | Use alternative approaches (8.7.3) |
 | Application manages its own secrets | Inject through init container or sidecar |
+
+## 8.8 CI/CD Integration
+
+### 8.8.1 Service Account Authentication
+
+CI/CD pipelines require non-interactive authentication:
+
+```mermaid
+sequenceDiagram
+    participant CI as CI Pipeline
+    participant V as Vault
+    participant App as Target Application
+
+    CI->>V: Authenticate (Kubernetes auth)
+    V->>CI: Service Token
+    CI->>App: Authenticate with Service Token
+    App->>App: Validate Token
+    App->>CI: Access Granted
+    CI->>App: Perform Operations
+```
+
+### 8.8.2 Robot Accounts
+
+Applications that support robot/service accounts:
+
+| Account Type | Purpose | Credential Source |
+|--------------|---------|-------------------|
+| Robot Account | Automated API access | Vault (created by Crossplane) |
+| Service Account | Kubernetes workload identity | Kubernetes ServiceAccount |
+| API Token | External service access | Vault |
+
+Robot accounts bypass OIDC authentication—they use direct token authentication suitable for automated systems.
 
 ---
 

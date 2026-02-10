@@ -181,13 +181,11 @@ secret/
 │   ├── keycloak/
 │   │   ├── admin-credentials
 │   │   └── database-credentials
-│   ├── harbor/
+│   ├── <application-name>/           # Per-application secrets
 │   │   ├── admin-credentials
 │   │   ├── database-credentials
 │   │   └── oidc-client-secret
-│   └── verdaccio/
-│       ├── oidc-client-secret
-│       └── storage-credentials
+│   └── ...
 └── shared/
     └── certificates/
         └── wildcard-tls
@@ -253,7 +251,7 @@ ESO creates standard Kubernetes Secrets that applications consume through:
 
 Crossplane extends Kubernetes to manage external resources through declarative definitions. In this architecture, Crossplane:
 
-- Provisions application-specific resources (Harbor projects, Verdaccio organizations)
+- Provisions application-specific resources (registry projects, package scopes, etc.)
 - Reconciles declared resource state with actual state
 - Integrates with Helm charts for resource definition templating
 - Enables GitOps management of application resources
@@ -272,16 +270,17 @@ Crossplane extends Kubernetes to manage external resources through declarative d
 **Inbound Interface: Managed Resources**
 
 Resource definitions specify:
-- Resource type (Harbor project, Verdaccio org, etc.)
+- Resource type (registry project, package scope, database schema, etc.)
 - Resource configuration
 - Provider reference (authentication)
 
 **Outbound Interface: Provider APIs**
 
-Crossplane providers interact with:
-- Harbor API for registry resources
-- Verdaccio API for package registry resources
-- Other application APIs as providers are added
+Crossplane providers interact with target system APIs:
+- Container registry APIs for image storage resources
+- Package registry APIs for package scope resources
+- Database APIs for schema and user resources
+- Cloud provider APIs for infrastructure resources
 
 ### 4.5.4 Provider Configuration
 
@@ -332,7 +331,7 @@ RFC-DEVELOPER-PLATFORM defines the portal's internal architecture, capability-ba
 
 ## 4.7 Target Applications
 
-### 4.7.1 Harbor Container Registry
+### 4.7.1 Container Registry Integration
 
 **Role**: Stores container images for platform workloads
 
@@ -342,13 +341,13 @@ RFC-DEVELOPER-PLATFORM defines the portal's internal architecture, capability-ba
 - Secrets (database credentials, OIDC client secret) from Vault via ESO
 
 **Authorization Model**:
-- Project-level access controlled by Harbor roles
-- Harbor roles mapped from Keycloak group/role claims
+- Project-level access controlled by registry roles
+- Registry roles mapped from Keycloak group/role claims
 - Robot accounts for CI/CD access (credentials in Vault)
 
-### 4.7.2 Verdaccio NPM Registry
+### 4.7.2 Package Registry Integration
 
-**Role**: Hosts private npm packages and proxies public registry
+**Role**: Hosts private packages and proxies public registries
 
 **Integration Points**:
 - OIDC authentication through Keycloak
@@ -356,7 +355,7 @@ RFC-DEVELOPER-PLATFORM defines the portal's internal architecture, capability-ba
 - Secrets (OIDC client secret, storage credentials) from Vault via ESO
 
 **Authorization Model**:
-- Package scope access controlled by Verdaccio groups
+- Package scope access controlled by registry groups
 - Groups derived from Keycloak claims
 - Publish tokens for CI/CD (credentials in Vault)
 

@@ -38,7 +38,7 @@ The architecture enforces a strict authorization hierarchy where Azure AD permis
 | Application authorization (what users can do) | Service-to-service authentication |
 | OIDC/OAuth browser-based flows | SSH, database, kubectl access |
 | API access via bearer tokens from OIDC | AI agent identity management |
-| Harbor, Verdaccio integration; Developer portal authentication (see RFC-DEVELOPER-PLATFORM) | Network-level access controls |
+| Platform application integration; Developer portal authentication (see RFC-DEVELOPER-PLATFORM) | Network-level access controls |
 
 This RFC addresses **interactive human users accessing web interfaces**—not automated workloads, infrastructure access, or machine identity.
 
@@ -117,18 +117,22 @@ RFC-SECOPS-0001 is the authoritative specification for secrets management—not 
 
 8. [Application Integration](./08-application-integration.md)
    - 8.1 Integration Patterns
-   - 8.2 Harbor Integration
-   - 8.3 Verdaccio Integration
-   - 8.4 Developer Portal Integration *(Reference: RFC-DEVELOPER-PLATFORM)*
-   - 8.5 Extension Model
+   - 8.2 Authentication Integration
+   - 8.3 Authorization Integration
+   - 8.4 Secrets Integration
+   - 8.5 Crossplane Resource Integration
+   - 8.6 Developer Portal Integration *(Reference: RFC-DEVELOPER-PLATFORM)*
+   - 8.7 Extension Model
+   - 8.8 CI/CD Integration
 
 ### Supplementary Sections
 
 9. [Rationale](./09-rationale.md)
-   - 9.1 Alternative Identity Architectures
-   - 9.2 Alternative Authorization Models
-   - 9.3 Alternative Secrets Management Approaches
-   - 9.4 Alternative GitOps Strategies
+   - 9.1 Organizational Authority Boundaries
+   - 9.2 Alternative Identity Architectures
+   - 9.3 Alternative Authorization Models
+   - 9.4 Alternative Secrets Management Approaches
+   - 9.5 Alternative GitOps Strategies
 
 10. [Evolution](./10-evolution.md)
     - 10.1 Anticipated Extensions
@@ -174,7 +178,7 @@ Evaluating security boundaries and controls:
 Understanding operational integration:
 1. [Components](./04-components.md) — System components
 2. [GitOps Integration](./07-gitops-integration.md) — Deployment model
-3. [Application Integration](./08-application-integration.md) — Harbor and Verdaccio
+3. [Application Integration](./08-application-integration.md) — Platform applications
 4. [Secrets Management §6.3-6.4](./06-secrets-management.md#63-namespace-distribution) — Secret distribution
 
 ### For Application Developers

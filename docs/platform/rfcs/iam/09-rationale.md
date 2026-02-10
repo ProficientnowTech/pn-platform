@@ -9,9 +9,124 @@ Category: Standards Track                                  Rationale
 
 ---
 
-## 9.1 Alternative Identity Architectures
+## 9.1 Organizational Authority Boundaries
 
-### 9.1.1 Direct Azure AD Integration
+This section explains the **primary rationale** for the Azure AD federation architecture: the separation of organizational authority between management/HR and technology teams.
+
+### 9.1.1 The Fundamental Problem
+
+Organizations have distinct functional domains with different responsibilities, risks, and authority:
+
+| Domain | Function | Responsibility | Risk Profile |
+|--------|----------|----------------|--------------|
+| **Management/HR** | People operations | Hiring, termination, team assignment | Employment, legal, compliance |
+| **Technology Teams** | Platform & application delivery | Technical implementation, access control | Operational, security, availability |
+
+These domains require different systems and workflows. Forcing technology decisions on management creates friction; forcing HR processes on engineers creates inefficiency.
+
+### 9.1.2 Identity Lifecycle Ownership
+
+**Who should add a developer to the technology team?**
+
+When a new developer joins the organization:
+- **HR** adds them to Azure AD and assigns them to the "Developers" group
+- This is HR's responsibility—they manage the employment relationship
+- HR already does this in Azure AD for email, Office 365, and other Microsoft services
+
+**Who should remove access when someone leaves?**
+
+When an employee departs:
+- **HR** removes them from Azure AD as part of the termination process
+- This happens automatically through existing HR workflows
+- The engineering manager or platform admin should NOT be responsible for this
+
+**Why this matters:**
+
+If Keycloak maintained its own user database:
+- HR would need to learn a new system
+- Termination checklists would require additional steps
+- Risk of orphaned accounts if HR forgets to remove users from Keycloak
+- Duplication of identity management effort
+
+### 9.1.3 Leveraging Existing Trust
+
+Management already uses Azure AD:
+- It's the organization's identity provider for Microsoft 365
+- HR knows how to add/remove users and manage groups
+- Security policies (MFA, conditional access) are already configured
+- Audit logging is centralized in Azure AD
+
+**Build around existing trust rather than replace it:**
+
+Instead of asking management to learn Keycloak and trust it for identity, this architecture:
+1. Keeps Azure AD as the identity authority (what management trusts)
+2. Uses Keycloak as a protocol broker (what technology needs)
+3. Preserves existing HR workflows (no retraining required)
+4. Maintains single termination process (Azure AD removal = platform access revocation)
+
+### 9.1.4 Separation of Concerns
+
+```mermaid
+flowchart TB
+    subgraph Management["Management Domain"]
+        HR[HR/Admin]
+        AAD[Azure AD]
+        HR -->|"Manages Users & Groups"| AAD
+    end
+
+    subgraph Technology["Technology Domain"]
+        PT[Platform Team]
+        KC[Keycloak]
+        Apps[Platform Apps]
+        PT -->|"Manages Clients & Roles"| KC
+        KC -->|"Authenticates"| Apps
+    end
+
+    AAD -->|"Federation (Read-Only)"| KC
+
+    style Management fill:#e1f5fe
+    style Technology fill:#fff3e0
+```
+
+| Responsibility | Managed By | System |
+|----------------|------------|--------|
+| User lifecycle (create, disable, terminate) | HR | Azure AD |
+| Group membership (team assignment) | HR/Management | Azure AD |
+| Application clients | Platform Team | Keycloak |
+| Application roles | Platform Team | Keycloak |
+| Role-to-group mapping | Platform Team | Keycloak |
+| Application permissions | Application Team | Application |
+
+### 9.1.5 Risk Mitigation
+
+This architecture mitigates organizational risks:
+
+| Risk | Without Federation | With Federation |
+|------|-------------------|-----------------|
+| **Orphaned accounts** | HR must remember to update Keycloak | Azure AD termination revokes all access |
+| **Inconsistent access** | Multiple places to check | Single source of truth (Azure AD) |
+| **Audit gaps** | Auditors must check multiple systems | Azure AD audit log covers identity |
+| **Training overhead** | HR must learn new system | HR uses familiar tools |
+| **Process compliance** | New procedures needed | Existing procedures work |
+
+### 9.1.6 Authority Ceiling Principle
+
+The architecture enforces an **authority ceiling**:
+
+- **Azure AD** defines what permissions are possible (group memberships)
+- **Keycloak** can only refine permissions within that ceiling
+- **Applications** can only grant what Keycloak tokens permit
+
+This means:
+- Platform team cannot grant access to someone HR hasn't authorized
+- Application teams cannot bypass platform controls
+- No privilege escalation path exists outside organizational approval
+
+---
+
+## 9.2 Alternative Identity Architectures
+
+### 9.2.1 Direct Azure AD Integration
 
 **Description**: Each application integrates directly with Azure AD for authentication, eliminating Keycloak as an intermediary.
 
@@ -34,7 +149,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Direct Azure AD integration sacrifices platform-layer flexibility for apparent simplicity. The operational cost of managing inconsistent integrations exceeds the cost of operating Keycloak.
 
-### 9.1.2 Keycloak as Primary Identity (No Azure AD Federation)
+### 9.2.2 Keycloak as Primary Identity (No Azure AD Federation)
 
 **Description**: Keycloak serves as the primary identity provider with its own user database, independent of Azure AD.
 
@@ -57,7 +172,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Independent Keycloak identity would create a permission escalation pathway and duplicate identity management. Enterprise identity integration is a requirement, not an option.
 
-### 9.1.3 Azure AD B2C for Platform Identity
+### 9.2.3 Azure AD B2C for Platform Identity
 
 **Description**: Use Azure AD B2C as the platform identity provider instead of Keycloak.
 
@@ -78,9 +193,9 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Azure AD B2C serves a different use case (external customer identity). Keycloak is purpose-built for the platform identity broker role this architecture requires.
 
-## 9.2 Alternative Authorization Models
+## 9.3 Alternative Authorization Models
 
-### 9.2.1 Application-Native Authorization
+### 9.3.1 Application-Native Authorization
 
 **Description**: Each application manages its own authorization using its native capabilities, without deriving permissions from Keycloak.
 
@@ -103,7 +218,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Application-native authorization creates the exact permission escalation problem this architecture addresses. Centralized authorization through Keycloak is essential.
 
-### 9.2.2 Flat Permission Model
+### 9.3.2 Flat Permission Model
 
 **Description**: All authenticated users receive the same permissions; no role differentiation.
 
@@ -125,7 +240,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Flat permissions are incompatible with enterprise security requirements and the multi-team platform model.
 
-### 9.2.3 Permission Synchronization (Keycloak → Azure AD)
+### 9.3.3 Permission Synchronization (Keycloak → Azure AD)
 
 **Description**: Instead of Azure AD constraining Keycloak, synchronize Keycloak permissions back to Azure AD, making Keycloak the authority.
 
@@ -147,9 +262,9 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: This approach inverts the trust hierarchy. Enterprise identity must constrain platform identity, not the reverse.
 
-## 9.3 Alternative Secrets Management Approaches
+## 9.4 Alternative Secrets Management Approaches
 
-### 9.3.1 Kubernetes Secrets Only
+### 9.4.1 Kubernetes Secrets Only
 
 **Description**: Use native Kubernetes Secrets without Vault, relying on Kubernetes RBAC for access control.
 
@@ -173,7 +288,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Kubernetes Secrets lack the lifecycle management, audit capabilities, and centralized control required for enterprise secrets management.
 
-### 9.3.2 Cloud Provider Secret Managers (Azure Key Vault)
+### 9.4.2 Cloud Provider Secret Managers (Azure Key Vault)
 
 **Description**: Use Azure Key Vault instead of HashiCorp Vault for secrets management.
 
@@ -194,7 +309,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Azure Key Vault is a viable alternative but would introduce vendor lock-in and require abandoning existing Vault investment. For organizations without existing Vault infrastructure, this alternative merits consideration.
 
-### 9.3.3 GitOps for Secrets (Sealed Secrets, SOPS)
+### 9.4.3 GitOps for Secrets (Sealed Secrets, SOPS)
 
 **Description**: Store encrypted secrets in Git using Sealed Secrets or SOPS, decrypted at deployment time.
 
@@ -217,9 +332,9 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Git-based secret management is appropriate for bootstrapping secrets and non-sensitive configuration, but not for production secret management at scale.
 
-### 9.3.4 Per-Application Secret Stores
+### 9.4.4 Per-Application Secret Stores
 
-**Description**: Each application manages its own secrets using its native capabilities (Harbor's built-in secrets, etc.).
+**Description**: Each application manages its own secrets using its native capabilities (application built-in secret stores, etc.).
 
 **Why It Was Attractive**:
 - Application teams have full control
@@ -240,9 +355,9 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Distributed secret management creates the secret sprawl problem this architecture addresses.
 
-## 9.4 Alternative GitOps Strategies
+## 9.5 Alternative GitOps Strategies
 
-### 9.4.1 Full GitOps for Access Control
+### 9.5.1 Full GitOps for Access Control
 
 **Description**: Manage all access control, including user-role assignments, through GitOps.
 
@@ -264,7 +379,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: GitOps is appropriate for structural configuration (what clients exist) but not for access assignments (who has which role). The boundary preserves operational flexibility for access management.
 
-### 9.4.2 Manual Configuration Only
+### 9.5.2 Manual Configuration Only
 
 **Description**: All configuration managed through administrative interfaces, no GitOps.
 
@@ -286,7 +401,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Manual configuration creates operational risk and compliance issues. GitOps provides essential version control and audit capabilities.
 
-### 9.4.3 Terraform Instead of Crossplane
+### 9.5.3 Terraform Instead of Crossplane
 
 **Description**: Use Terraform for resource provisioning instead of Crossplane.
 
@@ -307,7 +422,7 @@ Category: Standards Track                                  Rationale
 
 **Conclusion**: Crossplane's Kubernetes-native model and continuous reconciliation better suit the GitOps architecture. Organizations with existing Terraform investment could use Crossplane's Terraform provider as a bridge.
 
-### 9.4.4 ArgoCD ApplicationSets for Resource Generation
+### 9.5.4 ArgoCD ApplicationSets for Resource Generation
 
 **Description**: Use ArgoCD ApplicationSets to generate Crossplane resources instead of Helm templating.
 

@@ -35,19 +35,15 @@ flowchart TB
 
     subgraph Application["Application Layer"]
         DP[Developer Portal]
-        H[Harbor]
-        VD[Verdaccio]
+        Apps[Platform Applications]
     end
 
     AAD -->|Identity Federation| KC
     KC -->|Token Issuance| DP
-    KC -->|Token Issuance| H
-    KC -->|Token Issuance| VD
+    KC -->|Token Issuance| Apps
     V -->|Secrets| ESO
-    ESO -->|Kubernetes Secrets| H
-    ESO -->|Kubernetes Secrets| VD
-    CP -->|Managed Resources| H
-    CP -->|Managed Resources| VD
+    ESO -->|Kubernetes Secrets| Apps
+    CP -->|Managed Resources| Apps
     DP -->|Resource Requests| CP
 ```
 
@@ -57,7 +53,7 @@ flowchart TB
 
 **Infrastructure Layer**: Vault manages secrets, External Secrets Operator distributes secrets to namespaces, and Crossplane provisions application-specific resources.
 
-**Application Layer**: Platform tools (Harbor, Verdaccio, and the developer portal) consume identity services from Keycloak and secrets from ESO while being managed through Crossplane. The developer portal (Backstage) architecture is defined in RFC-DEVELOPER-PLATFORM.
+**Application Layer**: Platform applications (container registries, package registries, developer portal, monitoring tools) consume identity services from Keycloak and secrets from ESO while being managed through Crossplane. The developer portal (Backstage) architecture is defined in RFC-DEVELOPER-PLATFORM.
 
 ### 3.1.2 Design Philosophy
 
@@ -173,19 +169,20 @@ Crossplane holds authority over:
 
 | Domain | Scope |
 |--------|-------|
-| Resource Provisioning | Creating resources in target systems (Harbor projects, etc.) |
+| Resource Provisioning | Creating resources in target systems (registry projects, package scopes, etc.) |
 | Resource Reconciliation | Ensuring declared state matches actual state |
 | Resource Lifecycle | Creation, update, deletion of managed resources |
 
 ### 3.3.5 Application Authority Domains
 
-Individual applications (Harbor, Verdaccio, and the developer portal) hold authority only over their internal operations:
+Individual platform applications hold authority only over their internal operations:
 
-| Application | Authority Scope |
-|-------------|-----------------|
-| Harbor | Image storage, vulnerability scanning, replication |
-| Verdaccio | Package storage, proxy caching, package metadata |
+| Application Type | Authority Scope |
+|------------------|-----------------|
+| Container Registry | Image storage, vulnerability scanning, replication |
+| Package Registry | Package storage, proxy caching, package metadata |
 | Developer Portal | See RFC-DEVELOPER-PLATFORM |
+| Monitoring Tools | Dashboard access, alert management, metric queries |
 
 Applications do NOT hold authority over authentication or coarse-grained authorization—these decisions are made by Keycloak and enforced by the application.
 
@@ -240,7 +237,7 @@ flowchart LR
     end
 
     subgraph Application
-        APP[Harbor/Verdaccio/Developer Portal]
+        APP[Platform Application]
     end
 
     KC -->|Access Token| V2

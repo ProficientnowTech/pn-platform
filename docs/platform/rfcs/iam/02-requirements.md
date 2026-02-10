@@ -17,7 +17,7 @@ This RFC addresses **human user authentication to web applications** and **appli
 
 | In Scope | Description |
 |----------|-------------|
-| Web UI authentication | Users logging into Harbor, Verdaccio, and developer portal (Backstage, see RFC-DEVELOPER-PLATFORM) via browser |
+| Web UI authentication | Users logging into platform applications (container registry, package registry, developer portal) via browser |
 | Application authorization | What actions users can perform within these applications |
 | OIDC/OAuth flows | Browser-based authentication protocols |
 | API authorization | REST API access using bearer tokens from OIDC flows |
@@ -44,7 +44,7 @@ The platform requires an identity and access management architecture that:
 5. Integrates with GitOps workflows for declarative configuration management
 6. Enables developer self-service within organizational permission boundaries
 
-The architecture must serve immediate integration requirements for Harbor container registry and Verdaccio npm registry while establishing patterns applicable to future platform tools with web interfaces.
+The architecture must establish generic patterns applicable to any platform tool with a web interface, including container registries, package registries, developer portals, and monitoring dashboards.
 
 ## 2.2 Design Goals
 
@@ -159,7 +159,7 @@ While these concerns share common tools with this architecture (Keycloak for ide
 |----------------|----------------------------------|
 | Application-level authorization | Infrastructure-level access |
 | OIDC tokens for web applications | SSH certificates, database credentials |
-| Who can use Harbor, Verdaccio | Who can SSH to nodes, connect to databases |
+| Who can use platform applications | Who can SSH to nodes, connect to databases |
 | Keycloak roles → Application permissions | Keycloak identity → Infrastructure access |
 
 The future RFC would define how identity (established by this RFC) translates into infrastructure access rights, potentially using:
@@ -279,7 +279,7 @@ This invariant ensures that enterprise permission changes propagate to the platf
 
 ### Invariant 8 — Crossplane Template Coupling
 
-Crossplane provider resources that create application-specific entities (Harbor projects, Verdaccio organizations) MUST be templated through the same Helm chart values that deploy the parent application.
+Crossplane provider resources that create application-specific entities (registry projects, package scopes, etc.) MUST be templated through the same Helm chart values that deploy the parent application.
 
 Resource definitions MUST NOT exist independently of their associated application deployment.
 
@@ -337,8 +337,7 @@ The architecture succeeds when the following conditions are met:
 
 | Criterion | Validation |
 |-----------|------------|
-| Harbor authenticates through Keycloak | OIDC integration functional |
-| Verdaccio authenticates through Keycloak | OIDC integration functional |
+| Platform applications authenticate through Keycloak | OIDC integration functional for all integrated apps |
 | Developer portal authenticates through Keycloak | See RFC-DEVELOPER-PLATFORM for authorization model |
 | Crossplane resources deploy through GitOps | Resources reconcile from Git definitions |
 

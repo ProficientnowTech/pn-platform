@@ -13,7 +13,7 @@ Category: Standards Track                              Introduction
 
 ### 1.1.1 Scope of This RFC
 
-This RFC addresses **web UI authentication** and **application-level authorization** for platform developer tools. When a developer opens Harbor in their browser and clicks "Login," this RFC governs what happens. When that developer attempts to create a project or push an image, this RFC governs whether they are permitted to do so.
+This RFC addresses **web UI authentication** and **application-level authorization** for platform developer tools. When a developer opens a platform application (container registry, package registry, developer portal) in their browser and clicks "Login," this RFC governs what happens. When that developer attempts to create a project or access a resource, this RFC governs whether they are permitted to do so.
 
 This RFC does **not** address:
 - How Kubernetes pods authenticate to each other (workload identity)
@@ -138,7 +138,7 @@ The developer portal (Backstage) enables users to create and manage platform res
 
 ### 1.4.5 Extensible Integration Model
 
-The architecture defines clear integration patterns that new applications can adopt. Harbor and Verdaccio serve as initial integration targets, but the patterns apply equally to future platform tools. This extensibility ensures the architecture remains relevant as the platform evolves.
+The architecture defines clear integration patterns that any platform application can adopt. The patterns described in this RFC apply to container registries, package registries, developer portals, and any future platform tools with web interfaces. This extensibility ensures the architecture remains relevant as the platform evolves.
 
 ---
 

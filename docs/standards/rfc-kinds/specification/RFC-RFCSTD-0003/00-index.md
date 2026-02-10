@@ -19,7 +19,7 @@ Category: Standards Track                                             Index
 | Category | Standards Track |
 | Kind | Standards |
 | Version | 1.1.0 |
-| Author | Platform Engineering |
+| Author | [Shaik Noorullah](https://github.com/shaik-noorullah) |
 | Created | 2026-02-10 |
 | Last Updated | 2026-02-10 |
 

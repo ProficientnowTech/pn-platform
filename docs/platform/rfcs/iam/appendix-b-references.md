@@ -87,22 +87,27 @@ Documentation for technologies referenced in this RFC.
 **[HELM-DOCS]** Helm, "Helm Documentation".
 <https://helm.sh/docs/>
 
-### Applications
+### Example Platform Applications
 
-**[HARBOR-DOCS]** Harbor, "Harbor Documentation".
+These references provide examples of OIDC-compatible applications that can integrate with the architecture described in this RFC.
+
+**[HARBOR-DOCS]** Harbor, "Harbor Documentation". (Container Registry)
 <https://goharbor.io/docs/>
 
 **[HARBOR-OIDC]** Harbor, "Configure OIDC Provider Authentication".
 <https://goharbor.io/docs/latest/administration/configure-authentication/oidc-auth/>
 
-**[VERDACCIO-DOCS]** Verdaccio, "Verdaccio Documentation".
+**[VERDACCIO-DOCS]** Verdaccio, "Verdaccio Documentation". (Package Registry)
 <https://verdaccio.org/docs/what-is-verdaccio>
 
-**[BACKSTAGE-DOCS]** Spotify, "Backstage Documentation".
+**[BACKSTAGE-DOCS]** Spotify, "Backstage Documentation". (Developer Portal)
 <https://backstage.io/docs/overview/what-is-backstage>
 
 **[BACKSTAGE-AUTH]** Spotify, "Backstage Authentication".
 <https://backstage.io/docs/auth/>
+
+**[GRAFANA-OIDC]** Grafana, "Configure Grafana OAuth Authentication". (Monitoring)
+<https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/>
 
 ---
 

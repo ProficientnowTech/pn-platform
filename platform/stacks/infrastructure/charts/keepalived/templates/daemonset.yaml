@@ -38,9 +38,6 @@ spec:
         - name: keepalived
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - --log-detail
-            - --dump-conf
           env:
             - name: KEEPALIVED_INTERFACE
               value: {{ .Values.vip.interface }}

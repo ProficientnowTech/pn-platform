@@ -3,7 +3,7 @@ name: pn-keepalived
 description: Keepalived for HA Virtual IP management on bare metal Kubernetes
 type: application
 version: 0.1.0
-appVersion: "2.2.8"
+appVersion: "2.0.20"
 
 keywords:
   - keepalived

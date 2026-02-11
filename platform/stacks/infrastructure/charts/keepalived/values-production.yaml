@@ -1,0 +1,32 @@
+# Production Environment - Keepalived HA VIP
+# VIP: 192.168.100.3 for ingress traffic
+# Note: 192.168.100.2 is the K8s API VIP managed by kube-vip
+
+namespace: keepalived-system
+
+vip:
+  address: "192.168.100.3"
+  interface: "enp6s18"
+  cidr: "32"
+
+vrrp:
+  routerId: 51
+  authPass: "k8svip01"
+  checkInterval: 3
+
+# Run on worker nodes only (not control plane)
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: DoesNotExist
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

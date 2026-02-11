@@ -1,0 +1,64 @@
+# Keepalived HA VIP Configuration
+namespace: keepalived-system
+
+# Virtual IP configuration
+vip:
+  # The virtual IP address that will float between nodes
+  # 192.168.100.2 is used by kube-vip for K8s API
+  # 192.168.100.3 is the ingress HA VIP
+  address: "192.168.100.3"
+  # Network interface on nodes (must match across all nodes)
+  interface: "enp6s18"
+  # CIDR for the VIP
+  cidr: "32"
+
+# VRRP configuration
+vrrp:
+  # Virtual router ID (1-255, must be unique on the network segment)
+  routerId: 51
+  # VRRP authentication password (8 chars max)
+  authPass: "k8svip01"
+  # Check interval in seconds
+  checkInterval: 3
+
+# Node selector - run on worker nodes only
+nodeSelector:
+  # Empty means run on all nodes that match affinity rules
+  # You can add specific labels here
+
+# Node affinity - prefer worker nodes
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: DoesNotExist
+
+# Tolerations - allow running on all nodes if needed
+tolerations: []
+
+# Image configuration
+image:
+  repository: osixia/keepalived
+  tag: "2.2.8"
+  pullPolicy: IfNotPresent
+
+# Resource limits
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+# Health check script - checks if kube-proxy is running
+healthCheck:
+  enabled: true
+  # Script returns 0 if healthy, non-zero otherwise
+  script: |
+    #!/bin/sh
+    # Check if kube-proxy is listening (ensures node can forward traffic)
+    ss -tln | grep -q ':10249' && exit 0 || exit 1

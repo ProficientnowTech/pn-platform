@@ -38,6 +38,11 @@ applications:
     jsonPointers:
       - /spec/conversion/webhook/clientConfig/caBundle
 
+- name: keepalived
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+  destinationNamespaceOverwrite: 'keepalived-system'
+
 - name: ingress-nginx
   annotations:
     argocd.argoproj.io/sync-wave: "-5"

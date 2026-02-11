@@ -1,0 +1,17 @@
+apiVersion: v2
+name: pn-keepalived
+description: Keepalived for HA Virtual IP management on bare metal Kubernetes
+type: application
+version: 0.1.0
+appVersion: "2.2.8"
+
+keywords:
+  - keepalived
+  - vrrp
+  - high-availability
+  - vip
+  - bare-metal
+
+maintainers:
+  - name: Platform Team
+    email: snoorullah@proficientnowtech.com

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keepalived-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: keepalived
+    app.kubernetes.io/component: networking
+data:
+  keepalived.conf: |
+    global_defs {
+      router_id K8S_INGRESS_VIP
+      script_user root
+      enable_script_security
+    }
+
+    vrrp_script check_kube_proxy {
+      script "/etc/keepalived/check_kube_proxy.sh"
+      interval {{ .Values.vrrp.checkInterval }}
+      weight -20
+      fall 3
+      rise 2
+    }
+
+    vrrp_instance VI_INGRESS {
+      state BACKUP
+      interface {{ .Values.vip.interface }}
+      virtual_router_id {{ .Values.vrrp.routerId }}
+      priority 100
+      advert_int 1
+      nopreempt
+
+      authentication {
+        auth_type PASS
+        auth_pass {{ .Values.vrrp.authPass }}
+      }
+
+      virtual_ipaddress {
+        {{ .Values.vip.address }}/{{ .Values.vip.cidr }} dev {{ .Values.vip.interface }}
+      }
+
+      track_script {
+        check_kube_proxy
+      }
+    }
+
+  check_kube_proxy.sh: |
+    {{- .Values.healthCheck.script | nindent 4 }}

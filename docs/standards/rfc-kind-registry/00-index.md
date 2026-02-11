@@ -15,7 +15,7 @@ Category: Standards Track                                             Index
 |-------|-------|
 | Document ID | RFC-KIND-REGISTRY |
 | Title | RFC Kind Registry |
-| Status | Accepted |
+| Status | Draft |
 | Category | Standards Track |
 | Kind | Standards |
 | Version | 2.0.0 |

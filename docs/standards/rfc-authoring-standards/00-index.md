@@ -15,7 +15,7 @@ Category: Standards Track                                             Index
 |-------|-------|
 | Document ID | RFC-STANDARDS |
 | Title | RFC Authoring Standards |
-| Status | Accepted |
+| Status | Draft |
 | Category | Standards Track |
 | Kind | Standards |
 | Version | 2.0.0 |

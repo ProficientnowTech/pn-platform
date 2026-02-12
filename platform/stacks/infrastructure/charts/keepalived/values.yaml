@@ -26,15 +26,8 @@ nodeSelector:
   # Empty means run on all nodes that match affinity rules
   # You can add specific labels here
 
-# Node affinity - prefer worker nodes
-affinity:
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: node-role.kubernetes.io/control-plane
-              operator: DoesNotExist
+# Node affinity - override in environment-specific values
+affinity: {}
 
 # Tolerations - allow running on all nodes if needed
 tolerations: []

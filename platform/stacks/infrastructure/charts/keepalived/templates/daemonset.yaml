@@ -15,8 +15,6 @@ spec:
       labels:
         app.kubernetes.io/name: keepalived
         app.kubernetes.io/component: networking
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -48,9 +46,7 @@ spec:
             - name: KEEPALIVED_PASSWORD
               value: {{ .Values.vrrp.authPass }}
             - name: KEEPALIVED_PRIORITY
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+              value: "100"
             - name: KEEPALIVED_ROUTER_ID
               value: "{{ .Values.vrrp.routerId }}"
           securityContext:
@@ -61,13 +57,6 @@ spec:
                 - NET_RAW
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          volumeMounts:
-            - name: config
-              mountPath: /container/service/keepalived/assets/keepalived.conf
-              subPath: keepalived.conf
-            - name: config
-              mountPath: /etc/keepalived/check_kube_proxy.sh
-              subPath: check_kube_proxy.sh
           livenessProbe:
             exec:
               command:
@@ -84,8 +73,3 @@ spec:
                 - pgrep keepalived
             initialDelaySeconds: 5
             periodSeconds: 5
-      volumes:
-        - name: config
-          configMap:
-            name: keepalived-config
-            defaultMode: 0755

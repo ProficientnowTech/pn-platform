@@ -1,0 +1,102 @@
+{{- /*
+  Permanent Admin User for Keycloak Master Realm
+
+  Creates:
+  1. Password generator - generates random password
+  2. ExternalSecret - creates K8s Secret from generator
+  3. PushSecret - persists password to Vault
+  4. Crossplane User - creates admin user in Keycloak
+*/ -}}
+{{- if .Values.permanentAdmin.enabled }}
+{{- $vault := .Values.vaultIntegration }}
+---
+# Password Generator - generates a random password
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: keycloak-permanent-admin-password
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  length: {{ .Values.permanentAdmin.password.length | default 48 }}
+  digits: {{ .Values.permanentAdmin.password.digits | default 12 }}
+  symbols: {{ .Values.permanentAdmin.password.symbols | default 0 }}
+  noUpper: false
+  allowRepeat: true
+---
+# ExternalSecret - creates K8s Secret using the password generator
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: keycloak-permanent-admin-secret
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+spec:
+  refreshInterval: "0"
+  target:
+    name: keycloak-permanent-admin-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+  dataFrom:
+  - sourceRef:
+      generatorRef:
+        apiVersion: generators.external-secrets.io/v1alpha1
+        kind: Password
+        name: keycloak-permanent-admin-password
+---
+# PushSecret - persists the generated password to Vault
+apiVersion: external-secrets.io/v1alpha1
+kind: PushSecret
+metadata:
+  name: keycloak-permanent-admin-push
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+spec:
+  refreshInterval: 1h
+  deletionPolicy: None
+  updatePolicy: IfNotExists
+  secretStoreRefs:
+  - name: vault-backend
+    kind: ClusterSecretStore
+  selector:
+    secret:
+      name: keycloak-permanent-admin-secret
+  data:
+  - conversionStrategy: None
+    match:
+      secretKey: password
+      remoteRef:
+        remoteKey: {{ .Values.permanentAdmin.vaultPath | default "applications/security/keycloak/permanent-admin" }}
+        property: password
+---
+# Crossplane User - creates the permanent admin user in Keycloak master realm
+apiVersion: user.keycloak.crossplane.io/v1alpha1
+kind: User
+metadata:
+  name: pn-keycloak-permanent-admin
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  providerConfigRef:
+    name: pn-keycloak-crossplane
+  deletionPolicy: {{ .Values.permanentAdmin.deletionPolicy | default "Delete" }}
+  forProvider:
+    realmId: master
+    username: {{ .Values.permanentAdmin.username | quote }}
+    email: {{ .Values.permanentAdmin.email | quote }}
+    emailVerified: true
+    enabled: true
+    firstName: {{ .Values.permanentAdmin.firstName | quote }}
+    lastName: {{ .Values.permanentAdmin.lastName | quote }}
+    initialPassword:
+    - temporary: false
+      valueSecretRef:
+        name: keycloak-permanent-admin-secret
+        namespace: {{ .Release.Namespace }}
+        key: password
+{{- end }}

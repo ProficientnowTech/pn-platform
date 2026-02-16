@@ -470,7 +470,7 @@ All components expose Prometheus metrics via ServiceMonitors:
 
 ## Support
 
-- **Platform Team**: snoorullah@proficientnowtech.com
+- **Platform Team**: shaik-noorullah@proficientnowtech.com
 - **Documentation**: `./DEPLOYMENT_ORDER.md` for detailed procedures
 
 ## References

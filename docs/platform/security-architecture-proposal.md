@@ -727,6 +727,7 @@ Implementation follows a phased approach, with each phase building on the previo
 
 | Phase | Description | Duration |
 |-------|-------------|----------|
+| Phase 0 | Planning & Preparation | 1 week |
 | Phase 1 | Foundation (Secrets + IAM) | 3-4 weeks |
 | Phase 2 | Privileged Access | 2 weeks |
 | Phase 3 | Workload Security | 2 weeks |
@@ -739,8 +740,11 @@ gantt
     title Security Architecture Implementation Roadmap
     dateFormat YYYY-MM-DD
 
+    section Planning
+    Planning & Preparation :p1, 2026-02-16, 7d
+
     section Foundation
-    Secrets Management     :a1, 2026-01-01, 14d
+    Secrets Management     :a1, after p1, 14d
     Identity Management    :a2, after a1, 14d
 
     section Access Control

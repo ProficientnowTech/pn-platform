@@ -83,7 +83,7 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   providerConfigRef:
-    name: pn-keycloak-crossplane
+    name: {{ printf "%s-crossplane" (include "pn-keycloak.fullname" .) }}
   deletionPolicy: {{ .Values.permanentAdmin.deletionPolicy | default "Delete" }}
   forProvider:
     realmId: master

@@ -302,7 +302,7 @@ Credentials flow: Vault → ESO → Kubernetes Secret → Crossplane ProviderCon
 
 ## 4.6 Developer Portal (Reference: RFC-DEVELOPER-PLATFORM)
 
-The developer portal (Backstage) architecture is defined in RFC-DEVELOPER-PLATFORM (planned).
+The developer portal (Backstage) architecture is defined in [RFC-DEVELOPER-PLATFORM-0001](../developer-platform/00-index.md).
 
 ### 4.6.1 Identity Integration Point
 
@@ -381,4 +381,4 @@ All target applications share these integration properties:
 
 ---
 
-*End of Section 4*
+*End of Section 4 — RFC-IAM-0001*

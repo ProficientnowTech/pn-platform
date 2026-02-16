@@ -224,4 +224,4 @@ See [docs/platform/rfcs/STORAGE-ARCHITECTURE-QNA.md](../rfcs/STORAGE-ARCHITECTUR
 ---
 
 **Maintained by**: Platform Team
-**Contact**: snoorullah@proficientnowtech.com
+**Contact**: shaik-noorullah@proficientnowtech.com

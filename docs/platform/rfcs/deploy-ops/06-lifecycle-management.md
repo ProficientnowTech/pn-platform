@@ -167,17 +167,18 @@ Each role MUST be:
 
 Every task within a role MUST implement the following six phases:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           TASK EXECUTION PHASES                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  1. PRE-CHECK     Verify prerequisites are met before attempting changes   │
-│  2. APPLY         Execute the actual change (Helm install/upgrade)         │
-│  3. TEST          Verify the change was applied correctly                  │
-│  4. VALIDATE      Confirm the component is functioning as expected         │
-│  5. ROLLBACK      Revert to previous state if validation fails             │
-│  6. RESULT        Record outcome for downstream tasks and reporting        │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Phases["TASK EXECUTION PHASES"]
+        P1["1. PRE-CHECK<br/>Verify prerequisites are met<br/>before attempting changes"]
+        P2["2. APPLY<br/>Execute the actual change<br/>(Helm install/upgrade)"]
+        P3["3. TEST<br/>Verify the change was<br/>applied correctly"]
+        P4["4. VALIDATE<br/>Confirm the component is<br/>functioning as expected"]
+        P5["5. ROLLBACK<br/>Revert to previous state<br/>if validation fails"]
+        P6["6. RESULT<br/>Record outcome for downstream<br/>tasks and reporting"]
+    end
+
+    P1 --> P2 --> P3 --> P4 --> P5 --> P6
 ```
 
 ---
@@ -810,4 +811,4 @@ Directly delete stuck resources blocking deployment.
 
 ---
 
-*End of Section 6*
+*End of Section 6 — RFC-DEPLOY-0001*

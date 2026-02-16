@@ -543,4 +543,4 @@ For aggregated health (stack or platform level):
 
 ---
 
-*End of Section 5*
+*End of Section 5 — RFC-DEPLOY-0001*

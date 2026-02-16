@@ -186,15 +186,19 @@ The following RFCs are anticipated but not yet written:
 
 This RFC will define how the developer portal presents a permission-aware interface where users only see actions they are authorized to perform. Authentication flows through Keycloak (per RFC-IAM-0001), but the portal adapts its UI based on the user's permission claims rather than blocking unauthorized actions at runtime. Primary question: "How do developers interact with the platform?"
 
-**[RFC-WORKLOAD-IDENTITY]** (Planned) "Workload Identity Architecture"
-- Machine identity for VMs and physical hosts
-- Workload identity for Kubernetes pods and containers
-- Service-to-service authentication (mTLS, SPIFFE/SPIRE)
-- AI agent identity management
-- CI/CD pipeline identity
-- Service mesh identity integration
+**[RFC-WORKLOAD-IDENTITY-0001]** Platform Engineering, "Workload Identity Architecture", RFC-WORKLOAD-IDENTITY-0001, February 2026.
+`docs/platform/rfcs/workload-identity/00-index.md`
 
-This RFC will define non-human identity concerns that are explicitly out of scope for RFC-IAM-0001. Primary question: "Who is this workload and can it authenticate to other services?"
+RFC-WORKLOAD-IDENTITY-0001 defines non-human identity concerns that are explicitly out of scope for RFC-IAM-0001:
+- SPIFFE/SPIRE as primary workload identity framework
+- Kubernetes workload identity via ServiceAccounts
+- CI/CD pipeline identity via OIDC federation
+- GitOps operator identity
+- AI agent identity and delegation chains (OAuth 2.0 Token Exchange)
+- Machine identity via Teleport Machine ID (tbot)
+- Service mesh identity via Linkerd mTLS
+
+Primary question: "Who is this workload and can it authenticate to other services?"
 
 **[RFC-TENANT-SECURITY]** (Planned) "Tenant Application Security"
 - Web Application Firewall (WAF) configuration and policies
@@ -207,15 +211,35 @@ This RFC will define non-human identity concerns that are explicitly out of scop
 
 This RFC will define how tenant applications (applications deployed by business units on the platform) are protected from external threats and how network boundaries are enforced. Primary question: "How do we protect tenant applications?"
 
-**[RFC-PAM]** (Planned) "Privileged Access Management"
-- SSH access to infrastructure
-- Database port access for developers
-- VPC and network perimeter access
-- Kubernetes exec/attach governance
-- Command auditing on infrastructure
-- Session recording and access brokering
+**[RFC-PAM-0001]** (Planned) "Privileged Access Management Architecture"
 
-This RFC will define how identity (established by RFC-IAM-0001) translates into infrastructure access rights, potentially using tools like Teleport, Boundary, or Vault's SSH/database secrets engines. Primary question: "Can this human access this infrastructure resource?"
+RFC-PAM-0001 defines how human users access infrastructure resources (SSH, databases, Kubernetes) through a centralized access broker with full session recording and audit capabilities.
+
+**Scope**:
+- SSH access to Linux/Unix servers via certificate authentication
+- Database access for developers (PostgreSQL, MySQL, MongoDB) via dynamic credentials
+- Kubernetes exec/attach/port-forward governance
+- Windows RDP access
+- Session recording and playback for compliance
+- Just-in-time (JIT) access request workflows
+- Command and query auditing
+
+**Key Components**:
+- **Teleport**: Zero-trust access broker for all privileged access
+- **Vault SSH Engine**: Certificate authority for SSH authentication
+- **Vault Database Engine**: Dynamic, ephemeral database credentials
+- **Keycloak**: Identity source (per RFC-IAM-0001)
+- **ESO**: Distribution of agent enrollment secrets
+
+**Relationship to RFC-IAM-0001**:
+- RFC-IAM-0001 provides the identity layer (Keycloak SSO)
+- RFC-PAM-0001 consumes Keycloak tokens for user authentication
+- Teleport roles are constrained by Keycloak groups (which are constrained by Azure AD)
+- The authorization ceiling principle (INV-1) extends to privileged access
+
+**Primary Question**: "Can this human access this infrastructure resource?"
+
+**Plan Document**: `docs/platform/rfcs/pam/PLAN.md`
 
 ---
 
@@ -235,8 +259,4 @@ This RFC will define how identity (established by RFC-IAM-0001) translates into 
 
 ---
 
-*End of Appendix B*
-
----
-
-*End of RFC-IAM-0001*
+*End of Appendix B — RFC-IAM-0001*

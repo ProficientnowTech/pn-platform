@@ -33,37 +33,35 @@ This avoids the most common failure mode in deployment systems:
 
 At a high level, the platform consists of four conceptual layers:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       BOOTSTRAP LAYER                                        │
-│  Imperative setup of cluster prerequisites and orchestration primitives     │
-│  Authority: Day 0-1 operations                                              │
-│  Technology recommendation: Ansible with kubernetes.core collection         │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATION LAYER                                       │
-│  DAG-based dependency resolution and cross-application sequencing           │
-│  Authority: Deployment ordering and health-gated progression                │
-│  Technology: Argo Workflows                                                 │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     DEPLOYMENT LAYER                                         │
-│  Declarative application state management and continuous reconciliation     │
-│  Authority: Application-level sync, drift detection, self-healing           │
-│  Technology: ArgoCD                                                         │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      PROMOTION LAYER                                         │
-│  Environment-to-environment promotion with verification gates               │
-│  Authority: Stage progression and verification                              │
-│  Technology: Kargo, Argo Rollouts                                           │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Bootstrap["BOOTSTRAP LAYER"]
+        B1["Imperative setup of cluster prerequisites<br/>and orchestration primitives"]
+        B2["Authority: Day 0-1 operations"]
+        B3["Technology: Ansible with kubernetes.core collection"]
+    end
+
+    subgraph Orchestration["ORCHESTRATION LAYER"]
+        O1["DAG-based dependency resolution and<br/>cross-application sequencing"]
+        O2["Authority: Deployment ordering and<br/>health-gated progression"]
+        O3["Technology: Argo Workflows"]
+    end
+
+    subgraph Deployment["DEPLOYMENT LAYER"]
+        D1["Declarative application state management<br/>and continuous reconciliation"]
+        D2["Authority: Application-level sync,<br/>drift detection, self-healing"]
+        D3["Technology: ArgoCD"]
+    end
+
+    subgraph Promotion["PROMOTION LAYER"]
+        P1["Environment-to-environment promotion<br/>with verification gates"]
+        P2["Authority: Stage progression<br/>and verification"]
+        P3["Technology: Kargo, Argo Rollouts"]
+    end
+
+    Bootstrap --> Orchestration
+    Orchestration --> Deployment
+    Deployment --> Promotion
 ```
 
 Each layer activates in sequence, and authority transfers explicitly at defined
@@ -370,21 +368,20 @@ The architecture defines explicit trust boundaries between systems.
 
 ### Bootstrap Trust Boundary
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          EXTERNAL TRUST ZONE                                 │
-│  - Operator workstation or automation system                                │
-│  - Configuration repository                                                 │
-│  - Container registry                                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                           kubeconfig, credentials
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          CLUSTER TRUST ZONE                                  │
-│  - Kubernetes API                                                           │
-│  - Bootstrap controller                                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph External["EXTERNAL TRUST ZONE"]
+        E1["Operator workstation or automation system"]
+        E2["Configuration repository"]
+        E3["Container registry"]
+    end
+
+    subgraph Cluster["CLUSTER TRUST ZONE"]
+        C1["Kubernetes API"]
+        C2["Bootstrap controller"]
+    end
+
+    External -->|"kubeconfig, credentials"| Cluster
 ```
 
 The bootstrap layer bridges external and cluster trust zones using credentials
@@ -394,22 +391,21 @@ that MUST be rotated after initial setup.
 
 ### Orchestration Trust Boundary
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATION TRUST ZONE                                  │
-│  - Argo Workflows controller                                                │
-│  - ClusterWorkflowTemplates                                                 │
-│  - Automation service accounts                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                           ArgoCD API, health queries
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     DEPLOYMENT TRUST ZONE                                    │
-│  - ArgoCD Application Controller                                            │
-│  - Application resources                                                    │
-│  - Kubernetes API                                                           │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph OrchTrust["ORCHESTRATION TRUST ZONE"]
+        OT1["Argo Workflows controller"]
+        OT2["ClusterWorkflowTemplates"]
+        OT3["Automation service accounts"]
+    end
+
+    subgraph DeployTrust["DEPLOYMENT TRUST ZONE"]
+        DT1["ArgoCD Application Controller"]
+        DT2["Application resources"]
+        DT3["Kubernetes API"]
+    end
+
+    OrchTrust -->|"ArgoCD API, health queries"| DeployTrust
 ```
 
 Argo Workflows communicates with ArgoCD through its API, not by directly
@@ -419,22 +415,21 @@ manipulating Kubernetes resources managed by ArgoCD.
 
 ### External Trust Boundary
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         EXTERNAL SYSTEMS                                     │
-│  - Git repositories (source of intent)                                      │
-│  - Container registries (image artifacts)                                   │
-│  - Secret stores (external credentials)                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                           pull only, validated sources
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         CLUSTER SYSTEMS                                      │
-│  - ArgoCD (consumes Git)                                                    │
-│  - Kubernetes (consumes images)                                             │
-│  - External Secrets Operator (consumes secrets)                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph ExtSystems["EXTERNAL SYSTEMS"]
+        ES1["Git repositories (source of intent)"]
+        ES2["Container registries (image artifacts)"]
+        ES3["Secret stores (external credentials)"]
+    end
+
+    subgraph ClusterSystems["CLUSTER SYSTEMS"]
+        CS1["ArgoCD (consumes Git)"]
+        CS2["Kubernetes (consumes images)"]
+        CS3["External Secrets Operator (consumes secrets)"]
+    end
+
+    ExtSystems -->|"pull only, validated sources"| ClusterSystems
 ```
 
 External systems provide inputs to the cluster. The cluster MUST NOT have
@@ -771,4 +766,4 @@ rules** are unambiguous.
 
 ---
 
-*End of Section 3*
+*End of Section 3 — RFC-DEPLOY-0001*

@@ -14,6 +14,7 @@ Category: Standards Track                         Federated Identity
 | Field | Value |
 |-------|-------|
 | RFC ID | RFC-IAM-0001 |
+| Kind | Architecture |
 | Title | Federated Identity and Access Management Architecture |
 | Status | Draft |
 | Category | Standards Track |
@@ -50,10 +51,10 @@ This RFC is part of a family of platform architecture specifications:
 |-----|--------|-------|
 | **RFC-IAM-0001** (this document) | Web UI Auth & App Authorization | Human → Web Application |
 | **[RFC-SECOPS-0001](../secret-ops/00-index.md)** | Secrets Management | All secrets lifecycle (Vault as central authority) |
-| RFC-DEVELOPER-PLATFORM (planned) | Developer Portal | Backstage, capability-based UI, self-service |
-| RFC-WORKLOAD-IDENTITY (planned) | Workload Identity | Service-to-service auth, machine identity, AI agents |
-| RFC-TENANT-SECURITY (planned) | Tenant Application Security | WAF, network policies, routing, ingress protection |
-| RFC-PAM (planned) | Privileged Access | SSH, database, kubectl access |
+| **[RFC-DEVELOPER-PLATFORM-0001](../developer-platform/00-index.md)** | Developer Portal | Backstage, capability-based UI, self-service |
+| **[RFC-WORKLOAD-IDENTITY-0001](../workload-identity/00-index.md)** | Workload Identity | Service-to-service auth, machine identity, AI agents |
+| **[RFC-TENANT-SECURITY-0001](../tenant-security/00-index.md)** | Tenant Application Security | WAF, network policies, routing, ingress protection |
+| **[RFC-PAM-0001](../pam/00-index.md)** | Privileged Access | SSH, database, kubectl access (Teleport) |
 
 RFC-SECOPS-0001 is the authoritative specification for secrets management—not just machine secrets, but **all secrets** where Vault serves as central authority. This RFC defers to RFC-SECOPS-0001 for all secret storage, distribution, and rotation concerns.
 
@@ -199,4 +200,4 @@ Understanding how to integrate applications:
 
 ---
 
-*End of Index*
+*End of Index — RFC-IAM-0001*

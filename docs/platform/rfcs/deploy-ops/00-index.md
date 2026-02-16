@@ -53,6 +53,7 @@ Copyright (c) 2026 Platform Engineering. All rights reserved.
 | Attribute            | Value                                              |
 | -------------------- | -------------------------------------------------- |
 | RFC Number           | RFC-DEPLOY-0001                                    |
+| Kind                 | Architecture                                       |
 | Status               | Draft                                              |
 | Version              | 1.0                                                |
 | Created              | 2026-01-07                                         |

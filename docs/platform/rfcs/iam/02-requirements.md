@@ -287,7 +287,7 @@ This invariant ensures that resource lifecycle is coupled with application lifec
 
 ### Invariant 9 — Developer Portal Integration (Reference: RFC-DEVELOPER-PLATFORM)
 
-The developer portal (Backstage) architecture is defined in RFC-DEVELOPER-PLATFORM (planned).
+The developer portal (Backstage) architecture is defined in [RFC-DEVELOPER-PLATFORM-0001](../developer-platform/00-index.md).
 
 This RFC establishes only the identity integration point:
 - The developer portal MUST authenticate users through Keycloak (per Invariant 2)
@@ -351,4 +351,4 @@ The architecture succeeds when the following conditions are met:
 
 ---
 
-*End of Section 2*
+*End of Section 2 — RFC-IAM-0001*

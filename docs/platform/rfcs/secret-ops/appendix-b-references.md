@@ -208,7 +208,46 @@ and operational philosophies referenced in this RFC.
 
 ---
 
-## B.6 Acknowledgments
+## B.6 Internal References
+
+The following internal RFCs reference or depend on RFC-SECOPS-0001:
+
+---
+
+### Normative Consumers
+
+**[RFC-IAM-0001]** "Federated Identity and Access Management Architecture"
+`docs/platform/rfcs/iam/00-index.md`
+
+RFC-IAM-0001 defers to RFC-SECOPS-0001 for all secrets management concerns including:
+- Keycloak client secret storage and distribution
+- ExternalSecret patterns for identity-bound secrets
+- Vault as the authoritative secret store
+
+---
+
+### Planned Consumers
+
+**[RFC-PAM-0001]** (Planned) "Privileged Access Management Architecture"
+`docs/platform/rfcs/pam/PLAN.md`
+
+RFC-PAM-0001 will consume RFC-SECOPS-0001 for:
+- **Vault SSH Secrets Engine**: Certificate authority for SSH authentication
+- **Vault Database Secrets Engine**: Dynamic, ephemeral database credentials
+- **ESO Distribution**: Teleport agent enrollment secrets
+
+**[RFC-WORKLOAD-IDENTITY-0001]** Platform Engineering, "Workload Identity Architecture", RFC-WORKLOAD-IDENTITY-0001, February 2026.
+`docs/platform/rfcs/workload-identity/00-index.md`
+
+RFC-WORKLOAD-IDENTITY-0001 consumes RFC-SECOPS-0001 for:
+- Vault Kubernetes authentication (§5)
+- Dynamic database credentials for services (§5.3)
+- ESO secret distribution patterns (§4.6)
+- Service-to-service credential management
+
+---
+
+## B.7 Acknowledgments
 
 This RFC draws on concepts and patterns from the broader cloud-native
 community, including:
@@ -236,8 +275,4 @@ Platform Engineering
 
 ---
 
-*End of Appendix B*
-
----
-
-*End of RFC-SECOPS-0001*
+*End of Appendix B — RFC-SECOPS-0001*

@@ -134,7 +134,7 @@ Vault serves as the single source of truth for secrets, with External Secrets Op
 
 ### 1.4.4 Controlled Developer Self-Service
 
-The developer portal (Backstage) enables users to create and manage platform resources through self-service workflows. The complete developer portal architecture is defined in RFC-DEVELOPER-PLATFORM (planned). This RFC establishes only the identity integration: all portal authentication flows through Keycloak, and Keycloak tokens provide the permission claims that govern what users can do.
+The developer portal (Backstage) enables users to create and manage platform resources through self-service workflows. The complete developer portal architecture is defined in [RFC-DEVELOPER-PLATFORM-0001](../developer-platform/00-index.md). This RFC establishes only the identity integration: all portal authentication flows through Keycloak, and Keycloak tokens provide the permission claims that govern what users can do.
 
 ### 1.4.5 Extensible Integration Model
 
@@ -150,4 +150,4 @@ The architecture defines clear integration patterns that any platform applicatio
 
 ---
 
-*End of Section 1*
+*End of Section 1 — RFC-IAM-0001*

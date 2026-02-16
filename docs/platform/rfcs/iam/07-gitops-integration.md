@@ -404,7 +404,7 @@ The goal is not to prevent all manual changes but to ensure they are exceptional
 
 ## 7.6 Developer Portal GitOps Integration (Reference: RFC-DEVELOPER-PLATFORM)
 
-The developer portal's GitOps integration is defined in RFC-DEVELOPER-PLATFORM (planned).
+The developer portal's GitOps integration is defined in [RFC-DEVELOPER-PLATFORM-0001](../developer-platform/00-index.md).
 
 ### 7.6.1 Identity Integration Point
 
@@ -439,4 +439,4 @@ RFC-DEVELOPER-PLATFORM defines template execution, output formats, and the capab
 
 ---
 
-*End of Section 7*
+*End of Section 7 — RFC-IAM-0001*

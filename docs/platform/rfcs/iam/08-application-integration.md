@@ -272,7 +272,7 @@ This ensures:
 
 ## 8.6 Developer Portal Integration (Reference: RFC-DEVELOPER-PLATFORM)
 
-The developer portal (Backstage) integration is defined in RFC-DEVELOPER-PLATFORM (planned).
+The developer portal (Backstage) integration is defined in [RFC-DEVELOPER-PLATFORM-0001](../developer-platform/00-index.md).
 
 ### 8.6.1 Identity Integration Requirements
 
@@ -409,4 +409,4 @@ Robot accounts bypass OIDC authentication—they use direct token authentication
 
 ---
 
-*End of Section 8*
+*End of Section 8 — RFC-IAM-0001*

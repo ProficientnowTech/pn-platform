@@ -45,20 +45,32 @@ fundamental changes.
 
 ### Hub-Spoke Model
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              HUB CLUSTER                                     │
-│  - Central ArgoCD (manages all clusters)                                    │
-│  - Argo Workflows (orchestration across clusters)                           │
-│  - Kargo (promotion across environments/clusters)                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-                    │                    │                    │
-                    ▼                    ▼                    ▼
-┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐
-│    SPOKE: Dev        │ │   SPOKE: Staging     │ │    SPOKE: Prod       │
-│  - Workloads only    │ │  - Workloads only    │ │  - Workloads only    │
-│  - No ArgoCD         │ │  - No ArgoCD         │ │  - No ArgoCD         │
-└──────────────────────┘ └──────────────────────┘ └──────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Hub["HUB CLUSTER"]
+        H1["Central ArgoCD (manages all clusters)"]
+        H2["Argo Workflows (orchestration across clusters)"]
+        H3["Kargo (promotion across environments/clusters)"]
+    end
+
+    subgraph Dev["SPOKE: Dev"]
+        D1["Workloads only"]
+        D2["No ArgoCD"]
+    end
+
+    subgraph Staging["SPOKE: Staging"]
+        S1["Workloads only"]
+        S2["No ArgoCD"]
+    end
+
+    subgraph Prod["SPOKE: Prod"]
+        P1["Workloads only"]
+        P2["No ArgoCD"]
+    end
+
+    Hub --> Dev
+    Hub --> Staging
+    Hub --> Prod
 ```
 
 **Hub responsibilities**:
@@ -337,4 +349,4 @@ The architecture assumes ArgoCD for deployment. Alternative GitOps tools
 
 ---
 
-*End of Section 9*
+*End of Section 9 — RFC-DEPLOY-0001*

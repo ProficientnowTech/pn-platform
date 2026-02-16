@@ -5,6 +5,10 @@ Category: Standards Track           Internal Distribution Mechanics
 
 # Section 5a: Internal Secret and Configuration Distribution
 
+[← 5. Mechanics](./05-mechanics.md) | [Index](./00-index.md#table-of-contents) | [6. Rotation →](./06-rotation.md)
+
+---
+
 This section defines the framework for distributing secrets and configuration
 data generated within the same Kubernetes cluster to consumers in other
 namespaces. This framework ensures deterministic, auditable, and centralized
@@ -240,24 +244,23 @@ internal distribution framework.
 
 ### 5a.4.1 Decision Tree
 
-```
-Is the secret generated within the cluster?
-│
-├── NO → Do NOT use this framework
-│        Use: Bootstrap flow (Section 5.2) or external sources
-│
-└── YES → Does the consumer exist in the same namespace as producer?
-    │
-    ├── YES → Do NOT use this framework
-    │         Use: Direct Kubernetes Secret reference
-    │
-    └── NO → Does the secret require cross-namespace distribution?
-        │
-        ├── NO → Do NOT use this framework
-        │        Re-evaluate requirement
-        │
-        └── YES → USE THIS FRAMEWORK
-                  PushSecret → Vault → ExternalSecret
+```mermaid
+flowchart TD
+    Q1{Is the secret generated<br/>within the cluster?}
+    Q2{Does the consumer exist in<br/>the same namespace as producer?}
+    Q3{Does the secret require<br/>cross-namespace distribution?}
+
+    NO1[Do NOT use this framework<br/>Use: Bootstrap flow or external sources]
+    NO2[Do NOT use this framework<br/>Use: Direct Kubernetes Secret reference]
+    NO3[Do NOT use this framework<br/>Re-evaluate requirement]
+    YES[USE THIS FRAMEWORK<br/>PushSecret → Vault → ExternalSecret]
+
+    Q1 -->|NO| NO1
+    Q1 -->|YES| Q2
+    Q2 -->|YES| NO2
+    Q2 -->|NO| Q3
+    Q3 -->|NO| NO3
+    Q3 -->|YES| YES
 ```
 
 ### 5a.4.2 Decision Criteria Table
@@ -278,20 +281,19 @@ Is the secret generated within the cluster?
 
 For configuration data (non-sensitive):
 
-```
-Is the configuration for a cluster-internal service endpoint?
-│
-├── NO → Do NOT use this framework
-│        Use: ConfigMap or application configuration
-│
-└── YES → Does the endpoint need discovery by multiple namespaces?
-    │
-    ├── NO → Do NOT use this framework
-    │        Use: Direct service reference (service.namespace.svc)
-    │
-    └── YES → MAY use this framework
-              Benefits: Centralized discovery, audit trail
-              Trade-off: Additional complexity
+```mermaid
+flowchart TD
+    Q1{Is the configuration for a<br/>cluster-internal service endpoint?}
+    Q2{Does the endpoint need discovery<br/>by multiple namespaces?}
+
+    NO1[Do NOT use this framework<br/>Use: ConfigMap or application configuration]
+    NO2[Do NOT use this framework<br/>Use: Direct service reference]
+    YES[MAY use this framework<br/>Benefits: Centralized discovery, audit trail<br/>Trade-off: Additional complexity]
+
+    Q1 -->|NO| NO1
+    Q1 -->|YES| Q2
+    Q2 -->|NO| NO2
+    Q2 -->|YES| YES
 ```
 
 ---
@@ -539,6 +541,10 @@ The internal distribution framework maintains security boundaries by:
 
 ## Document Navigation
 
-| Previous | Up | Next |
-|----------|-----|------|
-| [Section 5: Mechanics](./05-mechanics.md) | [Index](./00-index.md) | [Section 6: Rotation](./06-rotation.md) |
+| Previous | Index | Next |
+|----------|-------|------|
+| [← 5. Mechanics](./05-mechanics.md) | [Table of Contents](./00-index.md#table-of-contents) | [6. Rotation →](./06-rotation.md) |
+
+---
+
+*End of Section 5a — RFC-SECOPS-0001*

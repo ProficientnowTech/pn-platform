@@ -318,4 +318,4 @@ Rotation becomes predictable, observable, and safe.
 
 ---
 
-*End of Section 6*
+*End of Section 6 — RFC-SECOPS-0001*

@@ -272,7 +272,7 @@ This RFC builds upon:
 
 ---
 
-*End of Appendix B*
+*End of Appendix B — RFC-DEPLOY-0001*
 
 ---
 

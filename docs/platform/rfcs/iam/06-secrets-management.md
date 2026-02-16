@@ -205,4 +205,4 @@ For all secrets-related implementation, consult [RFC-SECOPS-0001](../secret-ops/
 
 ---
 
-*End of Section 6*
+*End of Section 6 — RFC-IAM-0001*

@@ -1,0 +1,22 @@
+# inventory/production/group_vars/app_server.yml - App Server Dev Dependencies
+---
+# Developer toolchain configuration for app servers
+# Attach hosts to the "app_server" group in inventory to apply this.
+
+dev_dependencies:
+    packages:
+        - git
+        - build-essential
+        - nginx
+    docker:
+        install: true
+        add_users:
+            - ubuntu
+    nvm:
+        install: true
+        user: ubuntu
+        version: v0.39.7
+        node_version: lts/*
+    pnpm:
+        install: true
+        version: 8.15.6

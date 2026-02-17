@@ -1,0 +1,62 @@
+---
+# Dev Dependencies Role - Developer toolchain setup
+# Implements 5-phase safety pattern: validate → backup → apply → test → rollback
+
+- name: Initialize dev dependencies role status
+  set_fact:
+      dev_deps_validation_passed: false
+      dev_deps_backup_completed: false
+      dev_deps_configuration_applied: false
+      dev_deps_tests_passed: false
+      dev_deps_rollback_needed: false
+
+# Phase 1: VALIDATE
+- name: 'Validate dev dependencies prerequisites'
+  include_tasks: validate.yml
+  register: validation_result
+  ignore_errors: true
+
+- name: Set validation status
+  set_fact:
+      dev_deps_validation_passed: '{{ validation_result is succeeded }}'
+
+# Phase 2: BACKUP
+- name: 'Backup dev dependencies configuration'
+  include_tasks: backup.yml
+  when: dev_deps_validation_passed
+  register: backup_result
+  ignore_errors: true
+
+- name: Set backup status
+  set_fact:
+      dev_deps_backup_completed: '{{ backup_result is succeeded }}'
+  when: dev_deps_validation_passed
+
+# Phase 3: APPLY
+- name: 'Apply dev dependencies configuration'
+  include_tasks: apply.yml
+  when: dev_deps_validation_passed and (dev_deps_backup_completed or backup_result is skipped)
+  register: apply_result
+  ignore_errors: true
+
+- name: Set apply status
+  set_fact:
+      dev_deps_configuration_applied: '{{ apply_result is succeeded }}'
+  when: dev_deps_validation_passed
+
+# Phase 4: TEST
+- name: 'Test dev dependencies configuration'
+  include_tasks: test.yml
+  when: dev_deps_configuration_applied
+  register: test_result
+  ignore_errors: true
+
+- name: Set test status
+  set_fact:
+      dev_deps_tests_passed: '{{ test_result is succeeded }}'
+  when: dev_deps_configuration_applied
+
+# Phase 5: HANDLE RESULT
+- name: 'Handle dev dependencies result'
+  include_tasks: result_handler.yml
+  when: dev_deps_validation_passed

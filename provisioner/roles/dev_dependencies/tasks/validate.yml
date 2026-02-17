@@ -1,0 +1,59 @@
+---
+# Phase 1: Validate dev dependencies configuration
+
+- name: Ensure dev dependencies config is defined
+  assert:
+      that:
+          - dev_dependencies is defined
+      fail_msg: 'dev_dependencies config is not defined in inventory'
+      success_msg: 'dev_dependencies config found'
+
+- name: Set defaults for optional config
+  set_fact:
+      dev_deps_packages: '{{ dev_dependencies.packages | default([]) }}'
+      dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
+      dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
+      dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
+
+- name: Validate packages list format
+  assert:
+      that:
+          - dev_deps_packages is iterable
+      fail_msg: 'dev_dependencies.packages must be a list'
+  when: dev_deps_packages | length > 0
+
+- name: Validate Docker requirements on Debian
+  assert:
+      that:
+          - ansible_os_family == 'Debian'
+      fail_msg: 'Docker installation is currently supported only on Debian/Ubuntu in dev_dependencies'
+  when: dev_deps_docker.install | default(false)
+
+- name: Validate NVM configuration
+  assert:
+      that:
+          - dev_deps_nvm.user is defined
+          - dev_deps_nvm.version is defined
+          - dev_deps_nvm.node_version is defined
+      fail_msg: 'NVM install requires dev_dependencies.nvm.user, .version, and .node_version'
+  when: dev_deps_nvm.install | default(false)
+
+- name: Validate PNPM configuration
+  assert:
+      that:
+          - dev_deps_pnpm.version is defined
+      fail_msg: 'PNPM install requires dev_dependencies.pnpm.version'
+  when: dev_deps_pnpm.install | default(false)
+
+- name: Ensure NVM user exists
+  getent:
+      database: passwd
+      key: '{{ dev_deps_nvm.user }}'
+  when: dev_deps_nvm.install | default(false)
+
+- name: Enforce PNPM dependency on NVM
+  assert:
+      that:
+          - dev_deps_nvm.install | default(false)
+      fail_msg: 'PNPM install currently depends on NVM-managed Node.js; enable dev_dependencies.nvm.install'
+  when: dev_deps_pnpm.install | default(false)

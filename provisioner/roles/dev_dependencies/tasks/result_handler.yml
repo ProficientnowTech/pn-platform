@@ -1,0 +1,19 @@
+---
+# Phase 5: Handle dev dependencies results
+
+- name: Determine missing tools
+  set_fact:
+      dev_deps_missing_tools: '{{ dev_deps_requested_tools | difference(dev_deps_installed_tools) }}'
+
+- name: Set dev dependencies status
+  set_fact:
+      dev_dependencies_status: >-
+          {% if dev_deps_missing_tools | length == 0 %}success{% else %}failed{% endif %}
+
+- name: Log dev dependencies status
+  debug:
+      msg: |
+          Dev dependencies configuration status: {{ dev_dependencies_status }}
+          - Requested tools: {{ dev_deps_requested_tools | length }}
+          - Installed tools: {{ dev_deps_installed_tools | length }}
+          - Missing tools: {{ dev_deps_missing_tools | join(', ') if dev_deps_missing_tools | length > 0 else 'none' }}

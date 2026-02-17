@@ -1,0 +1,142 @@
+---
+# Phase 3: Apply dev dependencies configuration
+
+- name: Update apt cache (Debian)
+  apt:
+      update_cache: yes
+      cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+  register: apt_update
+
+- name: Install base packages (Debian)
+  apt:
+      name: '{{ dev_deps_packages }}'
+      state: present
+      install_recommends: false
+  when:
+      - ansible_os_family == 'Debian'
+      - dev_deps_packages | length > 0
+  register: apt_install_result
+
+- name: Set Docker architecture mapping
+  set_fact:
+      docker_arch: >-
+          {{
+            {
+              'x86_64': 'amd64',
+              'aarch64': 'arm64',
+              'armv7l': 'armhf'
+            }.get(ansible_architecture, ansible_architecture)
+          }}
+  when: dev_deps_docker.install | default(false)
+
+- name: Ensure Docker repository prerequisites (Debian)
+  apt:
+      name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+      state: present
+  when: dev_deps_docker.install | default(false)
+
+- name: Ensure Docker keyrings directory
+  file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+  when: dev_deps_docker.install | default(false)
+
+- name: Add Docker GPG key
+  get_url:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      dest: /etc/apt/keyrings/docker.gpg
+      mode: '0644'
+      force: true
+  when: dev_deps_docker.install | default(false)
+
+- name: Add Docker repository
+  apt_repository:
+      repo: 'deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable'
+      state: present
+      update_cache: yes
+  when: dev_deps_docker.install | default(false)
+
+- name: Install Docker packages
+  apt:
+      name: '{{ dev_deps_docker.packages | default(["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]) }}'
+      state: present
+  when: dev_deps_docker.install | default(false)
+  register: docker_install_result
+
+- name: Ensure Docker service is enabled and running
+  service:
+      name: docker
+      state: started
+      enabled: true
+  when: dev_deps_docker.install | default(false)
+
+- name: Ensure docker group exists
+  group:
+      name: docker
+      state: present
+  when: dev_deps_docker.install | default(false)
+
+- name: Add users to docker group
+  user:
+      name: '{{ item }}'
+      groups: docker
+      append: true
+  loop: '{{ dev_deps_docker.add_users | default([]) }}'
+  when:
+      - dev_deps_docker.install | default(false)
+      - dev_deps_docker.add_users is defined
+      - dev_deps_docker.add_users | length > 0
+
+- name: Install NVM
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ dev_deps_nvm.version }}/install.sh | bash
+      fi
+  args:
+      executable: /bin/bash
+      creates: '/home/{{ dev_deps_nvm.user }}/.nvm/nvm.sh'
+  when: dev_deps_nvm.install | default(false)
+  register: nvm_install
+
+- name: Install Node.js via NVM
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      nvm install {{ dev_deps_nvm.node_version }}
+      nvm alias default {{ dev_deps_nvm.node_version }}
+  args:
+      executable: /bin/bash
+  when: dev_deps_nvm.install | default(false)
+  register: node_install
+  changed_when: "'already installed' not in (node_install.stdout | default(''))"
+
+- name: Install PNPM via Corepack
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      corepack enable
+      corepack prepare pnpm@{{ dev_deps_pnpm.version }} --activate
+  args:
+      executable: /bin/bash
+  when: dev_deps_pnpm.install | default(false)
+  register: pnpm_install
+
+- name: Ensure nginx service is enabled and running
+  service:
+      name: nginx
+      state: started
+      enabled: true
+  when: "'nginx' in dev_deps_packages"

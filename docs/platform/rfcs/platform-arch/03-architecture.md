@@ -135,16 +135,235 @@ The orchestrator produces:
 
 ### 4.4 Orchestrator Algorithm
 
-The orchestrator operates continuously:
+The orchestrator operates as an event-driven state machine that continuously evaluates deployment readiness based on capability satisfaction.
 
-1. Observe current capability state
-2. For each pending deployment:
-   a. Check if all required capabilities are satisfied
-   b. If satisfied, trigger deployment
-   c. If not satisfied, continue waiting
-3. When deployments complete:
-   a. Update capability state based on deployment outcome
-   b. Re-evaluate pending deployments
+#### 4.4.1 Orchestrator State Machine
+
+The following state diagram shows the states of a deployment as managed by the orchestrator:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: Deployment Requested
+
+    Pending --> Evaluating: Event Received
+    Evaluating --> Pending: Requirements Unsatisfied
+    Evaluating --> Triggered: Requirements Satisfied
+
+    Triggered --> Deploying: ArgoCD Sync Started
+    Deploying --> Verifying: Resources Applied
+
+    Verifying --> Ready: Readiness Confirmed
+    Verifying --> Failed: Readiness Failed
+    Verifying --> Deploying: Retry (Transient)
+
+    Ready --> [*]: Steady State
+    Failed --> Pending: Retry Requested
+    Failed --> [*]: Abandoned
+
+    note right of Pending
+        Waiting for capability
+        satisfaction
+    end note
+
+    note right of Ready
+        Capability registered
+        and available
+    end note
+```
+
+#### 4.4.2 Capability State Machine
+
+Capabilities transition through the following states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unregistered
+
+    Unregistered --> Registered: Provider Declares
+    Registered --> Initializing: Deployment Started
+    Initializing --> Ready: Readiness Verified
+    Initializing --> Degraded: Partial Readiness
+
+    Ready --> Degraded: Health Check Failed
+    Ready --> Deprecated: Deprecation Announced
+
+    Degraded --> Ready: Recovery Complete
+    Degraded --> Unavailable: Failure Threshold
+
+    Deprecated --> Ready: Deprecation Cancelled
+    Deprecated --> Removed: Migration Complete
+
+    Unavailable --> Initializing: Recovery Started
+    Removed --> [*]
+
+    note right of Ready
+        Capability satisfies
+        consumer requirements
+    end note
+```
+
+#### 4.4.3 Orchestration Control Flow
+
+The following diagram shows the control flow of the orchestrator's main loop:
+
+```mermaid
+flowchart TD
+    subgraph EventLoop["Event Loop"]
+        A[Wait for Event] --> B{Event Type?}
+
+        B -->|Capability Event| C[Update Capability State]
+        B -->|Deployment Request| D[Register Pending Deployment]
+        B -->|Deployment Complete| E[Process Completion]
+
+        C --> F[Re-evaluate Pending Deployments]
+        D --> F
+        E --> F
+    end
+
+    subgraph Evaluation["Deployment Evaluation"]
+        F --> G[Get Pending Deployments]
+        G --> H{For Each Deployment}
+
+        H --> I[Get Required Capabilities]
+        I --> J{All Satisfied?}
+
+        J -->|Yes| K[Trigger Deployment]
+        J -->|No| L[Remain Pending]
+
+        K --> M[Update State to Triggered]
+        L --> H
+        M --> H
+
+        H -->|Done| A
+    end
+
+    subgraph Satisfaction["Capability Satisfaction Check"]
+        I --> N[Build Requirement Set R]
+        N --> O[Build Satisfied Set S]
+        O --> P{R ⊆ S?}
+        P --> J
+    end
+```
+
+#### 4.4.4 Formal Algorithm Specification
+
+The orchestrator algorithm is specified using standard algorithmic notation:
+
+---
+
+**ALGORITHM 1: OrchestratorMainLoop**
+
+```
+ALGORITHM OrchestratorMainLoop
+────────────────────────────────────────────────────────────────────────
+INPUT:  EventQueue E         ▷ Queue of incoming events
+        CapabilityRegistry C ▷ Current capability state
+        DeploymentSet D      ▷ Set of all deployments
+OUTPUT: Updated states for C and D
+
+ 1  loop forever
+ 2  │  event ← DEQUEUE(E)
+ 3  │
+ 4  │  case event.type of
+ 5  │  │  CAPABILITY_REGISTERED:
+ 6  │  │  │  C ← C ∪ {event.capability}
+ 7  │  │  │  EVALUATE-PENDING-DEPLOYMENTS(D, C)
+ 8  │  │
+ 9  │  │  CAPABILITY_READY:
+10  │  │  │  C[event.capability].state ← READY
+11  │  │  │  EVALUATE-PENDING-DEPLOYMENTS(D, C)
+12  │  │
+13  │  │  CAPABILITY_UNREADY:
+14  │  │  │  C[event.capability].state ← DEGRADED
+15  │  │  │  NOTIFY-CONSUMERS(event.capability)
+16  │  │
+17  │  │  DEPLOYMENT_REQUESTED:
+18  │  │  │  d ← CREATE-DEPLOYMENT(event.spec)
+19  │  │  │  d.state ← PENDING
+20  │  │  │  D ← D ∪ {d}
+21  │  │  │  EVALUATE-DEPLOYMENT(d, C)
+22  │  │
+23  │  │  DEPLOYMENT_COMPLETED:
+24  │  │  │  d ← D[event.deployment_id]
+25  │  │  │  if event.success then
+26  │  │  │  │  d.state ← READY
+27  │  │  │  │  REGISTER-PROVIDED-CAPABILITIES(d, C)
+28  │  │  │  │  EVALUATE-PENDING-DEPLOYMENTS(D, C)
+29  │  │  │  else
+30  │  │  │  │  HANDLE-DEPLOYMENT-FAILURE(d, event.error)
+31  │  │  end case
+32  end loop
+────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+**ALGORITHM 2: EvaluatePendingDeployments**
+
+```
+ALGORITHM EvaluatePendingDeployments
+────────────────────────────────────────────────────────────────────────
+INPUT:  DeploymentSet D      ▷ Set of all deployments
+        CapabilityRegistry C ▷ Current capability state
+OUTPUT: Triggered deployments
+
+ 1  P ← {d ∈ D : d.state = PENDING}          ▷ Get pending deployments
+ 2
+ 3  for each deployment d ∈ P do
+ 4  │  if REQUIREMENTS-SATISFIED(d, C) then
+ 5  │  │  d.state ← TRIGGERED
+ 6  │  │  TRIGGER-ARGOCD-SYNC(d)
+ 7  │  │  EMIT-EVENT(DEPLOYMENT_TRIGGERED, d)
+ 8  │  end if
+ 9  end for
+────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+**ALGORITHM 3: RequirementsSatisfied**
+
+```
+ALGORITHM RequirementsSatisfied
+────────────────────────────────────────────────────────────────────────
+INPUT:  Deployment d         ▷ Deployment to check
+        CapabilityRegistry C ▷ Current capability state
+OUTPUT: Boolean indicating whether all requirements are satisfied
+
+ 1  R ← d.required_capabilities                ▷ Required capability set
+ 2
+ 3  for each requirement r ∈ R do
+ 4  │  if r.capability_name ∉ C then
+ 5  │  │  return FALSE                         ▷ Capability not registered
+ 6  │  end if
+ 7  │
+ 8  │  c ← C[r.capability_name]
+ 9  │
+10  │  if c.state ≠ READY then
+11  │  │  if r.mandatory = TRUE then
+12  │  │  │  return FALSE                      ▷ Mandatory capability not ready
+13  │  │  end if
+14  │  end if
+15  │
+16  │  if ¬VERSION-COMPATIBLE(c.version, r.min_version) then
+17  │  │  return FALSE                         ▷ Version mismatch
+18  │  end if
+19  end for
+20
+21  return TRUE                                ▷ All requirements satisfied
+────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+#### 4.4.5 Algorithm Properties
+
+| Property | Guarantee | Proof Sketch |
+|----------|-----------|--------------|
+| Termination | Each event processing terminates | Finite deployments, finite capabilities |
+| Determinism | Same events → same state | No external randomness, ordered processing |
+| Monotonicity | Satisfied capabilities remain satisfied | Only explicit revocation changes READY state |
+| Convergence | System reaches stable state | Acyclic dependencies, finite graph |
 
 This algorithm is event-driven. State changes trigger re-evaluation. The orchestrator does not poll.
 
@@ -192,7 +411,53 @@ Contracts are versioned. Version compatibility rules govern which consumers can 
 
 ### 5.4 Capability Flow
 
-The lifecycle of a capability:
+The lifecycle of a capability follows a defined sequence from registration through optional removal:
+
+```mermaid
+sequenceDiagram
+    participant P as Provider
+    participant O as Orchestrator
+    participant R as Registry
+    participant C as Consumer
+
+    Note over P,C: Phase 1: Registration
+    P->>O: 1. Register capability
+    O->>R: 2. Store registration
+    R->>O: 3. Capability registered
+
+    Note over P,C: Phase 2: Advertisement
+    O->>C: 4. Capability available
+
+    Note over P,C: Phase 3: Requirement
+    C->>O: 5. Declare requirement
+    O->>O: 6. Check satisfaction
+
+    Note over P,C: Phase 4: Satisfaction
+    P->>O: 7. Signal readiness
+    O->>C: 8. Requirement satisfied
+    O->>C: 9. Trigger deployment
+
+    Note over P,C: Phase 5: Consumption
+    C->>P: 10. Access capability
+    P->>C: 11. Provide service
+
+    Note over P,C: Phase 6: Maintenance (ongoing)
+    loop Health Monitoring
+        O->>P: Check readiness
+        P->>O: Readiness status
+    end
+
+    Note over P,C: Phase 7: Deprecation (optional)
+    P->>O: 12. Announce deprecation
+    O->>C: 13. Deprecation notice
+
+    Note over P,C: Phase 8: Removal (after migration)
+    C->>O: 14. Confirm migration
+    P->>O: 15. Request removal
+    O->>R: 16. Remove capability
+```
+
+**Capability Lifecycle Stages:**
 
 1. **Registration:** Provider registers capability
 2. **Advertisement:** Capability becomes visible to consumers
@@ -223,7 +488,41 @@ The platform consists of:
 
 ### 6.2 Control Flow
 
-Control flows as follows:
+Control flows through the system as illustrated:
+
+```mermaid
+flowchart LR
+    subgraph External["External"]
+        Git[(Git Repository)]
+    end
+
+    subgraph Platform["Platform Core"]
+        Argo[ArgoCD]
+        Orch[Orchestrator]
+        Reg[(Capability Registry)]
+    end
+
+    subgraph Cluster["Kubernetes Cluster"]
+        K8s[API Server]
+        Pods[Application Pods]
+        Infra[Infrastructure Pods]
+    end
+
+    Git -->|1. Detect change| Argo
+    Argo -->|2. Notify pending| Orch
+    Orch -->|3. Check| Reg
+    Reg -->|4. Requirements| Orch
+    Orch -->|5. Approve/Block| Argo
+    Argo -->|6. Apply manifests| K8s
+    K8s -->|7. Create resources| Pods
+    K8s -->|7. Create resources| Infra
+    Pods -->|8. Register capability| Orch
+    Infra -->|8. Register capability| Orch
+    Orch -->|9. Update registry| Reg
+    Orch -->|10. Re-evaluate| Orch
+```
+
+**Control Flow Steps:**
 
 1. Git change triggers ArgoCD
 2. ArgoCD notifies orchestrator of pending deployment

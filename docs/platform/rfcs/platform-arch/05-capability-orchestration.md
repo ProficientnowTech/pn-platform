@@ -83,21 +83,17 @@ Event-driven operation means the orchestrator is reactive. It responds to change
 
 ### 3.2 Event Types
 
-The orchestrator processes these event types:
+The orchestrator processes the following event types:
 
-**Capability Registered:** A provider has registered a new capability. New capabilities may satisfy pending requirements.
-
-**Capability Ready:** A capability has become ready. Ready capabilities may enable waiting deployments.
-
-**Capability Unready:** A capability has become unready. This may affect consumers but does not trigger automatic remediation.
-
-**Capability Removed:** A capability has been removed. Consumers depending on this capability are affected.
-
-**Deployment Requested:** A Git change has introduced a new deployment. The orchestrator evaluates requirements.
-
-**Deployment Completed:** A deployment has finished. The orchestrator updates capability state.
-
-**Deployment Failed:** A deployment has failed. The orchestrator handles the failure.
+| Event | Category | Source(s) | Description | Orchestrator Action |
+|-------|----------|-----------|-------------|---------------------|
+| `CAPABILITY_REGISTERED` | Capability | Provider Pods | Provider declares a new capability | Add to registry, re-evaluate pending |
+| `CAPABILITY_READY` | Capability | Provider Pods, Health Checks | Capability passes readiness verification | Mark satisfied, trigger waiting deployments |
+| `CAPABILITY_UNREADY` | Capability | Provider Pods, Health Checks | Capability fails readiness check | Mark degraded, notify consumers |
+| `CAPABILITY_REMOVED` | Capability | Provider Pods | Capability is withdrawn | Remove from registry, block dependents |
+| `DEPLOYMENT_REQUESTED` | Deployment | Git Repository | Git change introduces new deployment | Evaluate requirements, queue or trigger |
+| `DEPLOYMENT_COMPLETED` | Deployment | ArgoCD | Deployment finishes successfully | Register provided capabilities |
+| `DEPLOYMENT_FAILED` | Deployment | ArgoCD | Deployment cannot complete | Classify failure, initiate recovery |
 
 ### 3.3 Event Properties
 
@@ -113,14 +109,33 @@ Events have the following properties:
 
 ### 3.4 Event Flow
 
-Events flow through the system:
+Events flow through the system according to the following sequence:
 
-1. State change occurs (Git commit, pod ready, etc.)
-2. Event is emitted
-3. Event is persisted
-4. Orchestrator processes event
-5. Orchestrator updates internal state
-6. Orchestrator emits consequent events or triggers actions
+```mermaid
+sequenceDiagram
+    participant Git as Git Repository
+    participant Argo as ArgoCD
+    participant Orch as Orchestrator
+    participant K8s as Kubernetes
+    participant Prov as Provider Pod
+
+    Git->>Argo: 1. Commit detected
+    Argo->>Orch: 2. DEPLOYMENT_REQUESTED
+    Orch->>Orch: 3. Check requirements
+
+    alt Requirements Satisfied
+        Orch->>Argo: 4a. Trigger sync
+        Argo->>K8s: 5. Apply manifests
+        K8s->>Prov: 6. Create resources
+        Prov->>Orch: 7. CAPABILITY_REGISTERED
+        Prov->>Orch: 8. CAPABILITY_READY
+        Argo->>Orch: 9. DEPLOYMENT_COMPLETED
+        Orch->>Orch: 10. Re-evaluate pending
+    else Requirements Not Satisfied
+        Orch->>Orch: 4b. Remain pending
+        Note over Orch: Wait for capability events
+    end
+```
 
 ### 3.5 Event Ordering Guarantees
 
@@ -131,6 +146,35 @@ Events maintain causal ordering:
 - Cross-capability events may be processed concurrently
 
 Causal ordering ensures correctness. Effects follow causes.
+
+#### 3.5.1 Formal Event Ordering
+
+---
+
+**ALGORITHM 7: EventOrdering**
+
+```
+ALGORITHM EventOrdering
+────────────────────────────────────────────────────────────────────────
+INPUT:  Event e₁, Event e₂
+OUTPUT: Ordering relationship
+
+ 1  ▷ Same-source ordering (total order within source)
+ 2  if e₁.source = e₂.source then
+ 3  │  return e₁.timestamp < e₂.timestamp
+ 4  end if
+ 5
+ 6  ▷ Same-capability ordering (causal order)
+ 7  if e₁.capability = e₂.capability then
+ 8  │  return e₁.sequence_number < e₂.sequence_number
+ 9  end if
+10
+11  ▷ Cross-capability: concurrent (no ordering required)
+12  return CONCURRENT
+────────────────────────────────────────────────────────────────────────
+```
+
+---
 
 ---
 
@@ -198,11 +242,11 @@ The orchestrator enforces ordering constraints:
 
 Failures are categorized by scope and recoverability:
 
-**Transient failures:** Temporary conditions that resolve without intervention. Network glitches, temporary resource exhaustion.
-
-**Persistent failures:** Conditions that require intervention. Misconfiguration, resource conflicts, missing dependencies.
-
-**Partial failures:** Some components succeed while others fail. Requires careful handling to avoid inconsistent state.
+| Category | Characteristics | Examples | Recovery Action | Intervention |
+|----------|-----------------|----------|-----------------|--------------|
+| **Transient** | Temporary, self-resolving | Network glitch, temporary resource exhaustion, API timeout | Automatic retry with exponential backoff | None required |
+| **Persistent** | Requires external fix | Misconfiguration, missing dependency, invalid manifest, quota exceeded | Alert and block dependents | Manual intervention |
+| **Partial** | Mixed success/failure state | Some pods failed, partial rollout, subset of resources created | Rollback successful components, alert | Manual review |
 
 ### 5.2 Failure Detection
 
@@ -230,14 +274,63 @@ Failure handling follows these principles:
 
 ### 5.4 Transient Failure Recovery
 
-Transient failures are handled through retry:
+Transient failures are handled through exponential backoff retry:
 
-1. Failure is detected
-2. Backoff period is observed
-3. Deployment is retried
-4. If successful, normal flow resumes
-5. If failed, retry continues up to limit
-6. If limit exceeded, failure becomes persistent
+```mermaid
+stateDiagram-v2
+    [*] --> Deploying
+
+    Deploying --> Failed: Failure Detected
+    Failed --> Classifying: Analyze Failure
+
+    Classifying --> WaitingRetry: Transient
+    Classifying --> Blocked: Persistent
+    Classifying --> RollingBack: Partial
+
+    WaitingRetry --> Deploying: Backoff Complete
+    WaitingRetry --> Blocked: Max Retries Exceeded
+
+    RollingBack --> Failed: Rollback Complete
+    Blocked --> [*]: Manual Intervention
+
+    note right of WaitingRetry
+        Backoff: 2^n seconds
+        Max retries: configurable
+    end note
+```
+
+---
+
+**ALGORITHM 8: TransientFailureRecovery**
+
+```
+ALGORITHM TransientFailureRecovery
+────────────────────────────────────────────────────────────────────────
+INPUT:  Deployment d          ▷ Failed deployment
+        Config cfg            ▷ Retry configuration
+OUTPUT: Deployment state
+
+ 1  d.retry_count ← d.retry_count + 1
+ 2
+ 3  if d.retry_count > cfg.max_retries then
+ 4  │  d.state ← BLOCKED
+ 5  │  EMIT-ALERT(PERSISTENT_FAILURE, d)
+ 6  │  return d.state
+ 7  end if
+ 8
+ 9  ▷ Exponential backoff with jitter
+10  base_delay ← cfg.initial_delay × 2^(d.retry_count - 1)
+11  jitter ← RANDOM(0, base_delay × 0.1)
+12  delay ← MIN(base_delay + jitter, cfg.max_delay)
+13
+14  SCHEDULE-RETRY(d, delay)
+15  d.state ← WAITING_RETRY
+16
+17  return d.state
+────────────────────────────────────────────────────────────────────────
+```
+
+---
 
 Retry is automatic. The orchestrator retries without manual intervention.
 
@@ -245,12 +338,25 @@ Retry is automatic. The orchestrator retries without manual intervention.
 
 Persistent failures require intervention:
 
-1. Failure is detected and categorized as persistent
-2. Alert is raised
-3. Deployment is marked as failed
-4. Dependent deployments are blocked
-5. Intervention corrects the failure
-6. Deployment is retriggered (manually or through Git change)
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant A as Alert System
+    participant D as Dependent Deployments
+    participant Op as Operator
+    participant G as Git
+
+    O->>O: 1. Classify as Persistent
+    O->>A: 2. Emit Alert
+    O->>D: 3. Block Dependents
+
+    Note over D: Dependents remain PENDING
+
+    Op->>G: 4. Fix Configuration
+    G->>O: 5. New Deployment Event
+    O->>O: 6. Re-evaluate
+    O->>D: 7. Unblock Dependents
+```
 
 Persistent failures do not block the entire platform. Only dependent deployments are blocked.
 
@@ -258,10 +364,30 @@ Persistent failures do not block the entire platform. Only dependent deployments
 
 Partial failures are the most complex case:
 
-1. Some components of a deployment succeed
-2. Other components fail
-3. The deployment cannot be considered successful
-4. Rolling back successful components may be required
+```mermaid
+flowchart TD
+    A[Deployment Started] --> B[Resources Applied]
+    B --> C{All Succeeded?}
+
+    C -->|Yes| D[Complete Success]
+    C -->|No| E{Any Succeeded?}
+
+    E -->|None| F[Complete Failure]
+    E -->|Some| G[Partial Failure]
+
+    G --> H[Identify Successful Resources]
+    H --> I{Rollback Policy?}
+
+    I -->|Rollback| J[Revert Successful]
+    I -->|Keep| K[Mark Inconsistent]
+
+    J --> L[State: FAILED]
+    K --> L
+    F --> L
+
+    D --> M[State: READY]
+    L --> N[Trigger Recovery Flow]
+```
 
 Partial failures are handled by ArgoCD sync semantics. The orchestrator treats the deployment as failed.
 
@@ -269,10 +395,49 @@ Partial failures are handled by ArgoCD sync semantics. The orchestrator treats t
 
 After recovery, state must be verified:
 
-1. All expected resources exist
-2. All resources are in expected state
-3. Capabilities are correctly registered
-4. Downstream dependencies are satisfied
+---
+
+**ALGORITHM 9: RecoveryVerification**
+
+```
+ALGORITHM RecoveryVerification
+────────────────────────────────────────────────────────────────────────
+INPUT:  Deployment d          ▷ Recovered deployment
+OUTPUT: Boolean indicating recovery completeness
+
+ 1  ▷ Phase 1: Resource verification
+ 2  expected ← d.manifest.resources
+ 3  actual ← GET-CLUSTER-RESOURCES(d.namespace)
+ 4
+ 5  for each resource r ∈ expected do
+ 6  │  if r ∉ actual then
+ 7  │  │  return FALSE                         ▷ Missing resource
+ 8  │  end if
+ 9  │  if actual[r].state ≠ READY then
+10  │  │  return FALSE                         ▷ Resource not ready
+11  │  end if
+12  end for
+13
+14  ▷ Phase 2: Capability verification
+15  for each capability c ∈ d.provides do
+16  │  if ¬CAPABILITY-READY(c) then
+17  │  │  return FALSE                         ▷ Capability not ready
+18  │  end if
+19  end for
+20
+21  ▷ Phase 3: Consumer verification
+22  consumers ← GET-CONSUMERS(d.provides)
+23  for each consumer con ∈ consumers do
+24  │  if con.state = BLOCKED then
+25  │  │  UNBLOCK(con)                         ▷ Re-enable blocked consumers
+26  │  end if
+27  end for
+28
+29  return TRUE                                ▷ Recovery complete
+────────────────────────────────────────────────────────────────────────
+```
+
+---
 
 Verification ensures that recovery is complete. Incomplete recovery is continued failure.
 
@@ -282,18 +447,241 @@ Verification ensures that recovery is complete. Incomplete recovery is continued
 
 ### 6.1 Resolution Algorithm
 
-Dependency resolution determines deployment order:
+Dependency resolution determines deployment order through graph analysis and topological sorting.
 
-1. Build capability dependency graph from declarations
-2. Detect cycles (cycles are errors)
-3. Topologically sort the graph
-4. Deploy in topological order, respecting capability satisfaction
+#### 6.1.1 Dependency Graph Structure
 
-The algorithm is deterministic. Same graph produces same order.
+The dependency graph G = (V, E) where:
+- V = set of deployments (applications and infrastructure)
+- E = set of directed edges representing capability dependencies
+- Edge (u, v) exists if deployment u requires a capability provided by deployment v
+
+```mermaid
+flowchart TD
+    subgraph Infrastructure["Shared Infrastructure (Deploy First)"]
+        DB[(PostgreSQL)]
+        Cache[(Redis)]
+        Auth[Identity Service]
+    end
+
+    subgraph Applications["Applications (Deploy After Dependencies)"]
+        App1[Application A]
+        App2[Application B]
+        App3[Application C]
+    end
+
+    App1 -.->|requires postgresql-database| DB
+    App1 -.->|requires redis-cache| Cache
+    App2 -.->|requires postgresql-database| DB
+    App2 -.->|requires identity-auth| Auth
+    App3 -.->|requires redis-cache| Cache
+    App3 -.->|requires identity-auth| Auth
+```
+
+**Notation:** Dashed arrows (-.->)  indicate capability requirements. Infrastructure providers must be ready before consuming applications can deploy.
+
+#### 6.1.2 Resolution Flow
+
+```mermaid
+flowchart TD
+    A[Start: Deployment Set D] --> B[Build Dependency Graph G]
+    B --> C{Detect Cycles}
+
+    C -->|Cycle Found| D[ERROR: Circular Dependency]
+    D --> E[Report Cycle Path]
+    E --> F[Abort Resolution]
+
+    C -->|No Cycles| G[Compute Topological Order]
+    G --> H[Initialize Ready Set S = ∅]
+    H --> I[Initialize Deploy Queue Q]
+
+    I --> J{Q empty?}
+    J -->|Yes| K[Resolution Complete]
+
+    J -->|No| L[d = DEQUEUE Q]
+    L --> M{deps d ⊆ S?}
+
+    M -->|Yes| N[Deploy d]
+    N --> O[S = S ∪ capabilities d]
+    O --> P[Mark d Complete]
+    P --> J
+
+    M -->|No| Q[Re-enqueue d]
+    Q --> R[Process Next Event]
+    R --> J
+```
+
+#### 6.1.3 Formal Algorithm Specification
+
+---
+
+**ALGORITHM 4: DependencyResolution**
+
+```
+ALGORITHM DependencyResolution
+────────────────────────────────────────────────────────────────────────
+INPUT:  DeploymentSet D      ▷ Set of all deployments with declarations
+OUTPUT: Ordered list L of deployments, or ERROR if cycle exists
+
+ 1  ▷ Phase 1: Build dependency graph
+ 2  V ← D                                      ▷ Vertices are deployments
+ 3  E ← ∅                                      ▷ Initialize edge set
+ 4
+ 5  for each deployment d ∈ D do
+ 6  │  for each requirement r ∈ d.requires do
+ 7  │  │  p ← FIND-PROVIDER(r.capability, D)
+ 8  │  │  if p ≠ NIL then
+ 9  │  │  │  E ← E ∪ {(d, p)}                  ▷ d depends on p
+10  │  │  end if
+11  │  end for
+12  end for
+13
+14  G ← (V, E)
+15
+16  ▷ Phase 2: Cycle detection using DFS
+17  if HAS-CYCLE(G) then
+18  │  cycle ← FIND-CYCLE-PATH(G)
+19  │  return ERROR("Circular dependency: " + cycle)
+20  end if
+21
+22  ▷ Phase 3: Topological sort
+23  L ← TOPOLOGICAL-SORT(G)
+24
+25  return REVERSE(L)                          ▷ Providers before consumers
+────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+**ALGORITHM 5: HasCycle (Cycle Detection)**
+
+```
+ALGORITHM HasCycle
+────────────────────────────────────────────────────────────────────────
+INPUT:  Graph G = (V, E)
+OUTPUT: Boolean indicating whether G contains a cycle
+
+ 1  color ← new Map()                          ▷ WHITE, GRAY, BLACK
+ 2  for each vertex v ∈ V do
+ 3  │  color[v] ← WHITE
+ 4  end for
+ 5
+ 6  for each vertex v ∈ V do
+ 7  │  if color[v] = WHITE then
+ 8  │  │  if DFS-VISIT(v, color, E) = TRUE then
+ 9  │  │  │  return TRUE                       ▷ Cycle found
+10  │  │  end if
+11  │  end if
+12  end for
+13
+14  return FALSE                               ▷ No cycle
+────────────────────────────────────────────────────────────────────────
+
+ALGORITHM DFS-Visit
+────────────────────────────────────────────────────────────────────────
+INPUT:  Vertex v, ColorMap color, EdgeSet E
+OUTPUT: Boolean indicating cycle through v
+
+ 1  color[v] ← GRAY                            ▷ Currently visiting
+ 2
+ 3  for each edge (v, u) ∈ E do
+ 4  │  if color[u] = GRAY then
+ 5  │  │  return TRUE                          ▷ Back edge = cycle
+ 6  │  end if
+ 7  │  if color[u] = WHITE then
+ 8  │  │  if DFS-VISIT(u, color, E) = TRUE then
+ 9  │  │  │  return TRUE
+10  │  │  end if
+11  │  end if
+12  end for
+13
+14  color[v] ← BLACK                           ▷ Finished visiting
+15  return FALSE
+────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+**ALGORITHM 6: TopologicalSort (Kahn's Algorithm)**
+
+```
+ALGORITHM TopologicalSort
+────────────────────────────────────────────────────────────────────────
+INPUT:  Graph G = (V, E)           ▷ Acyclic directed graph
+OUTPUT: List L in topological order
+
+ 1  in_degree ← new Map()
+ 2  for each vertex v ∈ V do
+ 3  │  in_degree[v] ← 0
+ 4  end for
+ 5
+ 6  for each edge (u, v) ∈ E do
+ 7  │  in_degree[v] ← in_degree[v] + 1
+ 8  end for
+ 9
+10  Q ← new Queue()                            ▷ Vertices with no dependencies
+11  for each vertex v ∈ V do
+12  │  if in_degree[v] = 0 then
+13  │  │  ENQUEUE(Q, v)
+14  │  end if
+15  end for
+16
+17  L ← []                                     ▷ Result list
+18
+19  while Q ≠ ∅ do
+20  │  v ← DEQUEUE(Q)
+21  │  APPEND(L, v)
+22  │
+23  │  for each edge (v, u) ∈ E do
+24  │  │  in_degree[u] ← in_degree[u] - 1
+25  │  │  if in_degree[u] = 0 then
+26  │  │  │  ENQUEUE(Q, u)
+27  │  │  end if
+28  │  end for
+29  end while
+30
+31  return L
+────────────────────────────────────────────────────────────────────────
+```
+
+---
+
+#### 6.1.4 Complexity Analysis
+
+| Operation | Time Complexity | Space Complexity |
+|-----------|-----------------|------------------|
+| Graph Construction | O(D × R) | O(D + E) |
+| Cycle Detection | O(V + E) | O(V) |
+| Topological Sort | O(V + E) | O(V) |
+| **Total** | **O(D × R + V + E)** | **O(D + E)** |
+
+Where:
+- D = number of deployments
+- R = average requirements per deployment
+- V = |D| (vertices)
+- E = total dependency edges
 
 ### 6.2 Cycle Detection
 
-Cycles are detected before deployment begins:
+Cycles are detected before deployment begins using depth-first search (DFS) with vertex coloring:
+
+```mermaid
+flowchart LR
+    subgraph ValidGraph["Valid: Acyclic"]
+        A1[App A] --> B1[Service B]
+        B1 --> C1[Database C]
+        A1 --> C1
+    end
+
+    subgraph InvalidGraph["Invalid: Cyclic"]
+        A2[App A] --> B2[Service B]
+        B2 --> C2[Service C]
+        C2 --> A2
+    end
+
+    style InvalidGraph fill:#ffcccc
+    style ValidGraph fill:#ccffcc
+```
 
 - A requires B, B requires A → cycle
 - A requires B, B requires C, C requires A → cycle

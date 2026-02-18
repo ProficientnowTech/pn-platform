@@ -15,7 +15,116 @@ This section explains the rationale behind key architectural decisions and docum
 
 ---
 
-## 2. Relationship with ArgoCD
+## 2. Binary Categorization Rationale
+
+### 2.1 Why Binary Categorization
+
+Components are classified into exactly two categories: Infrastructure Provider and Platform Consumer. This binary classification is not arbitrary—it is driven by a fundamental architectural constraint.
+
+**The constraint:** Base chart templates consume capabilities from Infrastructure Providers. If an Infrastructure Provider used the base chart, it would create a circular dependency.
+
+**Example:** If cert-manager used the base chart, and the base chart contains Certificate templates that consume cert-manager, cert-manager would depend on itself. This is impossible to deploy.
+
+### 2.2 Why Not Multiple Categories
+
+Previous models used four or more categories (Platform Core, Shared Infrastructure, Platform Applications, Platform Utilities). This created ambiguity:
+- Which categories use the base chart?
+- Where do observability components fit?
+- How does category determine deployment order?
+
+Binary categorization eliminates ambiguity. The single question—"Does base chart depend on this component's capability?"—produces a deterministic answer with clear implications.
+
+### 2.3 Why Not Phases or Layers
+
+Phases (Phase 1, Phase 2, Phase 3) and layers (Layer 0, Layer 1) imply sequential ordering. This is overly constraining:
+- Components may deploy concurrently if their requirements are satisfied
+- Phases create artificial dependencies between unrelated components
+- Phase numbers are meaningless—they don't explain why ordering exists
+
+Binary categorization focuses on base chart usage, not deployment ordering. Deployment order is determined by capability DAG resolution, which is more flexible and meaningful than phases.
+
+### 2.4 The Binary Test
+
+The test is simple and deterministic:
+
+**Does this component PROVIDE a capability that base chart templates consume?**
+- YES → Infrastructure Provider (no base chart)
+- NO → Platform Consumer (must use base chart)
+
+This test produces consistent results. No edge cases. No judgment calls. No ambiguity.
+
+---
+
+## 3. DAG-Based Resolution Rationale
+
+### 3.1 Why DAG Resolution
+
+Capability orchestration uses Directed Acyclic Graph (DAG) based resolution:
+- **Directed:** Dependencies flow from consumer to provider
+- **Acyclic:** Cycles are rejected at declaration time
+- Components deploy when ALL requirements are satisfied
+- Multiple components may deploy concurrently
+
+### 3.2 Why Not Phases
+
+Phases imply a predetermined sequence (Phase 1 completes, then Phase 2 begins). This model has problems:
+- Phases are implementation-specific ordering
+- Phases don't explain why components are in which phase
+- Phase numbers change when components are added/removed
+- Phases don't support parallelism within a "phase"
+
+DAG resolution is semantic. A component deploys when its capabilities are ready—not when an arbitrary phase number is reached.
+
+### 3.3 Why Not Layers
+
+Layers imply hierarchy (Layer 0 → Layer 1 → Layer 2). This model has problems:
+- Layer numbers are arbitrary
+- Layers conflate deployment order with component classification
+- Layers don't handle cross-layer dependencies well
+
+DAG resolution handles dependencies naturally. If component A requires component B's capability, A waits for B—regardless of any layer classification.
+
+### 3.4 Cycle Rejection at Declaration Time
+
+Cycles (A requires B, B requires A) are detected and rejected before deployment begins. This is better than runtime cycle detection because:
+- Errors surface early (at commit/validation time)
+- No wasted deployment attempts
+- Clear error messages identify the cycle
+
+---
+
+## 4. Base Chart Scope Rationale
+
+### 4.1 Why Platform Consumers Only
+
+The base chart is used exclusively by Platform Consumers. Infrastructure Providers cannot use it. This is not a governance choice—it is an architectural necessity.
+
+**The reason:** Base chart templates consume capabilities from Infrastructure Providers. If Infrastructure Providers used the base chart:
+- cert-manager would depend on Certificate templates that depend on cert-manager
+- Keycloak would depend on Keycloak client templates that depend on Keycloak
+- Every Infrastructure Provider would have a circular dependency
+
+### 4.2 Why Single Base Chart
+
+A single base chart (not multiple) exists because:
+- Uniform integration for all Platform Consumers
+- Single maintenance stream
+- Consistent governance
+- Platform evolution applies to all Platform Consumers at once
+
+### 4.3 Base Chart Evolution
+
+When new Infrastructure Providers are added:
+1. Infrastructure Provider deploys (without base chart)
+2. Infrastructure Provider becomes operational
+3. Base chart is updated with new templates
+4. Platform Consumers can use new capability through base chart
+
+The base chart is always updated AFTER the Infrastructure Provider is operational. This maintains the dependency direction.
+
+---
+
+## 5. ArgoCD Relationship
 
 ### 2.1 Why ArgoCD Is Used
 
@@ -95,7 +204,7 @@ The platform extends ArgoCD rather than replacing it.
 
 ---
 
-## 3. Rejected Alternatives
+## 6. Rejected Alternatives
 
 ### 3.1 Alternative: Application-Level Dependency Management
 
@@ -189,7 +298,7 @@ Explicit declaration is mandatory. No capability inference.
 
 ---
 
-## 4. Explicit Prohibitions
+## 7. Explicit Prohibitions
 
 ### 4.1 Prohibition: Application-to-Application Dependencies
 
@@ -257,7 +366,7 @@ Applications MUST NOT create secrets.
 
 ---
 
-## 5. Design Trade-offs
+## 8. Design Trade-offs
 
 ### 5.1 Complexity vs. Correctness
 
@@ -285,7 +394,7 @@ Explicit declaration requires effort. Applications must declare every capability
 
 ---
 
-## 6. Why These Decisions Matter
+## 9. Why These Decisions Matter
 
 ### 6.1 Determinism
 
@@ -307,9 +416,27 @@ Rejected alternatives impede evolution. Tight coupling, fragmented integration, 
 
 ---
 
-## 7. Summary
+## 10. Summary
 
-### 7.1 ArgoCD Relationship
+### 10.1 Binary Categorization Rationale
+
+| Decision | Rationale |
+|----------|-----------|
+| Binary categories | Prevents circular dependencies |
+| Infrastructure Provider vs Platform Consumer | Determined by base chart consumption |
+| No phases or layers | DAG resolution is more flexible |
+| Single decision test | Eliminates ambiguity |
+
+### 10.2 DAG Resolution Rationale
+
+| Decision | Rationale |
+|----------|-----------|
+| DAG-based resolution | Semantic dependency ordering |
+| No phases | Phases are arbitrary |
+| Concurrent deployment | Independent components deploy in parallel |
+| Cycle rejection | Detected at declaration time |
+
+### 10.3 ArgoCD Relationship
 
 | ArgoCD Does | Orchestrator Does |
 |-------------|-------------------|
@@ -317,7 +444,7 @@ Rejected alternatives impede evolution. Tight coupling, fragmented integration, 
 | Drift detection | Capability satisfaction |
 | Resource health | Semantic readiness |
 
-### 7.2 Rejected Alternatives
+### 10.4 Rejected Alternatives
 
 | Alternative | Rejection Reason |
 |-------------|------------------|
@@ -328,7 +455,7 @@ Rejected alternatives impede evolution. Tight coupling, fragmented integration, 
 | Per-application infrastructure | Duplicates burden, fragments governance |
 | Implicit capabilities | Unreliable, undiscoverable |
 
-### 7.3 Prohibitions
+### 10.5 Prohibitions
 
 | Prohibited | Rationale |
 |------------|-----------|
@@ -340,7 +467,7 @@ Rejected alternatives impede evolution. Tight coupling, fragmented integration, 
 | Application operators/CRDs | Platform authority |
 | Application secret creation | Bypasses management |
 
-### 7.4 Trade-offs Accepted
+### 10.6 Trade-offs Accepted
 
 | Sacrificed | Gained |
 |------------|--------|

@@ -5,15 +5,23 @@ Category: Standards Track                       Capability Orchestration
 
 # 5. Capability Orchestration
 
-[← Components](./04-components.md) | [Index](./00-index.md#table-of-contents) | [Next: Shared Infrastructure →](./06-shared-infrastructure.md)
+[← Binary Component Categorization](./04-components.md) | [Index](./00-index.md#table-of-contents) | [Next: Shared Infrastructure →](./06-shared-infrastructure.md)
 
 ---
 
-> **Normative Reference:** This section describes orchestration concepts. Implementation details using Argo Workflows DAG-based deployment are specified in [RFC-DEPLOY-0001](../deploy-ops/00-index.md).
+> **Scope Note:** This section describes the orchestration model—capabilities, providers, consumers, contracts, and DAG-based resolution. Implementation mechanisms are specified in [RFC-DEPLOY-0001](../deploy-ops/00-index.md). This RFC defines WHAT the model is, not HOW to implement orchestration.
 
 ## 5.1 Overview
 
-This section defines how the platform orchestrates deployments based on capability satisfaction. It covers readiness semantics, the event model, execution semantics, and failure handling. These mechanisms ensure that applications are deployed in correct order and that failures are handled without corrupting system state.
+This section defines how the platform orchestrates deployments based on capability satisfaction. Orchestration uses Directed Acyclic Graph (DAG) resolution: components deploy when ALL required capabilities are satisfied, with no phase or layer hierarchy constraining deployment order.
+
+The model covers:
+- **Readiness semantics:** When capabilities are considered satisfied
+- **DAG resolution:** How dependencies determine deployment order
+- **Event model:** How state changes trigger orchestration decisions
+- **Failure handling:** How failures are isolated and recovered
+
+These mechanisms ensure that Infrastructure Providers and Platform Consumers deploy in correct order based solely on declared capability dependencies.
 
 ---
 
@@ -49,15 +57,15 @@ Readiness must be verified, not assumed. The orchestrator does not trust that a 
 
 Verification is continuous. Readiness can change. A capability that was ready may become unready. The orchestrator monitors readiness continuously.
 
-### 2.4 Correctness Through Ordering
+### 2.4 Correctness Through DAG Resolution
 
-Correct orchestration ensures applications are deployed only when their requirements are satisfied. This ordering produces correctness:
+Correct orchestration ensures components deploy only when their requirements are satisfied. DAG resolution produces correctness:
 
-1. Applications without requirements are deployed first
-2. Applications whose requirements are satisfied are deployed next
-3. Applications whose requirements are unsatisfied wait
+1. Components with no requirements may deploy immediately
+2. Components whose requirements are satisfied may deploy concurrently
+3. Components whose requirements are unsatisfied wait
 
-This ordering is deterministic. Given the same capability graph and the same starting state, the orchestrator produces the same deployment sequence.
+This is deterministic. Given the same capability graph and the same starting state, the orchestrator produces the same final state. Deployment order may vary due to concurrency, but the end state is deterministic.
 
 ### 2.5 Determinism Guarantees
 
@@ -445,40 +453,53 @@ Verification ensures that recovery is complete. Incomplete recovery is continued
 
 ## 6. Dependency Resolution
 
+### 6.0 DAG-Based Resolution Model
+
+Capability orchestration uses Directed Acyclic Graph (DAG) based dependency resolution:
+
+**Directed:** Dependencies flow from consumer to provider. A Platform Consumer depends on the Infrastructure Providers whose capabilities it requires.
+
+**Acyclic:** Circular dependencies are prohibited. If component A requires B and B requires A, the configuration is rejected at declaration time—before any deployment begins.
+
+**No Phases or Layers:** There are no deployment phases. There is no hierarchical layer ordering. Components deploy when their requirements are satisfied. Components with no requirements may deploy immediately. Multiple components may deploy concurrently if their requirements are independently satisfied.
+
+**Deterministic Final State:** Given identical inputs, DAG resolution produces identical outputs. The deployment order may vary due to concurrency, but the final state is deterministic.
+
 ### 6.1 Resolution Algorithm
 
 Dependency resolution determines deployment order through graph analysis and topological sorting.
 
 #### 6.1.1 Dependency Graph Structure
 
-The dependency graph G = (V, E) where:
-- V = set of deployments (applications and infrastructure)
+The dependency graph G = (V, E) is a Directed Acyclic Graph (DAG) where:
+- V = set of deployments (Infrastructure Providers and Platform Consumers)
 - E = set of directed edges representing capability dependencies
 - Edge (u, v) exists if deployment u requires a capability provided by deployment v
+- Cycles are prohibited—detected and rejected at declaration time
 
 ```mermaid
 flowchart TD
-    subgraph Infrastructure["Shared Infrastructure (Deploy First)"]
-        DB[(PostgreSQL)]
+    subgraph InfraProviders["Infrastructure Providers (No requirements shown)"]
+        DB[(PostgreSQL Operator)]
         Cache[(Redis)]
-        Auth[Identity Service]
+        Auth[Keycloak]
     end
 
-    subgraph Applications["Applications (Deploy After Dependencies)"]
-        App1[Application A]
-        App2[Application B]
-        App3[Application C]
+    subgraph Consumers["Platform Consumers (Deploy when requirements satisfied)"]
+        App1[Backstage]
+        App2[Harbor]
+        App3[Tenant App]
     end
 
     App1 -.->|requires postgresql-database| DB
     App1 -.->|requires redis-cache| Cache
     App2 -.->|requires postgresql-database| DB
-    App2 -.->|requires identity-auth| Auth
+    App2 -.->|requires identity-oidc| Auth
     App3 -.->|requires redis-cache| Cache
-    App3 -.->|requires identity-auth| Auth
+    App3 -.->|requires identity-oidc| Auth
 ```
 
-**Notation:** Dashed arrows (-.->)  indicate capability requirements. Infrastructure providers must be ready before consuming applications can deploy.
+**Notation:** Dashed arrows (-.->)  indicate capability requirements. Infrastructure Providers must satisfy capabilities before Platform Consumers requiring those capabilities can deploy.
 
 #### 6.1.2 Resolution Flow
 
@@ -768,15 +789,24 @@ Logs enable post-hoc analysis.
 | Deployment Completed | Deployment finishes successfully |
 | Deployment Failed | Deployment cannot complete |
 
-### 8.3 Execution Model
+### 8.3 Resolution Model
 
 | Property | Description |
 |----------|-------------|
-| Atomic | All-or-nothing at application level |
+| DAG-based | Directed Acyclic Graph determines deployment order |
+| Acyclic | Circular dependencies rejected at declaration time |
+| Concurrent | Independent components deploy in parallel |
+| Deterministic | Same inputs produce same final state |
+
+### 8.4 Execution Model
+
+| Property | Description |
+|----------|-------------|
+| Atomic | All-or-nothing at component level |
 | Idempotent | Multiple triggers produce same result |
 | Ordered | Respects capability dependencies |
 
-### 8.4 Failure Model
+### 8.5 Failure Model
 
 | Category | Handling |
 |----------|----------|
@@ -790,7 +820,7 @@ Logs enable post-hoc analysis.
 
 | Previous | Index | Next |
 |----------|-------|------|
-| [← 4. Components](./04-components.md) | [Table of Contents](./00-index.md#table-of-contents) | [6. Shared Infrastructure →](./06-shared-infrastructure.md) |
+| [← 4. Binary Component Categorization](./04-components.md) | [Table of Contents](./00-index.md#table-of-contents) | [6. Shared Infrastructure →](./06-shared-infrastructure.md) |
 
 ---
 

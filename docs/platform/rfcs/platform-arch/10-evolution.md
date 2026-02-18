@@ -35,9 +35,29 @@ Extension process:
 3. Register with orchestrator
 4. Document in capability catalog
 
-### 2.2 Base Chart Extensions
+### 2.2 Adding New Infrastructure Providers
+
+When a new Infrastructure Provider is added to the platform:
+
+1. The new component is deployed using its upstream chart (no base chart)
+2. The component is classified as Infrastructure Provider (cannot use base chart)
+3. The component becomes operational and provides its capability
+4. The base chart is updated with templates that consume the new capability
+5. Platform Consumers can now request the capability through base chart
+
+**Order matters:** The base chart MUST NOT be updated until the Infrastructure Provider is operational. This maintains the dependency direction.
+
+**Example:** Adding a new message broker:
+1. Deploy Apache Pulsar operator (Infrastructure Provider)
+2. Pulsar becomes operational
+3. Add PulsarTopic templates to base chart
+4. Platform Consumers can declare Pulsar topic requirements
+
+### 2.3 Base Chart Extensions
 
 The base chart supports extension through:
+
+**New capability templates:** Templates consuming capabilities from newly added Infrastructure Providers.
 
 **Additional integration points:** New platform services can be integrated.
 
@@ -47,7 +67,27 @@ The base chart supports extension through:
 
 Extension follows semantic versioning. Breaking changes require major version increment.
 
-### 2.3 Governance Rule Extensions
+### 2.4 Sub-Category Labels
+
+Binary categorization (Infrastructure Provider vs Platform Consumer) is the primary classification. Future work may add optional sub-category labels for organizational purposes:
+
+**Potential sub-categories:**
+- Infrastructure Provider subtypes: operator, service, controller
+- Platform Consumer subtypes: platform-service, tenant-app, utility
+
+**Important:** Sub-categories are labels, not primary categories. They do not affect:
+- Base chart usage (determined by binary categorization only)
+- Deployment ordering (determined by DAG capability resolution)
+- Ownership rules (determined by binary categorization)
+
+Sub-category labels may be useful for:
+- Filtering and discovery
+- Organizational grouping
+- Documentation structure
+
+A future RFC may formalize sub-category labels if needed.
+
+### 2.5 Governance Rule Extensions
 
 Governance rules can be extended through:
 
@@ -280,8 +320,10 @@ Supersession is documented. Previous RFC status is updated to "Superseded."
 
 | Area | Extension Mechanism |
 |------|---------------------|
+| Infrastructure Providers | Deploy new provider, then update base chart |
 | Capabilities | New capability type definitions |
-| Base chart | Version increments with new features |
+| Base chart | Templates for new Infrastructure Provider capabilities |
+| Sub-categories | Optional labels (future RFC) |
 | Governance | Additional rules and validations |
 
 ### 12.2 Future Work Areas

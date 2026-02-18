@@ -23,25 +23,31 @@ An application MUST NOT be deployed until all capabilities it requires are satis
 
 If an application declares that it requires capability X, and capability X is not satisfied, deployment does not proceed. The orchestrator does not attempt deployment hoping for success. The orchestrator waits for capability satisfaction.
 
-### 2.2 Invariant: Deterministic Orchestration
+### 2.2 Invariant: Deterministic DAG Resolution
 
-Given identical inputs, orchestration MUST produce identical outputs. The order in which applications are deployed MUST be determined solely by capability dependencies, not by timing, concurrency, or external factors.
+Given identical inputs, orchestration MUST produce identical outputs. Dependencies form a Directed Acyclic Graph (DAG). The final state MUST be determined solely by capability dependencies, not by timing, concurrency, or external factors.
 
-Determinism means reproducibility. If the platform is deployed twice from the same Git state, the orchestration sequence must be the same. Determinism enables debugging, testing, and reasoning about platform behavior.
+Determinism means reproducibility. If the platform is deployed twice from the same Git state, the final orchestration state must be the same. The deployment order may vary due to concurrency, but the end state is deterministic. Determinism enables debugging, testing, and reasoning about platform behavior.
 
-### 2.3 Invariant: Failure Isolation
+### 2.3 Invariant: Circular Dependency Rejection
+
+Circular dependencies MUST be rejected at declaration time. If capability declarations form a cycle (A requires B, B requires A), the orchestrator MUST reject the configuration before deployment begins.
+
+Cycles in the dependency graph would cause deadlock. Early rejection at declaration time prevents deployment attempts that cannot succeed. Cycle detection is a validation step, not a runtime behavior.
+
+### 2.4 Invariant: Failure Isolation
 
 Failure of one application MUST NOT cause failure of other applications, except through declared capability dependencies. If application A fails but does not provide capabilities that application B requires, application B continues operating.
 
 Failure isolation prevents cascading failures. The blast radius of a failure is limited to the failing application and applications that explicitly depend on capabilities it provides. Implicit dependencies do not propagate failure.
 
-### 2.4 Invariant: Explicit Dependencies Only
+### 2.5 Invariant: Explicit Dependencies Only
 
 All dependencies MUST be explicitly declared. The orchestrator MUST NOT infer dependencies. If a dependency is not declared, it does not exist from the orchestrator's perspective.
 
 Explicit declaration prevents hidden coupling. Applications cannot depend on timing. Applications cannot depend on deployment order unless that order is expressed through capability dependencies. What is not declared is not depended upon.
 
-### 2.5 Invariant: Event Idempotency
+### 2.6 Invariant: Event Idempotency
 
 All state-changing operations MUST be idempotent. Processing the same event multiple times MUST produce the same result as processing it once. Idempotency is required because events may be redelivered.
 
@@ -81,9 +87,11 @@ Single source prevents conflicts. When a consumer requires a capability, there i
 
 ### 4.1 Invariant: Base Chart Usage
 
-All platform applications MUST use the canonical base chart. There are no alternative integration mechanisms. Applications that do not use the base chart are not platform applications.
+Platform Consumers MUST use the canonical base chart. Infrastructure Providers MUST NOT use the base chart.
 
-Base chart usage ensures uniform integration. Every application integrates through the same mechanism. Integration behavior is consistent. Consistency enables platform-wide reasoning.
+This binary distinction exists because base chart templates consume capabilities from Infrastructure Providers. If Infrastructure Providers used the base chart, circular dependencies would result. The decision is binary: Does this component PROVIDE a capability that base chart templates consume? If yes, it is an Infrastructure Provider and cannot use the base chart. If no, it is a Platform Consumer and must use the base chart.
+
+Base chart usage ensures uniform integration for Platform Consumers. Every Platform Consumer integrates through the same mechanism. Integration behavior is consistent. Infrastructure Providers use their upstream charts directly.
 
 ### 4.2 Invariant: Capability Declaration
 
@@ -229,19 +237,33 @@ Infrastructure is eligible for shared status when:
 
 **E-SI-05:** Platform team can commit to required guarantees.
 
-### 8.2 Platform Application Eligibility
+### 8.2 Platform Consumer Eligibility
 
-An application is eligible for platform deployment when:
+A component is eligible as a Platform Consumer when:
 
-**E-PA-01:** The application uses the canonical base chart.
+**E-PC-01:** The component does NOT provide capabilities consumed by base chart templates.
 
-**E-PA-02:** The application declares all required capabilities.
+**E-PC-02:** The component uses the canonical base chart.
 
-**E-PA-03:** The application declares all provided capabilities.
+**E-PC-03:** The component declares all required capabilities.
 
-**E-PA-04:** The application's secrets are declared, not embedded.
+**E-PC-04:** The component declares all provided capabilities.
 
-**E-PA-05:** The application complies with platform security policies.
+**E-PC-05:** The component's secrets are declared, not embedded.
+
+**E-PC-06:** The component complies with platform security policies.
+
+### 8.3 Infrastructure Provider Eligibility
+
+A component is classified as an Infrastructure Provider when:
+
+**E-IP-01:** The component PROVIDES a capability that base chart templates consume.
+
+**E-IP-02:** The component uses its upstream chart directly (no base chart).
+
+**E-IP-03:** The component is owned by the platform team.
+
+Examples: cert-manager, Crossplane, Vault, ESO, Keycloak, Zalando PostgreSQL Operator, Strimzi, Rook-Ceph, MetalLB, ingress-nginx, ArgoCD.
 
 ---
 

@@ -13,6 +13,11 @@ Category: Standards Track                         Shared Infrastructure
 
 This section defines the shared infrastructure model. It covers capability contracts, ownership and lifecycle rules, consumer relationships, and explicit anti-patterns. Shared infrastructure is the platform's mechanism for providing common services efficiently while maintaining governance.
 
+In terms of binary categorization:
+- **Infrastructure operators** (Zalando PostgreSQL Operator, Strimzi, Rook-Ceph, etc.) are **Infrastructure Providers**—they cannot use the base chart
+- **Operator-managed instances** (databases, topics, storage) are provisioned through base chart claims when **Platform Consumers** request them
+- **Platform Consumers** declare capability requirements; the base chart generates claims that Infrastructure Provider operators fulfill
+
 ---
 
 ## 2. Capability Contracts
@@ -112,15 +117,17 @@ Platform ownership means the platform team:
 
 ### 3.2 Consumer Relationship
 
-Applications are consumers of shared infrastructure. The consumer relationship means:
+Platform Consumers are consumers of shared infrastructure. The consumer relationship means:
 
-**Access rights:** Consumers may access capabilities according to contracts.
+**Access rights:** Platform Consumers may access capabilities according to contracts.
 
-**No modification rights:** Consumers may not modify infrastructure.
+**No modification rights:** Platform Consumers may not modify infrastructure.
 
 **No ownership transfer:** Consumption does not confer ownership.
 
-**Bound by contract:** Consumers must use capabilities according to contract terms.
+**Bound by contract:** Platform Consumers must use capabilities according to contract terms.
+
+**Base chart integration:** Platform Consumers declare capability requirements through the base chart. The base chart generates claims (Crossplane XR, PostgreSQL CR, etc.) that Infrastructure Provider operators process.
 
 ### 3.3 Lifecycle Independence
 
@@ -231,13 +238,13 @@ Messaging service contracts include delivery guarantees, ordering guarantees, an
 
 ### 5.3 Security Services
 
-Security services provide authentication, authorization, and secret management:
+Security services provide authentication, authorization, and secret management. These are Infrastructure Providers—they cannot use the base chart because base chart templates consume their capabilities:
 
-**Identity providers:** Keycloak for authentication and federation.
+**Identity providers:** Keycloak for authentication and federation. Base chart Keycloak client templates consume Keycloak.
 
-**Secret management:** Vault or External Secrets for secret storage and injection.
+**Secret management:** Vault and External Secrets Operator for secret storage and injection. Base chart ExternalSecret templates consume ESO.
 
-**Certificate management:** cert-manager for TLS certificate lifecycle.
+**Certificate management:** cert-manager for TLS certificate lifecycle. Base chart Certificate templates consume cert-manager.
 
 Security service contracts include authentication protocols, secret rotation policies, and certificate issuance procedures.
 
@@ -273,13 +280,13 @@ Including infrastructure components (databases, queues) within application deplo
 
 **Solution:** Applications declare infrastructure requirements. Platform provisions infrastructure through shared infrastructure. Applications consume capabilities.
 
-### 6.3 Anti-Pattern: Application-Owned Operators
+### 6.3 Anti-Pattern: Platform Consumer-Owned Operators
 
-Applications installing and managing operators that provide shared services is prohibited.
+Platform Consumers installing and managing operators that provide shared services is prohibited.
 
-**Problem:** Multiple operators for the same service create conflicts. Operators require elevated permissions that applications should not have. Operator lifecycle becomes entangled with application lifecycle.
+**Problem:** Multiple operators for the same service create conflicts. Operators require elevated permissions that Platform Consumers should not have. Operator lifecycle becomes entangled with Platform Consumer lifecycle. Installing an operator would make the Platform Consumer an Infrastructure Provider—breaking the binary categorization.
 
-**Solution:** Operators are platform-owned. Applications request capabilities. Platform provisions through platform-managed operators.
+**Solution:** Operators are Infrastructure Providers, platform-owned. Platform Consumers request capabilities through base chart. Platform provisions through platform-managed operators.
 
 ### 6.4 Anti-Pattern: Direct Infrastructure Access
 

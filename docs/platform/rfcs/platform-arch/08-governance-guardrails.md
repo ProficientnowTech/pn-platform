@@ -5,7 +5,7 @@ Category: Standards Track                       Governance & Guardrails
 
 # 8. Governance and Guardrails
 
-[← Application Model](./07-application-model.md) | [Index](./00-index.md#table-of-contents) | [Next: Rationale →](./09-rationale.md)
+[← Platform Consumer Model](./07-application-model.md) | [Index](./00-index.md#table-of-contents) | [Next: Rationale →](./09-rationale.md)
 
 ---
 
@@ -222,11 +222,16 @@ Over-permission creates security, governance, and operational risks.
 
 ### 5.1 Ownership Classification
 
-| Classification | Owner | Examples |
-|----------------|-------|----------|
-| Platform-owned | Platform team | Cluster infrastructure, operators, CRDs |
-| Shared infrastructure | Platform team | Databases, queues, identity services |
-| Application-owned | Application team | Workloads, configs, services |
+Ownership aligns with binary categorization:
+
+| Classification | Owner | Category | Examples |
+|----------------|-------|----------|----------|
+| Infrastructure Providers | Platform team | Infrastructure Provider | Operators, CRDs, cert-manager, Crossplane, Keycloak |
+| Shared infrastructure operators | Platform team | Infrastructure Provider | Zalando Operator, Strimzi, Rook-Ceph |
+| Platform-owned Platform Consumers | Platform team | Platform Consumer | Backstage, Harbor, Grafana, observability stack |
+| Tenant applications | Application team | Platform Consumer | Business workloads |
+
+Infrastructure Providers are always platform-owned. Platform Consumers may be platform-owned or application-owned.
 
 ### 5.2 Platform-Owned Resources
 
@@ -272,13 +277,15 @@ Custom Resources (CRs) ownership depends on purpose:
 
 ### 5.5 Operator Ownership
 
-Operators are ALWAYS platform-owned:
+Operators are Infrastructure Providers and are ALWAYS platform-owned:
+- Provide capabilities consumed by base chart templates
+- Cannot use base chart (circular dependency)
 - Cluster-wide effects
 - Elevated privileges
 - CRD management
 - Stability requirements
 
-Resources created by operators have nuanced ownership based on what and for whom they create.
+Resources created by operators (database instances, Kafka topics, etc.) are provisioned through base chart claims when Platform Consumers declare requirements.
 
 ### 5.6 Decommission Responsibility
 
@@ -483,12 +490,12 @@ Governance evolves:
 
 ### 9.4 Ownership
 
-| Classification | Owner |
-|----------------|-------|
-| Platform resources | Platform team |
-| Shared infrastructure | Platform team |
-| Application resources | Application team |
-| CRDs and Operators | Platform team (always) |
+| Component Category | Owner | Base Chart |
+|-------------------|-------|------------|
+| Infrastructure Providers | Platform team | Prohibited |
+| Platform-owned Platform Consumers | Platform team | Required |
+| Tenant applications | Application team | Required |
+| CRDs and Operators | Platform team (always) | N/A (Infrastructure Providers) |
 
 ### 9.5 Excluded Resources
 
@@ -514,7 +521,7 @@ Governance evolves:
 
 | Previous | Index | Next |
 |----------|-------|------|
-| [← 7. Application Model](./07-application-model.md) | [Table of Contents](./00-index.md#table-of-contents) | [9. Rationale →](./09-rationale.md) |
+| [← 7. Platform Consumer Model](./07-application-model.md) | [Table of Contents](./00-index.md#table-of-contents) | [9. Rationale →](./09-rationale.md) |
 
 ---
 

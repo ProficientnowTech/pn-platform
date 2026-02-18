@@ -1,9 +1,9 @@
 ```
 RFC-PLATARCH-0001                                              Section 7
-Category: Standards Track                            Application Model
+Category: Standards Track                     Platform Consumer Model
 ```
 
-# 7. Application Model
+# 7. Platform Consumer Model
 
 [← Shared Infrastructure](./06-shared-infrastructure.md) | [Index](./00-index.md#table-of-contents) | [Next: Governance →](./08-governance-guardrails.md)
 
@@ -11,7 +11,15 @@ Category: Standards Track                            Application Model
 
 ## 7.1 Overview
 
-This section defines the application model for platform applications. It covers capability declarations, secret and identity integration, networking and exposure rules, and application removal semantics. These rules ensure applications integrate consistently with the platform.
+This section defines the model for Platform Consumers—components that consume capabilities provided by Infrastructure Providers and integrate through the canonical base chart. It covers capability declarations, secret and identity integration, networking and exposure rules, and removal semantics.
+
+**Scope Note:** This section applies to Platform Consumers ONLY. Infrastructure Providers do not use the base chart and are not covered by these rules. For the distinction between Infrastructure Providers and Platform Consumers, see [Section 4: Binary Component Categorization](./04-components.md).
+
+Platform Consumers include:
+- Platform-owned services (Backstage, Harbor, Grafana, observability stack)
+- Tenant applications (business workloads deployed by application teams)
+
+All Platform Consumers MUST use the base chart. This is non-negotiable.
 
 ---
 
@@ -382,31 +390,33 @@ Breaking changes in the base chart require:
 
 ---
 
-## 7. Prohibited Application Patterns
+## 7. Prohibited Platform Consumer Patterns
+
+These patterns are prohibited for Platform Consumers. Violating these patterns would either break the binary categorization or bypass platform governance.
 
 ### 7.1 Direct Infrastructure Access
 
-Applications MUST NOT access infrastructure directly. All access MUST be through capability interfaces.
+Platform Consumers MUST NOT access infrastructure directly. All access MUST be through capability interfaces provided by the base chart.
 
 ### 7.2 CRD Creation
 
-Applications MUST NOT create CRDs. CRDs are platform resources.
+Platform Consumers MUST NOT create CRDs. Creating a CRD that base chart templates consume would make the component an Infrastructure Provider—violating binary categorization.
 
 ### 7.3 Operator Installation
 
-Applications MUST NOT install operators. Operators are platform-owned.
+Platform Consumers MUST NOT install operators. Operators that provide capabilities to base chart templates are Infrastructure Providers. Installing an operator would reclassify the Platform Consumer.
 
 ### 7.4 Cluster-Wide Resources
 
-Applications MUST NOT create cluster-wide resources (ClusterRoles, ClusterRoleBindings, etc.) without platform approval.
+Platform Consumers MUST NOT create cluster-wide resources (ClusterRoles, ClusterRoleBindings, etc.) without platform approval. Cluster-wide resources are Infrastructure Provider territory.
 
 ### 7.5 Cross-Namespace Access
 
-Applications MUST NOT access resources in other namespaces without explicit authorization through capabilities.
+Platform Consumers MUST NOT access resources in other namespaces without explicit authorization through capabilities.
 
 ### 7.6 Base Chart Bypass
 
-Applications MUST NOT deploy without the base chart. All platform applications use the base chart.
+Platform Consumers MUST NOT deploy without the base chart. The base chart is the single integration mechanism. Bypassing it bypasses platform governance.
 
 ---
 
@@ -462,4 +472,4 @@ Applications MUST NOT deploy without the base chart. All platform applications u
 
 ---
 
-*End of Section 7 — RFC-PLATARCH-0001*
+*End of Section 7 (Platform Consumer Model) — RFC-PLATARCH-0001*

@@ -17,33 +17,43 @@ This section defines the core architectural model of the platform. It describes 
 
 ## 2. Conceptual Model
 
-### 2.1 Layered Structure
+### 2.1 Conceptual Structure
 
-The platform is organized into layers. Each layer has distinct responsibilities. Higher layers depend on lower layers. Lower layers are unaware of higher layers.
+The platform organizes components into conceptual categories. These categories indicate responsibility and purpose, NOT deployment order. Deployment order is determined solely by capability DAG resolution.
 
-**Layer 0: Cluster Infrastructure**
-The foundational layer. Kubernetes control plane, node infrastructure, networking fabric. This layer exists before platform components.
+**Category: Cluster Infrastructure**
+The foundational layer. Kubernetes control plane, node infrastructure, networking fabric. This exists before platform components.
 
-**Layer 1: Platform Core**
-Core platform services. The orchestrator, platform operators, CRD definitions. This layer enables the layers above it.
+**Category: Infrastructure Providers**
+Components that PROVIDE capabilities consumed by base chart templates. These components do NOT use the base chart. Examples: cert-manager, Crossplane, Vault, ESO, Keycloak, Zalando PostgreSQL Operator, Strimzi, Rook-Ceph, MetalLB, ingress-nginx, ArgoCD.
 
-**Layer 2: Shared Infrastructure**
-Shared services consumed by applications. Databases, message queues, identity services. This layer provides capabilities to applications.
+**Category: Platform Consumers**
+Components that CONSUME capabilities from Infrastructure Providers. These components MUST use the base chart. Platform Consumers include both platform services (Backstage, Harbor, Grafana) and tenant applications (business workloads).
 
-**Layer 3: Platform Applications**
-Business workloads. Applications deployed through the base chart. This layer consumes capabilities from layers below.
+### 2.2 Binary Categorization
 
-### 2.2 Dependency Direction
+Components are classified using a binary test:
 
-Dependencies flow downward. Layer 3 depends on Layer 2. Layer 2 depends on Layer 1. Layer 1 depends on Layer 0. Upward dependencies are prohibited.
+**Does this component PROVIDE a capability that base chart templates consume?**
+- **YES** → Infrastructure Provider (no base chart)
+- **NO** → Platform Consumer (must use base chart)
 
-This directionality ensures stability. Lower layers can be modified without considering every possible consumer. Higher layers cannot break lower layers.
+This binary decision determines base chart usage and prevents circular dependencies. Base chart templates depend on Infrastructure Providers; if Infrastructure Providers used the base chart, cycles would result.
 
-### 2.3 Capability Boundaries
+### 2.3 Dependency Direction
 
-Each layer boundary is defined by capabilities. Lower layers provide capabilities. Higher layers consume capabilities. The capability model bridges layers.
+Dependencies form a Directed Acyclic Graph (DAG). Infrastructure Providers provide capabilities. Platform Consumers require capabilities. Dependencies flow from provider to consumer.
 
-Capabilities are the only permitted cross-layer interface. Applications do not directly access database internals. Applications access database capabilities. This indirection enables provider substitution.
+This directionality ensures:
+- Infrastructure Providers can be deployed when their dependencies are satisfied
+- Platform Consumers deploy when the capabilities they require are satisfied
+- No circular dependencies—cycles are rejected at declaration time
+
+### 2.4 Capability Boundaries
+
+Component boundaries are defined by capabilities. Infrastructure Providers provide capabilities. Platform Consumers consume capabilities. The capability model bridges components.
+
+Capabilities are the only permitted cross-component interface. Platform Consumers do not directly access database internals. Platform Consumers access database capabilities. This indirection enables provider substitution.
 
 ---
 
@@ -633,14 +643,14 @@ This constraint enables:
 
 ## 9. Summary
 
-### 9.1 Layered Model
+### 9.1 Binary Categorization Model
 
-| Layer | Content | Role |
-|-------|---------|------|
-| 0 | Cluster Infrastructure | Foundation |
-| 1 | Platform Core | Enablement |
-| 2 | Shared Infrastructure | Capability provision |
-| 3 | Platform Applications | Business workloads |
+| Category | Uses Base Chart | Role |
+|----------|-----------------|------|
+| Infrastructure Provider | NO | Provides capabilities consumed by base chart |
+| Platform Consumer | YES | Consumes capabilities from Infrastructure Providers |
+
+Categories indicate responsibility, NOT deployment order. Deployment order is determined by capability DAG resolution.
 
 ### 9.2 Capability Model
 

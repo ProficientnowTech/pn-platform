@@ -18,7 +18,7 @@ This glossary defines terms used throughout RFC-PLATARCH-0001. Terms are listed 
 ### A
 
 **Application**
-A workload deployed on the platform through the base chart. Platform applications consume capabilities and may provide capabilities.
+See "Platform Consumer" and "Tenant Application."
 
 **Application-Owned Resource**
 A Kubernetes resource owned by an application team. Application-owned resources exist within application namespaces and follow application lifecycle.
@@ -34,7 +34,10 @@ The GitOps continuous delivery tool used by the platform for reconciling cluster
 ### B
 
 **Base Chart**
-The single, canonical Helm chart that all platform applications must use for integration. The base chart provides capability declaration, secret integration, identity wiring, and platform compliance.
+The single, canonical Helm chart that all Platform Consumers must use for integration. The base chart provides templates that consume capabilities from Infrastructure Providers. Infrastructure Providers cannot use the base chart (circular dependency).
+
+**Binary Categorization**
+The classification of platform components into exactly two categories: Infrastructure Provider or Platform Consumer. The classification is determined by a single test: "Does base chart depend on this component's capability?" YES → Infrastructure Provider. NO → Platform Consumer. Note: Both categories may provide AND consume capabilities—the test is specifically about base chart template consumption, not about capability provision/consumption in general.
 
 **Blast Radius**
 The scope of impact from a failure or security incident. Platform governance aims to contain blast radius through isolation and permission boundaries.
@@ -67,6 +70,9 @@ An instance of a Custom Resource Definition. CR ownership depends on purpose: pl
 ---
 
 ### D
+
+**DAG (Directed Acyclic Graph)**
+The dependency structure used for capability orchestration. Dependencies form a directed graph (providers to consumers). Cycles are prohibited—detected and rejected at declaration time. Components deploy when all requirements are satisfied, with no phase or layer hierarchy constraining order.
 
 **Declarative**
 A configuration approach where desired state is declared rather than procedurally constructed. The platform prefers declarative specifications.
@@ -122,6 +128,9 @@ The credential set assigned to an application by the platform. Platform identity
 **Infrastructure**
 Services that provide foundational capabilities such as databases, message queues, and identity systems. Shared infrastructure is platform-owned.
 
+**Infrastructure Provider**
+A component that PROVIDES capabilities consumed by base chart templates. Infrastructure Providers cannot use the base chart (circular dependency). They use upstream charts directly. Examples: cert-manager, Crossplane, Vault, ESO, Keycloak, Zalando PostgreSQL Operator, Strimzi, Rook-Ceph, MetalLB, ingress-nginx, ArgoCD.
+
 **Invariant**
 A property that must always hold. Platform invariants include capability satisfaction before deployment, single ownership, and explicit declaration.
 
@@ -173,7 +182,10 @@ Responsibility and authority over a resource. Every resource has exactly one own
 The collection of infrastructure, services, and governance that enables application deployment. The platform provides capabilities; applications consume them.
 
 **Platform Application**
-An application that integrates with the platform through the base chart, declares capabilities, and follows platform governance. See "Application."
+Deprecated term. See "Platform Consumer."
+
+**Platform Consumer**
+A component that CONSUMES capabilities provided by Infrastructure Providers and does NOT provide capabilities consumed by base chart templates. Platform Consumers MUST use the base chart. Examples: Backstage, Harbor, Grafana, Loki, Tempo, tenant applications. Platform Consumers may be platform-owned or application team-owned.
 
 **Platform-Owned Resource**
 A resource owned by the platform team. Platform-owned resources include cluster infrastructure, operators, CRDs, and shared infrastructure.
@@ -228,6 +240,9 @@ An ArgoCD mechanism for ordering resources within an Application. Sync waves pro
 
 **Tenant**
 An application or consumer using shared infrastructure. Tenants are isolated from each other within shared infrastructure.
+
+**Tenant Application**
+A Platform Consumer owned by an application team (not the platform team). Tenant applications are business workloads that consume platform capabilities through the base chart. They are a subset of Platform Consumers.
 
 **TLS (Transport Layer Security)**
 The encryption protocol for secure communication. All exposed services must use TLS; there are no exceptions.

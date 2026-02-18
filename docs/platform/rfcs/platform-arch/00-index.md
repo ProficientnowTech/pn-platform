@@ -23,21 +23,31 @@ This document is a DRAFT and is subject to change based on review feedback.
 ## Abstract
 
 This Request for Comments (RFC) defines the comprehensive platform architecture
-for application deployment and orchestration. It establishes a capability-based
-orchestration model where applications depend on capabilities rather than direct
-application dependencies, centralizes shared infrastructure under platform
-ownership with explicit capability contracts, mandates a canonical base chart as
-the single integration mechanism for applications, and defines governance
-guardrails ensuring Git as source of truth with consistent namespace, project,
-and ownership boundaries.
+for deployment and orchestration. It establishes:
 
-The architecture addresses fundamental problems in platform engineering: brittle
-coupling between applications, infrastructure sprawl from per-application
-provisioning, inconsistent application integration patterns, and governance gaps
-from ad-hoc deployment practices. The solution provides deterministic
-orchestration through capability satisfaction, centralized infrastructure with
-guaranteed contracts, uniform application onboarding via mandatory base chart
-adoption, and enforceable governance through structural constraints.
+- **Binary Component Categorization:** Components are classified as either
+  Infrastructure Providers (cannot use base chart) or Platform Consumers
+  (must use base chart), based on whether base chart templates consume their capabilities.
+
+- **DAG-Based Capability Orchestration:** Directed Acyclic Graph (DAG) resolution
+  where components deploy when ALL required capabilities are satisfied, with no
+  phase or layer hierarchy constraining deployment order. Circular dependencies
+  are rejected at declaration time.
+
+- **Centralized Shared Infrastructure:** Platform-owned infrastructure with
+  explicit capability contracts. Infrastructure Providers (operators) manage
+  instances provisioned through base chart claims.
+
+- **Canonical Base Chart:** A single integration mechanism for Platform Consumers
+  that provides templates consuming capabilities from Infrastructure Providers.
+
+- **Governance Guardrails:** Git as source of truth with consistent namespace,
+  project, and ownership boundaries.
+
+The architecture addresses fundamental problems in platform engineering: circular
+dependency risks, brittle coupling between components, infrastructure sprawl from
+per-application provisioning, inconsistent integration patterns, and governance
+gaps from ad-hoc deployment practices.
 
 ---
 
@@ -54,9 +64,9 @@ Copyright (c) 2026 Platform Engineering. All rights reserved.
 | RFC Number           | RFC-PLATARCH-0001                                  |
 | Kind                 | Architecture                                       |
 | Status               | Draft                                              |
-| Version              | 1.0.0                                              |
+| Version              | 2.0.0                                              |
 | Created              | 2026-02-17                                         |
-| Last Updated         | 2026-02-17                                         |
+| Last Updated         | 2026-02-18                                         |
 | Authors              | Platform Engineering Team                          |
 | Reviewers            | Security, Infrastructure, SRE (TBD)                |
 | Application Domain   | Platform Architecture, Orchestration, Governance   |
@@ -65,6 +75,7 @@ Copyright (c) 2026 Platform Engineering. All rights reserved.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-02-18 | **Breaking:** Binary categorization model (Infrastructure Provider vs Platform Consumer), DAG-based capability resolution, removed phase/layer terminology |
 | 1.0.0 | 2026-02-17 | Initial release consolidating P1-P4 documents |
 
 ---
@@ -116,10 +127,10 @@ when, and only when, they appear in all capitals, as shown here.
    - 3.2 Conceptual Architecture
    - 3.3 System Structure
 
-4. [Component Taxonomy](./04-components.md)
-   - 4.1 Platform Components
-   - 4.2 Infrastructure Components
-   - 4.3 Application Components
+4. [Binary Component Categorization](./04-components.md)
+   - 4.1 Infrastructure Providers
+   - 4.2 Platform Consumers
+   - 4.3 Base Chart Scope
 
 5. [Capability Orchestration](./05-capability-orchestration.md)
    - 5.1 Event Model
@@ -132,12 +143,12 @@ when, and only when, they appear in all capitals, as shown here.
    - 6.3 Capability Contracts
    - 6.4 Lifecycle Management
 
-7. [Application Model](./07-application-model.md)
+7. [Platform Consumer Model](./07-application-model.md)
    - 7.1 Base Chart Mandate
    - 7.2 Capability Declarations
    - 7.3 Secrets, Configuration, and Identity
    - 7.4 Networking, Ingress, and Exposure
-   - 7.5 Application Removal
+   - 7.5 Platform Consumer Removal
 
 ### Part 3: Governance
 
@@ -173,10 +184,10 @@ when, and only when, they appear in all capitals, as shown here.
 | [1. Introduction](./01-introduction.md) | Problem space and motivation | All |
 | [2. Requirements](./02-requirements.md) | Design constraints and invariants | All |
 | [3. Architecture](./03-architecture.md) | Capability model and system structure | Engineers, Architects |
-| [4. Components](./04-components.md) | Component classification | Engineers |
+| [4. Binary Categorization](./04-components.md) | Infrastructure Provider vs Platform Consumer | Engineers |
 | [5. Orchestration](./05-capability-orchestration.md) | Deployment sequencing mechanics | Engineers |
 | [6. Shared Infrastructure](./06-shared-infrastructure.md) | Infrastructure centralization | Engineers, SRE |
-| [7. Application Model](./07-application-model.md) | Application integration requirements | Engineers |
+| [7. Platform Consumer Model](./07-application-model.md) | Platform Consumer integration requirements | Engineers |
 | [8. Governance](./08-governance-guardrails.md) | Platform governance rules | All |
 | [9. Rationale](./09-rationale.md) | Design decisions and alternatives | Architects |
 | [10. Evolution](./10-evolution.md) | Future considerations | Architects |
@@ -189,10 +200,10 @@ when, and only when, they appear in all capitals, as shown here.
 Start with [Introduction](./01-introduction.md) → [Requirements](./02-requirements.md) → [Architecture](./03-architecture.md)
 
 **Application Developer?**
-Focus on [Application Model](./07-application-model.md) → [Governance](./08-governance-guardrails.md) → [Glossary](./appendix-a-glossary.md)
+Focus on [Platform Consumer Model](./07-application-model.md) → [Governance](./08-governance-guardrails.md) → [Glossary](./appendix-a-glossary.md)
 
 **Platform Engineer?**
-Read [Architecture](./03-architecture.md) → [Components](./04-components.md) → [Orchestration](./05-capability-orchestration.md) → [Shared Infrastructure](./06-shared-infrastructure.md)
+Read [Architecture](./03-architecture.md) → [Binary Categorization](./04-components.md) → [Orchestration](./05-capability-orchestration.md) → [Shared Infrastructure](./06-shared-infrastructure.md)
 
 **Understanding Design Decisions?**
 Read [Requirements](./02-requirements.md) → [Rationale](./09-rationale.md) → [Evolution](./10-evolution.md)

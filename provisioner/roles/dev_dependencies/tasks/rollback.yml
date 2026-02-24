@@ -1,0 +1,78 @@
+---
+# Rollback dev dependencies configuration
+
+- name: Ensure dev dependencies defaults are set for rollback
+  set_fact:
+      dev_deps_packages: '{{ dev_dependencies.packages | default([]) }}'
+      dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
+      dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
+      dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
+      dev_deps_certbot: '{{ dev_dependencies.certbot | default({}) }}'
+  when:
+      - dev_dependencies is defined
+
+- name: Stop and disable Docker service
+  service:
+      name: docker
+      state: stopped
+      enabled: false
+  when: dev_deps_docker.install | default(false)
+  failed_when: false
+
+- name: Remove Docker packages
+  apt:
+      name: '{{ dev_deps_docker.packages | default(["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]) }}'
+      state: absent
+      purge: true
+      autoremove: true
+  when: dev_deps_docker.install | default(false)
+
+- name: Remove Docker repository file
+  file:
+      path: /etc/apt/sources.list.d/docker.sources
+      state: absent
+  when: dev_deps_docker.install | default(false)
+
+- name: Remove Docker GPG key
+  file:
+      path: /etc/apt/keyrings/docker.asc
+      state: absent
+  when: dev_deps_docker.install | default(false)
+
+- name: Remove nginx package
+  apt:
+      name: nginx
+      state: absent
+      purge: true
+      autoremove: true
+  when: "'nginx' in dev_deps_packages"
+
+- name: Remove NVM directory
+  file:
+      path: '/home/{{ dev_deps_nvm.user }}/.nvm'
+      state: absent
+  when: dev_deps_nvm.install | default(false)
+
+- name: Remove NVM init lines from bashrc
+  lineinfile:
+      path: '/home/{{ dev_deps_nvm.user }}/.bashrc'
+      line: '{{ item }}'
+      state: absent
+  loop:
+      - 'export NVM_DIR="$HOME/.nvm"'
+      - '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
+  when: dev_deps_nvm.install | default(false)
+
+- name: Remove Certbot venv and symlink
+  file:
+      path: '{{ item }}'
+      state: absent
+  loop:
+      - /opt/certbot
+      - /usr/local/bin/certbot
+  when: dev_deps_certbot.install | default(false)
+
+- name: Update apt cache after removals
+  apt:
+      update_cache: yes
+  when: ansible_os_family == 'Debian'

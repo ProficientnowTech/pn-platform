@@ -67,6 +67,18 @@
       dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["pnpm"] }}'
   when: dev_deps_pnpm.install | default(false) and pnpm_version.rc == 0
 
+- name: Check Certbot installation
+  command: certbot --version
+  register: certbot_version
+  changed_when: false
+  failed_when: false
+  when: dev_deps_certbot.install | default(false)
+
+- name: Record Certbot status
+  set_fact:
+      dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["certbot"] }}'
+  when: dev_deps_certbot.install | default(false) and certbot_version.rc == 0
+
 - name: Calculate installation success rate
   set_fact:
       dev_deps_requested_tools: >-
@@ -74,7 +86,8 @@
             (dev_deps_docker.install | default(false) | ternary(["docker"], [])) +
             (("nginx" in dev_deps_packages) | ternary(["nginx"], [])) +
             (dev_deps_nvm.install | default(false) | ternary(["node"], [])) +
-            (dev_deps_pnpm.install | default(false) | ternary(["pnpm"], []))
+            (dev_deps_pnpm.install | default(false) | ternary(["pnpm"], [])) +
+            (dev_deps_certbot.install | default(false) | ternary(["certbot"], []))
           }}
 
 - name: Compute success rate

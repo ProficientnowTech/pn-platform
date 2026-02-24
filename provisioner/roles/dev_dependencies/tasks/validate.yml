@@ -14,6 +14,7 @@
       dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
       dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
       dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
+      dev_deps_certbot: '{{ dev_dependencies.certbot | default({}) }}'
 
 - name: Validate packages list format
   assert:
@@ -57,3 +58,10 @@
           - dev_deps_nvm.install | default(false)
       fail_msg: 'PNPM install currently depends on NVM-managed Node.js; enable dev_dependencies.nvm.install'
   when: dev_deps_pnpm.install | default(false)
+
+- name: Validate Certbot requirements on Debian
+  assert:
+      that:
+          - ansible_os_family == 'Debian'
+      fail_msg: 'Certbot installation is currently supported only on Debian/Ubuntu in dev_dependencies'
+  when: dev_deps_certbot.install | default(false)

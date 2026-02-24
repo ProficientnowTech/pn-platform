@@ -23,6 +23,7 @@
           docker_enabled: {{ dev_deps_docker.install | default(false) }}
           nvm_enabled: {{ dev_deps_nvm.install | default(false) }}
           pnpm_enabled: {{ dev_deps_pnpm.install | default(false) }}
+          certbot_enabled: {{ dev_deps_certbot.install | default(false) }}
 
           # Packages to be installed:
           {% for package in dev_deps_packages %}
@@ -40,3 +41,4 @@
           - Docker enabled: {{ dev_deps_docker.install | default(false) }}
           - NVM enabled: {{ dev_deps_nvm.install | default(false) }}
           - PNPM enabled: {{ dev_deps_pnpm.install | default(false) }}
+          - Certbot enabled: {{ dev_deps_certbot.install | default(false) }}

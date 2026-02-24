@@ -161,3 +161,35 @@
       state: started
       enabled: true
   when: "'nginx' in dev_deps_packages"
+
+- name: Ensure Certbot system dependencies are installed
+  apt:
+      name:
+          - python3
+          - python3-venv
+          - python3-pip
+      state: present
+      update_cache: yes
+  when: dev_deps_certbot.install | default(false)
+
+- name: Ensure Certbot virtual environment exists
+  command: python3 -m venv /opt/certbot
+  args:
+      creates: /opt/certbot/bin/activate
+  when: dev_deps_certbot.install | default(false)
+
+- name: Upgrade pip in Certbot virtual environment
+  command: /opt/certbot/bin/pip install --upgrade pip
+  when: dev_deps_certbot.install | default(false)
+
+- name: Install Certbot and nginx plugin in venv
+  command: /opt/certbot/bin/pip install certbot certbot-nginx
+  when: dev_deps_certbot.install | default(false)
+
+- name: Ensure certbot is on PATH
+  file:
+      src: /opt/certbot/bin/certbot
+      dest: /usr/local/bin/certbot
+      state: link
+      force: true
+  when: dev_deps_certbot.install | default(false)

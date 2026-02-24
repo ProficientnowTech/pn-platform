@@ -18,6 +18,13 @@
       - dev_deps_packages | length > 0
   register: apt_install_result
 
+- name: Check if Docker is already installed
+  command: docker --version
+  register: docker_version_check
+  changed_when: false
+  failed_when: false
+  when: dev_deps_docker.install | default(false)
+
 - name: Set Docker architecture mapping
   set_fact:
       docker_arch: >-
@@ -28,7 +35,9 @@
               'armv7l': 'armhf'
             }.get(ansible_architecture, ansible_architecture)
           }}
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
 
 - name: Ensure Docker repository prerequisites (Debian)
   apt:
@@ -36,14 +45,18 @@
           - ca-certificates
           - curl
       state: present
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
 
 - name: Ensure Docker keyrings directory
   file:
       path: /etc/apt/keyrings
       state: directory
       mode: '0755'
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
 
 - name: Add Docker GPG key
   get_url:
@@ -51,7 +64,9 @@
       dest: /etc/apt/keyrings/docker.asc
       mode: '0644'
       force: true
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
 
 - name: Add Docker apt sources file
   copy:
@@ -63,18 +78,24 @@
           Signed-By: /etc/apt/keyrings/docker.asc
       dest: /etc/apt/sources.list.d/docker.sources
       mode: '0644'
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
 
 - name: Update apt cache after adding Docker repository
   apt:
       update_cache: yes
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
 
 - name: Install Docker packages
   apt:
       name: '{{ dev_deps_docker.packages | default(["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]) }}'
       state: present
-  when: dev_deps_docker.install | default(false)
+  when:
+      - dev_deps_docker.install | default(false)
+      - docker_version_check.rc != 0
   register: docker_install_result
 
 - name: Ensure Docker service is enabled and running
@@ -101,6 +122,24 @@
       - dev_deps_docker.add_users is defined
       - dev_deps_docker.add_users | length > 0
 
+- name: Check if Node.js is already installed (NVM user)
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      if [ -s "$NVM_DIR/nvm.sh" ]; then
+        . "$NVM_DIR/nvm.sh"
+        node --version
+      else
+        exit 127
+      fi
+  args:
+      executable: /bin/bash
+  register: node_version_check
+  changed_when: false
+  failed_when: false
+  when: dev_deps_nvm.install | default(false)
+
 - name: Install NVM
   become: true
   become_user: '{{ dev_deps_nvm.user }}'
@@ -112,7 +151,9 @@
   args:
       executable: /bin/bash
       creates: '/home/{{ dev_deps_nvm.user }}/.nvm/nvm.sh'
-  when: dev_deps_nvm.install | default(false)
+  when:
+      - dev_deps_nvm.install | default(false)
+      - node_version_check.rc != 0
   register: nvm_install
 
 - name: Install Node.js via NVM
@@ -125,9 +166,25 @@
       nvm alias default {{ dev_deps_nvm.node_version }}
   args:
       executable: /bin/bash
-  when: dev_deps_nvm.install | default(false)
+  when:
+      - dev_deps_nvm.install | default(false)
+      - node_version_check.rc != 0
   register: node_install
   changed_when: "'already installed' not in (node_install.stdout | default(''))"
+
+- name: Check if PNPM is already installed (NVM user)
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      pnpm --version
+  args:
+      executable: /bin/bash
+  register: pnpm_version_check
+  changed_when: false
+  failed_when: false
+  when: dev_deps_pnpm.install | default(false)
 
 - name: Install PNPM via Corepack
   become: true
@@ -139,7 +196,9 @@
       corepack prepare pnpm@{{ dev_deps_pnpm.version }} --activate
   args:
       executable: /bin/bash
-  when: dev_deps_pnpm.install | default(false)
+  when:
+      - dev_deps_pnpm.install | default(false)
+      - pnpm_version_check.rc != 0
   register: pnpm_install
 
 - name: Ensure NVM is loaded in bashrc

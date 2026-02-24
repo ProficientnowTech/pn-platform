@@ -1,279 +1,62 @@
 ---
 # Phase 3: Apply dev dependencies configuration
 
-- name: Update apt cache (Debian)
-  apt:
-      update_cache: yes
-      cache_valid_time: 3600
-  when: ansible_os_family == 'Debian'
-  register: apt_update
+- name: Apply defaults
+  include_tasks:
+      file: apply_parts/defaults.yml
+      apply:
+          tags:
+              - packages
+              - docker
+              - node
+              - pnpm
+              - nginx
+              - certbot
 
-- name: Ensure dev dependencies defaults are set for apply run
-  set_fact:
-      dev_deps_packages: '{{ dev_dependencies.packages | default([]) }}'
-      dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
-      dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
-      dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
-      dev_deps_certbot: '{{ dev_dependencies.certbot | default({}) }}'
-  when:
-      - dev_deps_packages is not defined
-      - dev_dependencies is defined
+- name: Common setup (packages)
+  include_tasks:
+      file: apply_parts/common.yml
+      apply:
+          tags:
+              - packages
+  when: ('apply' in ansible_run_tags) or ('packages' in ansible_run_tags) or (ansible_run_tags | length == 0)
 
-- name: Install base packages (Debian)
-  apt:
-      name: '{{ dev_deps_packages }}'
-      state: present
-      install_recommends: false
-  when:
-      - ansible_os_family == 'Debian'
-      - dev_deps_packages | length > 0
-  register: apt_install_result
+- name: Install Docker
+  include_tasks:
+      file: apply_parts/docker.yml
+      apply:
+          tags:
+              - docker
+  when: dev_deps_docker.install | default(false) and ('apply' in ansible_run_tags or 'docker' in ansible_run_tags or (ansible_run_tags | length == 0))
 
-- name: Check if Docker is already installed
-  command: docker --version
-  register: docker_version_check
-  changed_when: false
-  failed_when: false
-  when: dev_deps_docker.install | default(false)
+- name: Install Node.js (NVM)
+  include_tasks:
+      file: apply_parts/node.yml
+      apply:
+          tags:
+              - node
+  when: dev_deps_nvm.install | default(false) and ('apply' in ansible_run_tags or 'node' in ansible_run_tags or (ansible_run_tags | length == 0))
 
-- name: Set Docker architecture mapping
-  set_fact:
-      docker_arch: >-
-          {{
-            {
-              'x86_64': 'amd64',
-              'aarch64': 'arm64',
-              'armv7l': 'armhf'
-            }.get(ansible_architecture, ansible_architecture)
-          }}
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
+- name: Install PNPM
+  include_tasks:
+      file: apply_parts/pnpm.yml
+      apply:
+          tags:
+              - pnpm
+  when: dev_deps_pnpm.install | default(false) and ('apply' in ansible_run_tags or 'pnpm' in ansible_run_tags or (ansible_run_tags | length == 0))
 
-- name: Ensure Docker repository prerequisites (Debian)
-  apt:
-      name:
-          - ca-certificates
-          - curl
-      state: present
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
+- name: Ensure nginx is running
+  include_tasks:
+      file: apply_parts/nginx.yml
+      apply:
+          tags:
+              - nginx
+  when: "'nginx' in dev_deps_packages and ('apply' in ansible_run_tags or 'nginx' in ansible_run_tags or (ansible_run_tags | length == 0))"
 
-- name: Ensure Docker keyrings directory
-  file:
-      path: /etc/apt/keyrings
-      state: directory
-      mode: '0755'
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
-
-- name: Add Docker GPG key
-  get_url:
-      url: https://download.docker.com/linux/ubuntu/gpg
-      dest: /etc/apt/keyrings/docker.asc
-      mode: '0644'
-      force: true
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
-
-- name: Add Docker apt sources file
-  copy:
-      content: |
-          Types: deb
-          URIs: https://download.docker.com/linux/ubuntu
-          Suites: {{ ansible_distribution_release }}
-          Components: stable
-          Signed-By: /etc/apt/keyrings/docker.asc
-      dest: /etc/apt/sources.list.d/docker.sources
-      mode: '0644'
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
-
-- name: Update apt cache after adding Docker repository
-  apt:
-      update_cache: yes
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
-
-- name: Install Docker packages
-  apt:
-      name: '{{ dev_deps_docker.packages | default(["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]) }}'
-      state: present
-  when:
-      - dev_deps_docker.install | default(false)
-      - docker_version_check.rc != 0
-  register: docker_install_result
-
-- name: Ensure Docker service is enabled and running
-  service:
-      name: docker
-      state: started
-      enabled: true
-  when: dev_deps_docker.install | default(false)
-
-- name: Ensure docker group exists
-  group:
-      name: docker
-      state: present
-  when: dev_deps_docker.install | default(false)
-
-- name: Add users to docker group
-  user:
-      name: '{{ item }}'
-      groups: docker
-      append: true
-  loop: '{{ dev_deps_docker.add_users | default([]) }}'
-  when:
-      - dev_deps_docker.install | default(false)
-      - dev_deps_docker.add_users is defined
-      - dev_deps_docker.add_users | length > 0
-
-- name: Check if Node.js is already installed (NVM user)
-  become: true
-  become_user: '{{ dev_deps_nvm.user }}'
-  shell: |
-      export NVM_DIR="$HOME/.nvm"
-      if [ -s "$NVM_DIR/nvm.sh" ]; then
-        . "$NVM_DIR/nvm.sh"
-        node --version
-      else
-        exit 127
-      fi
-  args:
-      executable: /bin/bash
-  register: node_version_check
-  changed_when: false
-  failed_when: false
-  when: dev_deps_nvm.install | default(false)
-
-- name: Install NVM
-  become: true
-  become_user: '{{ dev_deps_nvm.user }}'
-  shell: |
-      export NVM_DIR="$HOME/.nvm"
-      if [ ! -s "$NVM_DIR/nvm.sh" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ dev_deps_nvm.version }}/install.sh | bash
-      fi
-  args:
-      executable: /bin/bash
-      creates: '/home/{{ dev_deps_nvm.user }}/.nvm/nvm.sh'
-  when:
-      - dev_deps_nvm.install | default(false)
-      - node_version_check.rc != 0
-  register: nvm_install
-
-- name: Install Node.js via NVM
-  become: true
-  become_user: '{{ dev_deps_nvm.user }}'
-  shell: |
-      export NVM_DIR="$HOME/.nvm"
-      . "$NVM_DIR/nvm.sh"
-      nvm install {{ dev_deps_nvm.node_version }}
-      nvm alias default {{ dev_deps_nvm.node_version }}
-  args:
-      executable: /bin/bash
-  when:
-      - dev_deps_nvm.install | default(false)
-      - node_version_check.rc != 0
-  register: node_install
-  changed_when: "'already installed' not in (node_install.stdout | default(''))"
-
-- name: Check if PNPM is already installed (NVM user)
-  become: true
-  become_user: '{{ dev_deps_nvm.user }}'
-  shell: |
-      export NVM_DIR="$HOME/.nvm"
-      . "$NVM_DIR/nvm.sh"
-      pnpm --version
-  args:
-      executable: /bin/bash
-  register: pnpm_version_check
-  changed_when: false
-  failed_when: false
-  when: dev_deps_pnpm.install | default(false)
-
-- name: Install PNPM via Corepack
-  become: true
-  become_user: '{{ dev_deps_nvm.user }}'
-  shell: |
-      export NVM_DIR="$HOME/.nvm"
-      . "$NVM_DIR/nvm.sh"
-      corepack enable
-      corepack prepare pnpm@{{ dev_deps_pnpm.version }} --activate
-  args:
-      executable: /bin/bash
-  when:
-      - dev_deps_pnpm.install | default(false)
-      - pnpm_version_check.rc != 0
-  register: pnpm_install
-
-- name: Ensure NVM is loaded in bashrc
-  become: true
-  become_user: '{{ dev_deps_nvm.user }}'
-  lineinfile:
-      path: '/home/{{ dev_deps_nvm.user }}/.bashrc'
-      line: '{{ item }}'
-      state: present
-      create: true
-  loop:
-      - 'export NVM_DIR="$HOME/.nvm"'
-      - '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
-  when: dev_deps_nvm.install | default(false)
-
-- name: Ensure nginx service is enabled and running
-  service:
-      name: nginx
-      state: started
-      enabled: true
-  when: "'nginx' in dev_deps_packages"
-
-- name: Check if Certbot is already installed
-  stat:
-      path: /opt/certbot/bin/certbot
-  register: certbot_binary
-  when: dev_deps_certbot.install | default(false)
-
-- name: Ensure Certbot system dependencies are installed
-  apt:
-      name:
-          - python3
-          - python3-venv
-          - python3-pip
-      state: present
-      update_cache: yes
-  when:
-      - dev_deps_certbot.install | default(false)
-      - not certbot_binary.stat.exists
-
-- name: Ensure Certbot virtual environment exists
-  command: python3 -m venv /opt/certbot
-  args:
-      creates: /opt/certbot/bin/activate
-  when:
-      - dev_deps_certbot.install | default(false)
-      - not certbot_binary.stat.exists
-
-- name: Upgrade pip in Certbot virtual environment
-  command: /opt/certbot/bin/pip install --upgrade pip
-  when:
-      - dev_deps_certbot.install | default(false)
-      - not certbot_binary.stat.exists
-
-- name: Install Certbot and nginx plugin in venv
-  command: /opt/certbot/bin/pip install certbot certbot-nginx
-  when:
-      - dev_deps_certbot.install | default(false)
-      - not certbot_binary.stat.exists
-
-- name: Ensure certbot is on PATH
-  file:
-      src: /opt/certbot/bin/certbot
-      dest: /usr/local/bin/certbot
-      state: link
-      force: true
-  when: dev_deps_certbot.install | default(false)
+- name: Install Certbot
+  include_tasks:
+      file: apply_parts/certbot.yml
+      apply:
+          tags:
+              - certbot
+  when: dev_deps_certbot.install | default(false) and ('apply' in ansible_run_tags or 'certbot' in ansible_run_tags or (ansible_run_tags | length == 0))

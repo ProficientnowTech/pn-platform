@@ -47,14 +47,32 @@
       apply:
           tags:
               - apply
+              - packages
+              - docker
+              - node
+              - pnpm
+              - nginx
+              - certbot
   when: >-
       (dev_deps_validation_passed | default(false) and
       (dev_deps_backup_completed | default(false) or backup_result is skipped)) or
-      ('apply' in ansible_run_tags)
+      ('apply' in ansible_run_tags) or
+      ('docker' in ansible_run_tags) or
+      ('node' in ansible_run_tags) or
+      ('pnpm' in ansible_run_tags) or
+      ('nginx' in ansible_run_tags) or
+      ('certbot' in ansible_run_tags) or
+      ('packages' in ansible_run_tags)
   register: apply_result
   ignore_errors: true
   tags:
       - apply
+      - packages
+      - docker
+      - node
+      - pnpm
+      - nginx
+      - certbot
 
 - name: Set apply status
   set_fact:
@@ -68,11 +86,21 @@
       apply:
           tags:
               - test
+              - docker
+              - node
+              - pnpm
+              - nginx
+              - certbot
   when: (dev_deps_configuration_applied | default(false)) or ('test' in ansible_run_tags)
   register: test_result
   ignore_errors: true
   tags:
       - test
+      - docker
+      - node
+      - pnpm
+      - nginx
+      - certbot
 
 - name: Set test status
   set_fact:

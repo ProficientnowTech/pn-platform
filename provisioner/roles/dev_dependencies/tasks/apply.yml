@@ -162,6 +162,12 @@
       enabled: true
   when: "'nginx' in dev_deps_packages"
 
+- name: Check if Certbot is already installed
+  stat:
+      path: /opt/certbot/bin/certbot
+  register: certbot_binary
+  when: dev_deps_certbot.install | default(false)
+
 - name: Ensure Certbot system dependencies are installed
   apt:
       name:
@@ -170,21 +176,29 @@
           - python3-pip
       state: present
       update_cache: yes
-  when: dev_deps_certbot.install | default(false)
+  when:
+      - dev_deps_certbot.install | default(false)
+      - not certbot_binary.stat.exists
 
 - name: Ensure Certbot virtual environment exists
   command: python3 -m venv /opt/certbot
   args:
       creates: /opt/certbot/bin/activate
-  when: dev_deps_certbot.install | default(false)
+  when:
+      - dev_deps_certbot.install | default(false)
+      - not certbot_binary.stat.exists
 
 - name: Upgrade pip in Certbot virtual environment
   command: /opt/certbot/bin/pip install --upgrade pip
-  when: dev_deps_certbot.install | default(false)
+  when:
+      - dev_deps_certbot.install | default(false)
+      - not certbot_binary.stat.exists
 
 - name: Install Certbot and nginx plugin in venv
   command: /opt/certbot/bin/pip install certbot certbot-nginx
-  when: dev_deps_certbot.install | default(false)
+  when:
+      - dev_deps_certbot.install | default(false)
+      - not certbot_binary.stat.exists
 
 - name: Ensure certbot is on PATH
   file:

@@ -11,10 +11,10 @@ dev_dependencies:
     docker:
         install: true
         add_users:
-            - ubuntu
+            - ansible
     nvm:
         install: true
-        user: ubuntu
+        user: ansible
         version: v0.39.7
         node_version: lts/*
     pnpm:

@@ -1,8 +1,48 @@
 ---
 # Dev Dependencies Playbook
 # Installs developer toolchain for app servers
+- name: Bootstrap ansible user if missing
+  hosts: app_server
+  remote_user: root
+  become: false
+  gather_facts: false
+
+  tasks:
+      - name: Check if ansible user exists
+        getent:
+            database: passwd
+            key: ansible
+        register: ansible_user_entry
+        failed_when: false
+        changed_when: false
+
+      - name: Determine if ansible user exists
+        set_fact:
+            ansible_user_exists: >-
+                {{
+                  (ansible_user_entry.ansible_facts.getent_passwd is defined) and
+                  ('ansible' in ansible_user_entry.ansible_facts.getent_passwd)
+                }}
+
+      - name: Create ansible user if missing
+        user:
+            name: ansible
+            groups: sudo
+            shell: /bin/bash
+            create_home: true
+            state: present
+        when: not ansible_user_exists
+
+      - name: Add SSH key for ansible user
+        authorized_key:
+            user: ansible
+            key: "{{ lookup('file', ansible_ssh_private_key_file + '.pub') }}"
+            state: present
+        when: not ansible_user_exists
+
 - name: Developer Dependencies Setup
-  hosts: all
+  hosts: app_server
+  remote_user: ansible
   become: true
   gather_facts: true
   vars:
@@ -46,7 +86,16 @@
                 ✗ Missing tools: {{ dev_deps_missing_tools | default([]) | join(', ') }}
                 {% endif %}
 
-      - name: Create dev dependencies status file
+      - name: Ensure local status directory exists
+        file:
+            path: /home/doxbox/ansible-status
+            state: directory
+            mode: '0755'
+        delegate_to: localhost
+        become: false
+        run_once: true
+
+      - name: Create dev dependencies status file on controller
         copy:
             content: |
                 # Dev dependencies playbook status
@@ -56,9 +105,7 @@
                 base_dependency: {{ base_status | default('not_executed') }}
                 tools_installed: {{ dev_deps_installed_tools | default([]) | join(', ') }}
                 success_rate: {{ dev_deps_success_rate | default('unknown') }}
-            dest: /var/lib/ansible/playbook-dev-dependencies-status
+            dest: "/home/doxbox/ansible-status/playbook-dev-dependencies-status-{{ inventory_hostname }}"
             mode: '0644'
-            owner: root
-            group: root
         delegate_to: localhost
-        run_once: true
+        become: false

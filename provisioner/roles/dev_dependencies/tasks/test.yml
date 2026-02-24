@@ -27,7 +27,7 @@
 - name: Record nginx status
   set_fact:
       dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["nginx"] }}'
-  when: "'nginx' in dev_deps_packages" and nginx_version.rc == 0
+  when: "'nginx' in dev_deps_packages and nginx_version.rc == 0"
 
 - name: Check Node.js installation
   become: true

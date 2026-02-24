@@ -24,8 +24,12 @@
 
 # Phase 2: BACKUP
 - name: 'Backup dev dependencies configuration'
-  include_tasks: backup.yml
-  when: dev_deps_validation_passed
+  include_tasks:
+      file: backup.yml
+      apply:
+          tags:
+              - backup
+  when: (dev_deps_validation_passed | default(false)) or ('backup' in ansible_run_tags)
   register: backup_result
   ignore_errors: true
   tags:

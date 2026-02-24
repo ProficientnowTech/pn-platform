@@ -3,7 +3,11 @@
 
 - name: Determine missing tools
   set_fact:
-      dev_deps_missing_tools: '{{ dev_deps_requested_tools | difference(dev_deps_installed_tools) }}'
+      dev_deps_missing_tools: >-
+          {{
+            (dev_deps_requested_tools | default([])) |
+            difference(dev_deps_installed_tools | default([]))
+          }}
 
 - name: Set dev dependencies status
   set_fact:
@@ -14,6 +18,6 @@
   debug:
       msg: |
           Dev dependencies configuration status: {{ dev_dependencies_status }}
-          - Requested tools: {{ dev_deps_requested_tools | length }}
-          - Installed tools: {{ dev_deps_installed_tools | length }}
-          - Missing tools: {{ dev_deps_missing_tools | join(', ') if dev_deps_missing_tools | length > 0 else 'none' }}
+          - Requested tools: {{ dev_deps_requested_tools | default([]) | length }}
+          - Installed tools: {{ dev_deps_installed_tools | default([]) | length }}
+          - Missing tools: {{ dev_deps_missing_tools | default([]) | join(', ') if (dev_deps_missing_tools | default([]) | length) > 0 else 'none' }}

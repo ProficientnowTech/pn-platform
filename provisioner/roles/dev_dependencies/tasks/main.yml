@@ -70,7 +70,11 @@
 
 # Phase 5: HANDLE RESULT
 - name: 'Handle dev dependencies result'
-  include_tasks: result_handler.yml
-  when: dev_deps_validation_passed
+  include_tasks:
+      file: result_handler.yml
+      apply:
+          tags:
+              - result
+  when: (dev_deps_validation_passed | default(false)) or ('result' in ansible_run_tags)
   tags:
       - result

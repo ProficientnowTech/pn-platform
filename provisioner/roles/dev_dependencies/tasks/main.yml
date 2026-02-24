@@ -42,8 +42,15 @@
 
 # Phase 3: APPLY
 - name: 'Apply dev dependencies configuration'
-  include_tasks: apply.yml
-  when: dev_deps_validation_passed and (dev_deps_backup_completed or backup_result is skipped)
+  include_tasks:
+      file: apply.yml
+      apply:
+          tags:
+              - apply
+  when: >-
+      (dev_deps_validation_passed | default(false) and
+      (dev_deps_backup_completed | default(false) or backup_result is skipped)) or
+      ('apply' in ansible_run_tags)
   register: apply_result
   ignore_errors: true
   tags:

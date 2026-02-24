@@ -8,6 +8,17 @@
   when: ansible_os_family == 'Debian'
   register: apt_update
 
+- name: Ensure dev dependencies defaults are set for apply run
+  set_fact:
+      dev_deps_packages: '{{ dev_dependencies.packages | default([]) }}'
+      dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
+      dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
+      dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
+      dev_deps_certbot: '{{ dev_dependencies.certbot | default({}) }}'
+  when:
+      - dev_deps_packages is not defined
+      - dev_dependencies is defined
+
 - name: Install base packages (Debian)
   apt:
       name: '{{ dev_deps_packages }}'

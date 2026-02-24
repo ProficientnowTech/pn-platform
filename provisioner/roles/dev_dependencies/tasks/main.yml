@@ -15,6 +15,8 @@
   include_tasks: validate.yml
   register: validation_result
   ignore_errors: true
+  tags:
+      - validate
 
 - name: Set validation status
   set_fact:
@@ -26,6 +28,8 @@
   when: dev_deps_validation_passed
   register: backup_result
   ignore_errors: true
+  tags:
+      - backup
 
 - name: Set backup status
   set_fact:
@@ -38,6 +42,8 @@
   when: dev_deps_validation_passed and (dev_deps_backup_completed or backup_result is skipped)
   register: apply_result
   ignore_errors: true
+  tags:
+      - apply
 
 - name: Set apply status
   set_fact:
@@ -46,10 +52,16 @@
 
 # Phase 4: TEST
 - name: 'Test dev dependencies configuration'
-  include_tasks: test.yml
-  when: dev_deps_configuration_applied
+  include_tasks:
+      file: test.yml
+      apply:
+          tags:
+              - test
+  when: (dev_deps_configuration_applied | default(false)) or ('test' in ansible_run_tags)
   register: test_result
   ignore_errors: true
+  tags:
+      - test
 
 - name: Set test status
   set_fact:
@@ -60,3 +72,5 @@
 - name: 'Handle dev dependencies result'
   include_tasks: result_handler.yml
   when: dev_deps_validation_passed
+  tags:
+      - result

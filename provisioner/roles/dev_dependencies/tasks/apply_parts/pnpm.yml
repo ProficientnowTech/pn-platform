@@ -1,0 +1,29 @@
+---
+- name: Check if PNPM is already installed (NVM user)
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      pnpm --version
+  args:
+      executable: /bin/bash
+  register: pnpm_version_check
+  changed_when: false
+  failed_when: false
+  when: dev_deps_pnpm.install | default(false)
+
+- name: Install PNPM via Corepack
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      corepack enable
+      corepack prepare pnpm@{{ dev_deps_pnpm.version }} --activate
+  args:
+      executable: /bin/bash
+  when:
+      - dev_deps_pnpm.install | default(false)
+      - pnpm_version_check.rc != 0
+  register: pnpm_install

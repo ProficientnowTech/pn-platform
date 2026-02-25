@@ -1,0 +1,55 @@
+---
+# Phase 2: Backup existing dev dependencies configuration
+
+- name: Create backup directory
+  file:
+      path: /var/backups/ansible-dev-dependencies
+      state: directory
+      mode: '0700'
+      owner: root
+      group: root
+
+- name: Generate backup timestamp
+  set_fact:
+      backup_timestamp: '{{ ansible_date_time.epoch }}'
+
+- name: Ensure dev dependencies defaults are set for backup run
+  set_fact:
+      dev_deps_packages: '{{ dev_dependencies.packages | default([]) }}'
+      dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
+      dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
+      dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
+      dev_deps_certbot: '{{ dev_dependencies.certbot | default({}) }}'
+  when:
+      - dev_deps_packages is not defined
+      - dev_dependencies is defined
+
+- name: Create dev dependencies backup manifest
+  copy:
+      content: |
+          # Dev dependencies backup manifest - {{ ansible_date_time.iso8601 }}
+          backup_timestamp: {{ backup_timestamp }}
+          os_family: {{ ansible_os_family }}
+          packages_requested: {{ dev_deps_packages | length }}
+          docker_enabled: {{ dev_deps_docker.install | default(false) }}
+          nvm_enabled: {{ dev_deps_nvm.install | default(false) }}
+          pnpm_enabled: {{ dev_deps_pnpm.install | default(false) }}
+          certbot_enabled: {{ dev_deps_certbot.install | default(false) }}
+
+          # Packages to be installed:
+          {% for package in dev_deps_packages %}
+          - {{ package }}
+          {% endfor %}
+      dest: '/var/backups/ansible-dev-dependencies/manifest.{{ backup_timestamp }}'
+      mode: '0600'
+
+- name: Log backup completion
+  debug:
+      msg: |
+          Dev dependencies backup completed:
+          - Timestamp: {{ backup_timestamp }}
+          - Packages requested: {{ dev_deps_packages | length }}
+          - Docker enabled: {{ dev_deps_docker.install | default(false) }}
+          - NVM enabled: {{ dev_deps_nvm.install | default(false) }}
+          - PNPM enabled: {{ dev_deps_pnpm.install | default(false) }}
+          - Certbot enabled: {{ dev_deps_certbot.install | default(false) }}

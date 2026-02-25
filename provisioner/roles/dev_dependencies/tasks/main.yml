@@ -1,0 +1,119 @@
+---
+# Dev Dependencies Role - Developer toolchain setup
+# Implements 5-phase safety pattern: validate → backup → apply → test → rollback
+
+- name: Initialize dev dependencies role status
+  set_fact:
+      dev_deps_validation_passed: false
+      dev_deps_backup_completed: false
+      dev_deps_configuration_applied: false
+      dev_deps_tests_passed: false
+      dev_deps_rollback_needed: false
+
+# Phase 1: VALIDATE
+- name: 'Validate dev dependencies prerequisites'
+  include_tasks: validate.yml
+  register: validation_result
+  ignore_errors: true
+  tags:
+      - validate
+
+- name: Set validation status
+  set_fact:
+      dev_deps_validation_passed: '{{ validation_result is succeeded }}'
+
+# Phase 2: BACKUP
+- name: 'Backup dev dependencies configuration'
+  include_tasks:
+      file: backup.yml
+      apply:
+          tags:
+              - backup
+  when: (dev_deps_validation_passed | default(false)) or ('backup' in ansible_run_tags)
+  register: backup_result
+  ignore_errors: true
+  tags:
+      - backup
+
+- name: Set backup status
+  set_fact:
+      dev_deps_backup_completed: '{{ backup_result is succeeded }}'
+  when: dev_deps_validation_passed
+
+# Phase 3: APPLY
+- name: 'Apply dev dependencies configuration'
+  include_tasks:
+      file: apply.yml
+      apply:
+          tags:
+              - apply
+              - packages
+              - docker
+              - node
+              - pnpm
+              - nginx
+              - certbot
+  when: >-
+      (dev_deps_validation_passed | default(false) and
+      (dev_deps_backup_completed | default(false) or backup_result is skipped)) or
+      ('apply' in ansible_run_tags) or
+      ('docker' in ansible_run_tags) or
+      ('node' in ansible_run_tags) or
+      ('pnpm' in ansible_run_tags) or
+      ('nginx' in ansible_run_tags) or
+      ('certbot' in ansible_run_tags) or
+      ('packages' in ansible_run_tags)
+  register: apply_result
+  ignore_errors: true
+  tags:
+      - apply
+      - packages
+      - docker
+      - node
+      - pnpm
+      - nginx
+      - certbot
+
+- name: Set apply status
+  set_fact:
+      dev_deps_configuration_applied: '{{ apply_result is succeeded }}'
+  when: dev_deps_validation_passed
+
+# Phase 4: TEST
+- name: 'Test dev dependencies configuration'
+  include_tasks:
+      file: test.yml
+      apply:
+          tags:
+              - test
+              - docker
+              - node
+              - pnpm
+              - nginx
+              - certbot
+  when: (dev_deps_configuration_applied | default(false)) or ('test' in ansible_run_tags)
+  register: test_result
+  ignore_errors: true
+  tags:
+      - test
+      - docker
+      - node
+      - pnpm
+      - nginx
+      - certbot
+
+- name: Set test status
+  set_fact:
+      dev_deps_tests_passed: '{{ test_result is succeeded }}'
+  when: dev_deps_configuration_applied
+
+# Phase 5: HANDLE RESULT
+- name: 'Handle dev dependencies result'
+  include_tasks:
+      file: result_handler.yml
+      apply:
+          tags:
+              - result
+  when: (dev_deps_validation_passed | default(false)) or ('result' in ansible_run_tags)
+  tags:
+      - result

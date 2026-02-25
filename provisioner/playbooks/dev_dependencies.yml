@@ -1,0 +1,111 @@
+---
+# Dev Dependencies Playbook
+# Installs developer toolchain for app servers
+- name: Bootstrap ansible user if missing
+  hosts: app_server
+  remote_user: root
+  become: false
+  gather_facts: false
+
+  tasks:
+      - name: Check if ansible user exists
+        getent:
+            database: passwd
+            key: ansible
+        register: ansible_user_entry
+        failed_when: false
+        changed_when: false
+
+      - name: Determine if ansible user exists
+        set_fact:
+            ansible_user_exists: >-
+                {{
+                  (ansible_user_entry.ansible_facts.getent_passwd is defined) and
+                  ('ansible' in ansible_user_entry.ansible_facts.getent_passwd)
+                }}
+
+      - name: Create ansible user if missing
+        user:
+            name: ansible
+            groups: sudo
+            shell: /bin/bash
+            create_home: true
+            state: present
+        when: not ansible_user_exists
+
+      - name: Add SSH key for ansible user
+        authorized_key:
+            user: ansible
+            key: "{{ lookup('file', ansible_ssh_private_key_file + '.pub') }}"
+            state: present
+        when: not ansible_user_exists
+
+- name: Developer Dependencies Setup
+  hosts: app_server
+  remote_user: ansible
+  become: true
+  gather_facts: true
+  vars:
+      dev_dependencies_status: 'unknown'
+
+  pre_tasks:
+      - name: Check base role dependency if defined
+        assert:
+            that:
+                - base_status is not defined or base_status == 'success'
+            fail_msg: |
+                Dev dependencies playbook requires successful base configuration when base_status is provided.
+                Base status: {{ base_status | default('undefined') }}
+            success_msg: 'Base dependency satisfied or not enforced'
+
+      - name: Log dev dependencies playbook start
+        debug:
+            msg: |
+                Starting dev dependencies playbook
+                Base status: {{ base_status | default('not_executed') }}
+                OS family: {{ ansible_os_family }}
+
+  roles:
+      - role: dev_dependencies
+        when: dev_dependencies is defined
+
+  post_tasks:
+      - name: Set dev dependencies completion status
+        set_fact:
+            dev_dependencies_status: "{{ dev_dependencies_status | default('failed') }}"
+
+      - name: Log dev dependencies playbook completion
+        debug:
+            msg: |
+                Dev dependencies playbook completed
+                Status: {{ dev_dependencies_status }}
+                {% if dev_dependencies_status == 'success' %}
+                ✓ Tools installed: {{ dev_deps_installed_tools | default([]) | join(', ') }}
+                ✓ Success rate: {{ dev_deps_success_rate | default('unknown') }}%
+                {% else %}
+                ✗ Missing tools: {{ dev_deps_missing_tools | default([]) | join(', ') }}
+                {% endif %}
+
+      - name: Ensure local status directory exists
+        file:
+            path: /home/doxbox/ansible-status
+            state: directory
+            mode: '0755'
+        delegate_to: localhost
+        become: false
+        run_once: true
+
+      - name: Create dev dependencies status file on controller
+        copy:
+            content: |
+                # Dev dependencies playbook status
+                timestamp: {{ ansible_date_time.iso8601 }}
+                playbook: dev_dependencies.yml
+                status: {{ dev_dependencies_status }}
+                base_dependency: {{ base_status | default('not_executed') }}
+                tools_installed: {{ dev_deps_installed_tools | default([]) | join(', ') }}
+                success_rate: {{ dev_deps_success_rate | default('unknown') }}
+            dest: "/home/doxbox/ansible-status/playbook-dev-dependencies-status-{{ inventory_hostname }}"
+            mode: '0644'
+        delegate_to: localhost
+        become: false

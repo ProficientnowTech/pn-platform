@@ -1,0 +1,139 @@
+---
+# Phase 4: Test dev dependencies configuration
+
+- name: Initialize installed tools list
+  set_fact:
+      dev_deps_installed_tools: []
+
+- name: Ensure dev dependencies defaults are set for test run
+  set_fact:
+      dev_deps_packages: '{{ dev_dependencies.packages | default([]) }}'
+      dev_deps_docker: '{{ dev_dependencies.docker | default({}) }}'
+      dev_deps_nvm: '{{ dev_dependencies.nvm | default({}) }}'
+      dev_deps_pnpm: '{{ dev_dependencies.pnpm | default({}) }}'
+      dev_deps_certbot: '{{ dev_dependencies.certbot | default({}) }}'
+  when:
+      - dev_deps_packages is not defined
+      - dev_dependencies is defined
+
+- name: Check Docker installation
+  command: docker --version
+  register: docker_version
+  changed_when: false
+  failed_when: false
+  when: dev_deps_docker.install | default(false)
+  tags:
+      - docker
+
+- name: Record Docker status
+  set_fact:
+      dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["docker"] }}'
+  when: dev_deps_docker.install | default(false) and docker_version.rc == 0
+  tags:
+      - docker
+
+- name: Check nginx installation
+  command: nginx -v
+  register: nginx_version
+  changed_when: false
+  failed_when: false
+  when: "'nginx' in dev_deps_packages"
+  tags:
+      - nginx
+
+- name: Record nginx status
+  set_fact:
+      dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["nginx"] }}'
+  when: "'nginx' in dev_deps_packages and nginx_version.rc == 0"
+  tags:
+      - nginx
+
+- name: Check Node.js installation
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      node --version
+  args:
+      executable: /bin/bash
+  register: node_version
+  changed_when: false
+  failed_when: false
+  when: dev_deps_nvm.install | default(false)
+  tags:
+      - node
+
+- name: Record Node.js status
+  set_fact:
+      dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["node"] }}'
+  when: dev_deps_nvm.install | default(false) and node_version.rc == 0
+  tags:
+      - node
+
+- name: Check PNPM installation
+  become: true
+  become_user: '{{ dev_deps_nvm.user }}'
+  shell: |
+      export NVM_DIR="$HOME/.nvm"
+      . "$NVM_DIR/nvm.sh"
+      pnpm --version
+  args:
+      executable: /bin/bash
+  register: pnpm_version
+  changed_when: false
+  failed_when: false
+  when: dev_deps_pnpm.install | default(false)
+  tags:
+      - pnpm
+
+- name: Record PNPM status
+  set_fact:
+      dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["pnpm"] }}'
+  when: dev_deps_pnpm.install | default(false) and pnpm_version.rc == 0
+  tags:
+      - pnpm
+
+- name: Check Certbot installation
+  command: certbot --version
+  register: certbot_version
+  changed_when: false
+  failed_when: false
+  when: dev_deps_certbot.install | default(false)
+  tags:
+      - certbot
+
+- name: Record Certbot status
+  set_fact:
+      dev_deps_installed_tools: '{{ dev_deps_installed_tools + ["certbot"] }}'
+  when: dev_deps_certbot.install | default(false) and certbot_version.rc == 0
+  tags:
+      - certbot
+
+- name: Calculate installation success rate
+  set_fact:
+      dev_deps_requested_tools: >-
+          {{
+            (dev_deps_docker.install | default(false) | ternary(["docker"], [])) +
+            (("nginx" in dev_deps_packages) | ternary(["nginx"], [])) +
+            (dev_deps_nvm.install | default(false) | ternary(["node"], [])) +
+            (dev_deps_pnpm.install | default(false) | ternary(["pnpm"], [])) +
+            (dev_deps_certbot.install | default(false) | ternary(["certbot"], []))
+          }}
+
+- name: Compute success rate
+  set_fact:
+      dev_deps_success_rate: >-
+          {{
+            ((dev_deps_installed_tools | length) / (dev_deps_requested_tools | length) * 100) | round(2)
+            if (dev_deps_requested_tools | length) > 0 else 100
+          }}
+
+- name: Log test results
+  debug:
+      msg: |
+          Dev dependencies test results:
+          - Requested tools: {{ dev_deps_requested_tools | length }}
+          - Installed tools: {{ dev_deps_installed_tools | length }}
+          - Success rate: {{ dev_deps_success_rate }}%
+          - Installed: {{ dev_deps_installed_tools | join(', ') }}

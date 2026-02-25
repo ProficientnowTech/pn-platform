@@ -1,0 +1,62 @@
+---
+# Phase 3: Apply dev dependencies configuration
+
+- name: Apply defaults
+  include_tasks:
+      file: apply_parts/defaults.yml
+      apply:
+          tags:
+              - packages
+              - docker
+              - node
+              - pnpm
+              - nginx
+              - certbot
+
+- name: Common setup (packages)
+  include_tasks:
+      file: apply_parts/common.yml
+      apply:
+          tags:
+              - packages
+  when: ('apply' in ansible_run_tags) or ('packages' in ansible_run_tags) or (ansible_run_tags | length == 0)
+
+- name: Install Docker
+  include_tasks:
+      file: apply_parts/docker.yml
+      apply:
+          tags:
+              - docker
+  when: dev_deps_docker.install | default(false) and ('apply' in ansible_run_tags or 'docker' in ansible_run_tags or (ansible_run_tags | length == 0))
+
+- name: Install Node.js (NVM)
+  include_tasks:
+      file: apply_parts/node.yml
+      apply:
+          tags:
+              - node
+  when: dev_deps_nvm.install | default(false) and ('apply' in ansible_run_tags or 'node' in ansible_run_tags or (ansible_run_tags | length == 0))
+
+- name: Install PNPM
+  include_tasks:
+      file: apply_parts/pnpm.yml
+      apply:
+          tags:
+              - pnpm
+  when: dev_deps_pnpm.install | default(false) and ('apply' in ansible_run_tags or 'pnpm' in ansible_run_tags or (ansible_run_tags | length == 0))
+
+- name: Ensure nginx is running
+  include_tasks:
+      file: apply_parts/nginx.yml
+      apply:
+          tags:
+              - nginx
+  when: "'nginx' in dev_deps_packages and ('apply' in ansible_run_tags or 'nginx' in ansible_run_tags or (ansible_run_tags | length == 0))"
+
+- name: Install Certbot
+  include_tasks:
+      file: apply_parts/certbot.yml
+      apply:
+          tags:
+              - certbot
+  when: dev_deps_certbot.install | default(false) and ('apply' in ansible_run_tags or 'certbot' in ansible_run_tags or (ansible_run_tags | length == 0))

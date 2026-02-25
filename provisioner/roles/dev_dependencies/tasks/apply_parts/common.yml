@@ -1,0 +1,17 @@
+---
+- name: Update apt cache (Debian)
+  apt:
+      update_cache: yes
+      cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+  register: apt_update
+
+- name: Install base packages (Debian)
+  apt:
+      name: '{{ dev_deps_packages }}'
+      state: present
+      install_recommends: false
+  when:
+      - ansible_os_family == 'Debian'
+      - dev_deps_packages | length > 0
+  register: apt_install_result

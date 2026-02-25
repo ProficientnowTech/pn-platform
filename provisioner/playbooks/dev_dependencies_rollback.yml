@@ -1,0 +1,26 @@
+---
+# Dev Dependencies Rollback Playbook
+# Removes developer toolchain from app servers
+- name: Developer Dependencies Rollback
+  hosts: app_server
+  remote_user: ansible
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+      - name: Log dev dependencies rollback start
+        debug:
+            msg: |
+                Starting dev dependencies rollback
+                OS family: {{ ansible_os_family }}
+
+  tasks:
+      - name: Run dev dependencies rollback tasks
+        include_tasks:
+            file: ../roles/dev_dependencies/tasks/rollback.yml
+
+  post_tasks:
+      - name: Log dev dependencies rollback completion
+        debug:
+            msg: |
+                Dev dependencies rollback completed

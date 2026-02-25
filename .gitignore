@@ -24,6 +24,7 @@ charts/*/charts
 
 # Ansible
 *.retry
+provisioner/inventory/production/hosts.yml
 
 # Python
 __pycache__/

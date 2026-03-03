@@ -1,0 +1,6 @@
+---
+wireguard_interface: wg0
+wireguard_cidr_prefix: 24
+wireguard_listen_port: 51820
+wireguard_keepalive: 25
+wireguard_ip_forward: false

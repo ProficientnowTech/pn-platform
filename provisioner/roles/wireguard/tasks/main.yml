@@ -149,11 +149,14 @@
     port: "{{ wireguard_listen_port }}"
     proto: udp
 
-- name: Allow all inbound on wg0
+- name: Allow specific ports on wg0
   ufw:
     rule: allow
     direction: in
     interface: "{{ wireguard_interface }}"
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ wireguard_allowed_ports }}"
 
 - name: Enable and start WireGuard
   systemd:

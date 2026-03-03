@@ -158,6 +158,41 @@
     proto: tcp
   loop: "{{ wireguard_allowed_ports }}"
 
+- name: Install iptables-persistent (for localhost blocking rules)
+  apt:
+    name: iptables-persistent
+    state: present
+    update_cache: false
+  when: wireguard_block_localhost | bool
+
+- name: Block localhost access to WG ports (IPv4)
+  shell: >
+    iptables -C OUTPUT -d 127.0.0.1/32 -p tcp --dport {{ item }} -j REJECT
+    || (iptables -I OUTPUT -d 127.0.0.1/32 -p tcp --dport {{ item }} -j REJECT && echo added)
+  changed_when: false
+  loop: "{{ wireguard_allowed_ports }}"
+  when: wireguard_block_localhost | bool
+
+- name: Block localhost access to WG ports (IPv6)
+  shell: >
+    ip6tables -C OUTPUT -d ::1/128 -p tcp --dport {{ item }} -j REJECT
+    || (ip6tables -I OUTPUT -d ::1/128 -p tcp --dport {{ item }} -j REJECT && echo added)
+  changed_when: false
+  loop: "{{ wireguard_allowed_ports }}"
+  when: wireguard_block_localhost | bool
+
+- name: Block host access to its public IP on WG ports (IPv4)
+  shell: >
+    iptables -C OUTPUT -d {{ ansible_host }} -p tcp --dport {{ item }} -j REJECT
+    || (iptables -I OUTPUT -d {{ ansible_host }} -p tcp --dport {{ item }} -j REJECT && echo added)
+  changed_when: false
+  loop: "{{ wireguard_allowed_ports }}"
+  when: wireguard_block_localhost | bool and ansible_host is defined
+
+- name: Persist iptables rules
+  command: netfilter-persistent save
+  when: wireguard_block_localhost | bool
+
 - name: Enable and start WireGuard
   systemd:
     name: "wg-quick@{{ wireguard_interface }}"

@@ -1,0 +1,43 @@
+---
+- name: Deploy PNow ATS services on WireGuard network
+  hosts: app_server
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Check WireGuard interface presence
+      command: "ip -4 addr show {{ app_deploy_wireguard_interface | default('wg0') }}"
+      register: app_deploy_wg_iface_check
+      changed_when: false
+      failed_when: false
+      when: app_deploy_manage_wireguard | default(true) | bool
+
+    - name: Check WireGuard service state
+      command: "systemctl is-active wg-quick@{{ app_deploy_wireguard_interface | default('wg0') }}"
+      register: app_deploy_wg_service_check
+      changed_when: false
+      failed_when: false
+      when: app_deploy_manage_wireguard | default(true) | bool
+
+    - name: Decide whether WireGuard remediation is needed
+      set_fact:
+        app_deploy_wireguard_needs_apply: >-
+          {{
+            (app_deploy_wg_iface_check.rc | default(1)) != 0 or
+            (app_deploy_wg_service_check.stdout | default('')) != 'active'
+          }}
+      when: app_deploy_manage_wireguard | default(true) | bool
+
+  tasks:
+    - name: Apply WireGuard role only when missing/inactive
+      include_role:
+        name: wireguard
+      when:
+        - app_deploy_manage_wireguard | default(true) | bool
+        - app_deploy_wireguard_needs_apply | default(true) | bool
+
+    - name: Deploy application services
+      include_role:
+        name: app_deploy
+      vars:
+        app_deploy_state: present

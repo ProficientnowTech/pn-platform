@@ -22,3 +22,67 @@ dev_dependencies:
         version: 8.15.6
     certbot:
         install: true
+
+# App deployment defaults (used by playbooks/app_services_deploy.yml)
+app_deploy_source_mode: git
+app_deploy_repo_url: git@github.com:ProficientnowTech/pnow-ats-v2.git
+app_deploy_repo_version: develop
+app_deploy_repo_key_path: /root/.ssh/github/id_rsa
+# Store in Ansible Vault in practice:
+# app_deploy_repo_ssh_key: |
+#   -----BEGIN OPENSSH PRIVATE KEY-----
+#   ...
+#   -----END OPENSSH PRIVATE KEY-----
+
+app_deploy_dest_path: /home/ansible/pnow-ats-v2
+app_deploy_compose_files:
+    - docker/docker-compose.yml
+    - docker/pi-scrape.docker-compose.yml
+    - apps/backend/audit-service/docker-compose.yml
+    - apps/backend/tasks-reminders/docker-compose.yml
+    - apps/backend/pi-boolgen/docker-compose.yml
+    - apps/backend/pi-mailsum/docker-compose.yml
+    - apps/backend/mailer/docker-compose.yml
+    - apps/legacy/automation-service/docker-compose.yml
+    - apps/legacy/dbt-pipelines/docker-compose.yml
+    - apps/legacy/leads-gen-service/docker-compose.yml
+    - apps/legacy/notify/docker-compose.yml
+    - docker/dev.docker-compose.yml
+    - docker/postgres.docker-compose.yml
+    - docs/v2/dev-docs/docker-compose.yml
+app_deploy_target_compose_files: []
+app_deploy_env_src_local_path: ""
+app_deploy_env_dest_relpath: ""
+app_deploy_env_files:
+    - src: /home/doxbox/pnow-ats-v2/docker/.env
+      dest: docker/.env
+      mode: "0600"
+    - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-scrape/.env
+      dest: apps/backend/pi-scrape/.env
+      mode: "0600"
+# Alternative to file copy: store full docker/.env in vault
+# app_deploy_env_content: |
+#   ATS_DB_HOST=...
+
+app_deploy_pull_images: false
+app_deploy_sync_delete: false
+app_deploy_manage_wireguard: true
+app_deploy_require_wireguard: true
+app_deploy_wireguard_interface: wg0
+app_deploy_env_overrides: []
+# Optional: limit deployment to a subset of services
+# app_deploy_services:
+#   - api-gateway
+#   - frontend-web
+#
+# Optional: per-compose service filters
+app_deploy_services_by_compose:
+    docker/pi-scrape.docker-compose.yml:
+        - api
+#   docker/docker-compose.yml:
+#       - api-gateway
+#       - backend-main
+#
+# Optional: deploy only selected compose stacks (flag-style override)
+# app_deploy_target_compose_files:
+#   - docker/pi-scrape.docker-compose.yml

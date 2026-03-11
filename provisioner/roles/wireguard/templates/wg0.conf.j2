@@ -1,0 +1,13 @@
+[Interface]
+Address = {{ wireguard_address }}/{{ wireguard_cidr_prefix }}
+PrivateKey = {{ wireguard_private_key }}
+ListenPort = {{ wireguard_listen_port }}
+
+{% for peer in wireguard_peers %}
+[Peer]
+PublicKey = {{ peer.public_key }}
+Endpoint = {{ peer.endpoint }}:{{ wireguard_listen_port }}
+AllowedIPs = {{ peer.address }}/32
+PersistentKeepalive = {{ wireguard_keepalive }}
+
+{% endfor %}

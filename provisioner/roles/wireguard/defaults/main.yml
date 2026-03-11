@@ -1,0 +1,75 @@
+---
+wireguard_interface: wg0
+wireguard_cidr_prefix: 24
+wireguard_listen_port: 51820
+wireguard_keepalive: 25
+wireguard_ip_forward: false
+wireguard_subnet_cidr: 10.50.0.0/24
+wireguard_block_localhost: true
+# WG-only inbound allowlist (update if env-based ports differ in production)
+wireguard_allowed_ports:
+  # Web/frontends
+  - 3000  # frontend (Dockerfile.frontend), grafana uses MAILER_PORT:3000
+  - 3033  # frontend-web (docker/docker-compose.yml)
+  - 3031  # dev-docs (docs/v2/dev-docs)
+
+  # APIs / app services
+  - 3003  # leads-gen-service (app)
+  - 8074  # pi-mailsum
+  - 8245  # pi-scrape
+  - 8080  # api defaults (audit-api), kafka-ui default, tasks service
+  - 8090  # reminders / audit-activity-timeline
+
+  # Kafka + connectors
+  - 9092  # kafka broker 1
+  - 9093  # kafka broker 2
+  - 9094  # kafka broker 3
+  - 8081  # kafka-ui (docker/docker-compose.yml default)
+  - 8083  # debezium
+
+  # Data stores
+  - 5432  # postgres, pgbouncer
+  - 5445  # pnow-idp postgres
+  - 5446  # automation_db
+  - 6379  # redis
+  - 8123  # clickhouse
+
+  # Object storage
+  - 9000  # minio api
+  - 9001  # minio console
+
+  # Observability / ops tools
+  - 9090  # prometheus
+  - 9100  # node-exporter
+  - 9121  # redis-exporter
+  - 3302  # bull-monitor
+  - 5050  # pgadmin
+  - 8200  # duplicati
+
+  # Misc / workflows
+  - 5555  # flower
+  - 6666  # leads-gen-service (flower)
+  - 7008  # backstage
+  - 8084  # tabix
+  - 11434 # ollama
+
+  # Env-derived ports (verify mappings in .env files)
+  - 3010
+  - 3066
+  - 3234
+  - 4000
+  - 5000
+  - 5431
+  - 5444
+  - 6543
+  - 6969
+  - 7000
+  - 8000
+  - 8001
+  - 8002
+  - 8003
+  - 8004
+  - 8132
+  - 8465
+  - 8888
+  - 9080

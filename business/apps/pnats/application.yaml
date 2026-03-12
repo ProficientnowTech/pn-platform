@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pnats-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: pnats
+    environment: staging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:ProficientnowTech/pn-infra-main.git
+    targetRevision: main
+    path: business/apps/pnats/overlays/staging
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pnats-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pnats-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: pnats
+    environment: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:ProficientnowTech/pn-infra-main.git
+    targetRevision: main
+    path: business/apps/pnats/overlays/production
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pnats
+
+  syncPolicy:
+    # Production: manual sync for safety
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

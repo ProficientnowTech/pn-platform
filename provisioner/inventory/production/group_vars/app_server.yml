@@ -94,7 +94,6 @@ app_deploy_env_files:
       mode: "0600"
       required: false
 app_deploy_external_networks:
-    - pnow-ats-v2_pnats_network
     - pnats_pnats-network
     - 2_pg_default
     - nocodb-leads_default

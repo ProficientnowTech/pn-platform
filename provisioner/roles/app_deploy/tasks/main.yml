@@ -356,15 +356,72 @@
   when: app_deploy_state == 'present'
 
 - name: Ensure required external Docker networks exist
-  shell: >
-    docker network inspect {{ item }} >/dev/null 2>&1
-    || (docker network create {{ item }} && echo created)
+  shell: |
+    if docker network inspect {{ item | quote }} >/dev/null 2>&1; then
+      echo exists
+    else
+      if [ {{ item | quote }} = 'pnow-ats-v2_pnats_network' ]; then
+        docker network create \
+          --label com.docker.compose.network=pnats_network \
+          --label com.docker.compose.project=pnow-ats-v2 \
+          {{ item | quote }} >/dev/null
+      else
+        docker network create {{ item | quote }} >/dev/null
+      fi
+      echo created
+    fi
   register: app_deploy_network_create_result
   changed_when: "'created' in app_deploy_network_create_result.stdout"
   loop: "{{ app_deploy_effective_external_networks | default([]) }}"
   when:
     - app_deploy_state == 'present'
     - app_deploy_effective_external_networks | default([]) | length > 0
+
+- name: Inspect existing pnats compose network metadata
+  shell: |
+    set -euo pipefail
+    if docker network inspect pnow-ats-v2_pnats_network >/dev/null 2>&1; then
+      docker network inspect pnow-ats-v2_pnats_network --format '{% raw %}{{ index .Labels "com.docker.compose.network" }}|{{ len .Containers }}{% endraw %}'
+    else
+      echo "missing|0"
+    fi
+  args:
+    executable: /bin/bash
+  register: app_deploy_pnats_network_meta
+  changed_when: false
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+
+- name: Set pnats network facts
+  set_fact:
+    app_deploy_pnats_network_label: "{{ (app_deploy_pnats_network_meta.stdout | default('missing|0')).split('|')[0] }}"
+    app_deploy_pnats_network_container_count: "{{ ((app_deploy_pnats_network_meta.stdout | default('missing|0')).split('|')[1] | int) }}"
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+
+- name: Fail when pnats network has wrong label and active containers
+  fail:
+    msg: >-
+      Docker network pnow-ats-v2_pnats_network has label '{{ app_deploy_pnats_network_label }}'
+      but docker/docker-compose.yml requires 'pnats_network'. Active containers attached: {{ app_deploy_pnats_network_container_count }}.
+      Stop dependent stacks first, then rerun deployment.
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+    - app_deploy_pnats_network_label not in ['missing', 'pnats_network']
+    - app_deploy_pnats_network_container_count | int > 0
+
+- name: Remove stale pnats network with wrong label
+  command: docker network rm pnow-ats-v2_pnats_network
+  register: app_deploy_remove_stale_pnats_network
+  changed_when: app_deploy_remove_stale_pnats_network.rc == 0
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+    - app_deploy_pnats_network_label not in ['missing', 'pnats_network']
+    - app_deploy_pnats_network_container_count | int == 0
 
 - name: Discover host bind mount directories from compose files
   shell: |

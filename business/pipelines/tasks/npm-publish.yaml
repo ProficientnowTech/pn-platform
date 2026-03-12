@@ -1,0 +1,84 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: npm-publish
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  description: |
+    Runs changeset version + publish to Verdaccio.
+    Publishes Layer 0 packages first (no deps), then Layer 1 (with deps).
+  params:
+    - name: registry-url
+      type: string
+      default: https://npm.pnats.cloud
+      description: Verdaccio registry URL
+  workspaces:
+    - name: source
+      description: Source code with packages
+    - name: npm-credentials
+      description: Workspace containing .npmrc with auth token
+  steps:
+    - name: configure-registry
+      image: node:24-alpine
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        cd "$(workspaces.source.path)"
+
+        # Copy npmrc with auth token
+        if [ -f "$(workspaces.npm-credentials.path)/.npmrc" ]; then
+          cp "$(workspaces.npm-credentials.path)/.npmrc" .npmrc
+        fi
+
+        # Install pnpm
+        corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+        # Install dependencies
+        pnpm install --frozen-lockfile
+
+    - name: version-and-publish
+      image: node:24-alpine
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        apk add --no-cache git openssh
+
+        cd "$(workspaces.source.path)"
+        corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+        # Check if there are pending changesets
+        if [ -z "$(ls .changeset/*.md 2>/dev/null | grep -v README)" ]; then
+          echo "No pending changesets, skipping publish"
+          exit 0
+        fi
+
+        # Apply changeset versions
+        pnpm changeset version
+
+        # Build all packages
+        pnpm --recursive --filter './shared/*' --filter './plugins/*' run build
+
+        # Publish to Verdaccio
+        pnpm changeset publish
+
+        # Commit version bumps back to repo
+        if [ -d "$(workspaces.npm-credentials.path)/../ssh" ]; then
+          cp -R "$(workspaces.npm-credentials.path)/../ssh" /root/.ssh
+          chmod 700 /root/.ssh
+          chmod -R 400 /root/.ssh/*
+          ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
+        fi
+
+        git config user.email "tekton@pnats.cloud"
+        git config user.name "Tekton CI"
+        git add -A
+        if ! git diff --cached --quiet; then
+          git commit -m "chore: version packages"
+          git push origin HEAD
+        fi
+
+        echo "Packages published successfully"

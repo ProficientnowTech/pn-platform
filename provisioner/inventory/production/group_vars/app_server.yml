@@ -60,6 +60,61 @@ app_deploy_env_files:
     - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-scrape/.env
       dest: apps/backend/pi-scrape/.env
       mode: "0600"
+    - src: /home/doxbox/pnow-ats-v2/apps/backend/audit-service/.env
+      dest: apps/backend/audit-service/.env
+      mode: "0600"
+    - src: /home/doxbox/pnow-ats-v2/apps/backend/tasks-reminders/.env
+      dest: apps/backend/tasks-reminders/.env
+      mode: "0600"
+    - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-boolgen/.env
+      dest: apps/backend/pi-boolgen/.env
+      mode: "0600"
+    - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-mailsum/.env
+      dest: apps/backend/pi-mailsum/.env
+      mode: "0600"
+      required: false
+    - src: /home/doxbox/pnow-ats-v2/apps/backend/mailer/.env
+      dest: apps/backend/mailer/.env
+      mode: "0600"
+      required: false
+    - src: /home/doxbox/pnow-ats-v2/apps/legacy/automation-service/.env
+      dest: apps/legacy/automation-service/.env
+      mode: "0600"
+      required: false
+    - src: /home/doxbox/pnow-ats-v2/apps/legacy/dbt-pipelines/.env
+      dest: apps/legacy/dbt-pipelines/.env
+      mode: "0600"
+      required: false
+    - src: /home/doxbox/pnow-ats-v2/apps/legacy/leads-gen-service/.env
+      dest: apps/legacy/leads-gen-service/.env
+      mode: "0600"
+      required: false
+    - src: /home/doxbox/pnow-ats-v2/apps/legacy/notify/.env
+      dest: apps/legacy/notify/.env
+      mode: "0600"
+      required: false
+app_deploy_external_networks:
+    - pnow-ats-v2_pnats_network
+    - pnats_pnats-network
+    - 2_pg_default
+    - nocodb-leads_default
+app_deploy_prereq_dirs:
+    - /databases/meta
+    - /databases/tenants
+    - /databases/kafka-controller-1
+    - /databases/kafka-controller-2
+    - /databases/kafka-controller-3
+    - /databases/kafka-broker-1
+    - /databases/kafka-broker-2
+    - /databases/kafka-broker-3
+    - /databases/debezium
+    - /databases/minio
+    - /databases/redis
+    - /databases/clickhouse
+    - /databases/clickhouse_logs
+    - /databases/automation
+    - /databases/airflow-logs
+    - /backups
 # Alternative to file copy: store full docker/.env in vault
 # app_deploy_env_content: |
 #   ATS_DB_HOST=...

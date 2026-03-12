@@ -193,6 +193,54 @@
     - app_deploy_state == 'present'
     - app_deploy_env_content | default('') | length > 0 or app_deploy_env_src_local_path | default('') | length > 0
 
+- name: Check local env file sources exist on controller
+  delegate_to: localhost
+  become: false
+  stat:
+    path: "{{ item.src }}"
+  loop: "{{ app_deploy_env_files }}"
+  register: app_deploy_env_file_stats
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Fail when required env file source is missing
+  assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "Required env source file is missing: {{ item.item.src }}"
+  loop: "{{ app_deploy_env_file_stats.results | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+    - item.item.required | default(true) | bool
+
+- name: Build effective env file list (existing local sources)
+  set_fact:
+    app_deploy_effective_env_files: >-
+      {{
+        app_deploy_env_file_stats.results
+        | default([])
+        | selectattr('stat.exists')
+        | selectattr('stat.isreg')
+        | map(attribute='item')
+        | list
+      }}
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Log skipped optional env files
+  debug:
+    msg: "Skipping optional missing env file: {{ item.item.src }}"
+  loop: "{{ app_deploy_env_file_stats.results | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+    - not (item.stat.exists and item.stat.isreg)
+    - not (item.item.required | default(true) | bool)
+
 - name: Ensure extra env file parent directories exist
   file:
     path: "{{ app_deploy_dest_path }}/{{ item.dest | dirname }}"
@@ -200,10 +248,10 @@
     owner: root
     group: root
     mode: "0755"
-  loop: "{{ app_deploy_env_files }}"
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
   when:
     - app_deploy_state == 'present'
-    - app_deploy_env_files | length > 0
+    - app_deploy_effective_env_files | default([]) | length > 0
 
 - name: Write environment file from inventory or vault content
   copy:
@@ -246,10 +294,10 @@
     archive: false
     perms: true
   no_log: true
-  loop: "{{ app_deploy_env_files }}"
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
   when:
     - app_deploy_state == 'present'
-    - app_deploy_env_files | length > 0
+    - app_deploy_effective_env_files | default([]) | length > 0
 
 - name: Set secure permissions on extra env files
   file:
@@ -257,10 +305,10 @@
     owner: root
     group: root
     mode: "{{ item.mode | default('0600') }}"
-  loop: "{{ app_deploy_env_files }}"
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
   when:
     - app_deploy_state == 'present'
-    - app_deploy_env_files | length > 0
+    - app_deploy_effective_env_files | default([]) | length > 0
 
 - name: Apply env overrides into target env files
   lineinfile:
@@ -282,10 +330,10 @@
   register: app_deploy_network_name_discovery
   changed_when: false
   failed_when: false
-  loop: "{{ app_deploy_env_files }}"
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
   when:
     - app_deploy_state == 'present'
-    - app_deploy_env_files | length > 0
+    - app_deploy_effective_env_files | default([]) | length > 0
     - app_deploy_needs_external_network_discovery | bool
 
 - name: Build effective external Docker network list
@@ -317,6 +365,68 @@
   when:
     - app_deploy_state == 'present'
     - app_deploy_effective_external_networks | default([]) | length > 0
+
+- name: Discover host bind mount directories from compose files
+  shell: |
+    set -euo pipefail
+    f="{{ app_deploy_dest_path }}/{{ item }}"
+    awk '
+      {
+        line=$0
+        gsub(/["'\'']/, "", line)
+      }
+      match(line, /^[[:space:]]*device:[[:space:]]*(\/[^[:space:]#]+)/, m) {
+        print m[1]
+      }
+      match(line, /^[[:space:]]*-[[:space:]]*(\/[^:]+):[^[:space:]#]+/, m) {
+        print m[1]
+      }
+    ' "$f" | sed "/^$/d"
+  args:
+    executable: /bin/bash
+  register: app_deploy_bind_dir_discovery
+  changed_when: false
+  failed_when: false
+  loop: "{{ app_deploy_effective_compose_files }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_create_prereq_dirs | bool
+
+- name: Build effective prerequisite directory list
+  set_fact:
+    app_deploy_effective_prereq_dirs: >-
+      {{
+        (
+          app_deploy_prereq_dirs
+          +
+          (
+            app_deploy_bind_dir_discovery.results
+            | default([])
+            | map(attribute='stdout_lines')
+            | list
+            | flatten
+          )
+        )
+        | map('trim')
+        | reject('equalto', '')
+        | unique
+      }}
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_create_prereq_dirs | bool
+
+- name: Ensure prerequisite host directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ app_deploy_effective_prereq_dirs | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_create_prereq_dirs | bool
+    - app_deploy_effective_prereq_dirs | default([]) | length > 0
 
 - name: Pull container images
   command: "docker compose -f {{ item | basename }} pull"

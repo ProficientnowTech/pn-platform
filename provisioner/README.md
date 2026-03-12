@@ -121,7 +121,7 @@ Deployment variables live in `inventory/production/group_vars/app_server.yml`:
 - `app_deploy_env_src_local_path`
 - `app_deploy_env_content` (recommended via Ansible Vault)
 - `app_deploy_env_dest_relpath`
-- `app_deploy_env_files` (additional local `.env` sync list with `src` and `dest`)
+- `app_deploy_env_files` (additional local `.env` sync list with `src`, `dest`, optional `required: false`)
 - `app_deploy_env_overrides` (force specific env keys after sync, e.g. missing required vars)
 - `app_deploy_require_wireguard`
 - `app_deploy_manage_wireguard` (auto-remediate WG only when needed)
@@ -129,6 +129,8 @@ Deployment variables live in `inventory/production/group_vars/app_server.yml`:
 - `app_deploy_services_by_compose` (optional per-compose subset)
 - `app_deploy_selectors` (short selector list for playbook-only targeting)
 - `app_deploy_external_network_env_compose_files` (which compose files should trigger auto-create of env-driven external networks)
+- `app_deploy_create_prereq_dirs` (auto-create host bind mount directories before compose up)
+- `app_deploy_prereq_dirs` (extra directories to create explicitly)
 
 ### Playbook-Only Short Targeting
 

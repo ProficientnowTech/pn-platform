@@ -311,6 +311,8 @@ app_deploy_env_overrides: []
 app_deploy_external_networks: []
 app_deploy_external_network_env_compose_files:
   - docker/pi-scrape.docker-compose.yml
+app_deploy_create_prereq_dirs: true
+app_deploy_prereq_dirs: []
 app_deploy_require_wireguard: true
 app_deploy_wireguard_interface: wg0
 app_deploy_sync_excludes:

@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kaniko-build
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  params:
+    - name: image
+      type: string
+      description: Full image reference (e.g., registry.pnats.cloud/pnats/api-gateway)
+    - name: tag
+      type: string
+      default: latest
+      description: Image tag
+    - name: dockerfile
+      type: string
+      default: Dockerfile
+      description: Path to Dockerfile relative to context
+    - name: context
+      type: string
+      default: .
+      description: Build context directory relative to workspace
+    - name: build-args
+      type: array
+      default: []
+      description: Build arguments (KEY=VALUE format)
+  workspaces:
+    - name: source
+      description: Source code workspace
+  results:
+    - name: image-digest
+      description: Digest of the built image
+    - name: image-url
+      description: Full URL of the pushed image
+  steps:
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      args:
+        - --dockerfile=$(params.dockerfile)
+        - --context=$(workspaces.source.path)/$(params.context)
+        - --destination=$(params.image):$(params.tag)
+        - --digest-file=$(results.image-digest.path)
+        - --cache=true
+        - --cache-repo=$(params.image)/cache
+        - --snapshot-mode=redo
+        - --compressed-caching=false
+        - $(params.build-args[*])
+      env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: harbor-registry-credentials
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+  sidecars: []

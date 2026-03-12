@@ -1,0 +1,65 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: github-release
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  description: Creates a GitHub release with changelog
+  params:
+    - name: tag
+      type: string
+      description: Release tag (e.g., v1.2.0)
+    - name: repo
+      type: string
+      default: ProficientnowTech/pnow-ats-v2
+    - name: title
+      type: string
+      default: ""
+      description: Release title (defaults to tag)
+    - name: prerelease
+      type: string
+      default: "false"
+  workspaces:
+    - name: source
+      description: Source code with changelog
+    - name: github-token
+      description: Workspace containing GitHub token
+  steps:
+    - name: create-release
+      image: alpine:3.19
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        apk add --no-cache curl jq
+
+        TOKEN=$(cat "$(workspaces.github-token.path)/token")
+        TAG="$(params.tag)"
+        REPO="$(params.repo)"
+        TITLE="$(params.title)"
+        [ -z "${TITLE}" ] && TITLE="${TAG}"
+
+        PRERELEASE=$(params.prerelease)
+
+        # Extract changelog for this version if available
+        BODY="Release ${TAG}"
+        if [ -f "$(workspaces.source.path)/CHANGELOG.md" ]; then
+          BODY=$(sed -n "/^## ${TAG}/,/^## /p" "$(workspaces.source.path)/CHANGELOG.md" | head -n -1)
+          [ -z "${BODY}" ] && BODY="Release ${TAG}"
+        fi
+
+        # Create release via GitHub API
+        curl -s -X POST \
+          -H "Authorization: token ${TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${REPO}/releases" \
+          -d "$(jq -n \
+            --arg tag "${TAG}" \
+            --arg name "${TITLE}" \
+            --arg body "${BODY}" \
+            --argjson prerelease "${PRERELEASE}" \
+            '{tag_name: $tag, name: $name, body: $body, prerelease: $prerelease}')"
+
+        echo "Created release ${TAG} on ${REPO}"

@@ -1,0 +1,75 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pnats
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - ingress.yaml
+
+patches:
+  # Higher replicas for all deployments in production
+  - target:
+      kind: Deployment
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  # Higher resource limits for production
+  - target:
+      kind: Deployment
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 250m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+
+images:
+  - name: registry.pnats.cloud/pnats/api-gateway
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/auth-service
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/backend-main
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/integrations-service
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/mailer
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/web
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/pi-analysis
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/pi-scrape
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/pi-mailsum
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/pi-mailgen
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/boolgen-generator
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/boolgen-parser
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/boolgen-validator
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/boolgen-orchestrator
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/tasks
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/reminders
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/audit-timeline
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/audit-api
+    newTag: latest
+  - name: registry.pnats.cloud/pnats/audit-cdc
+    newTag: latest

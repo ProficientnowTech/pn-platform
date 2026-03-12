@@ -1,0 +1,416 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: pnats-ci
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  description: |
+    CI pipeline for pnats monorepo. Triggered on PR merge.
+    1. Clone source
+    2. Publish npm packages to Verdaccio (changesets)
+    3. Build all Docker images (Kaniko, parallel)
+    4. Update image tags in infra repo (triggers ArgoCD)
+  params:
+    - name: git-url
+      type: string
+      default: git@github.com:ProficientnowTech/pnow-ats-v2.git
+    - name: git-revision
+      type: string
+      default: develop
+    - name: image-tag
+      type: string
+      description: Tag for Docker images (semver or sha)
+    - name: target-environment
+      type: string
+      default: staging
+    - name: create-release
+      type: string
+      default: "false"
+  workspaces:
+    - name: shared-workspace
+      description: Shared workspace for source code
+    - name: ssh-credentials
+      description: SSH key for git operations
+    - name: docker-credentials
+      description: Docker config for Harbor
+    - name: npm-credentials
+      description: npmrc for Verdaccio auth
+    - name: github-token
+      description: GitHub token for releases
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+        - name: ssh-credentials
+          workspace: ssh-credentials
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+    - name: publish-packages
+      taskRef:
+        name: npm-publish
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: npm-credentials
+          workspace: npm-credentials
+      params:
+        - name: registry-url
+          value: https://npm.pnats.cloud
+    - name: build-api-gateway
+      taskRef:
+        name: kaniko-build
+      runAfter: ["publish-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/api-gateway
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile
+        - name: build-args
+          value: ["--build-arg=APP_NAME=api-gateway"]
+    - name: build-auth-service
+      taskRef:
+        name: kaniko-build
+      runAfter: ["publish-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/auth-service
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile
+        - name: build-args
+          value: ["--build-arg=APP_NAME=auth-service"]
+    - name: build-backend-main
+      taskRef:
+        name: kaniko-build
+      runAfter: ["publish-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/backend-main
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile
+        - name: build-args
+          value: ["--build-arg=APP_NAME=backend-main"]
+    - name: build-integrations-service
+      taskRef:
+        name: kaniko-build
+      runAfter: ["publish-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/integrations-service
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile
+        - name: build-args
+          value: ["--build-arg=APP_NAME=integrations-service"]
+    - name: build-mailer
+      taskRef:
+        name: kaniko-build
+      runAfter: ["publish-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/mailer
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile
+        - name: build-args
+          value: ["--build-arg=APP_NAME=mailer"]
+    - name: build-web
+      taskRef:
+        name: kaniko-build
+      runAfter: ["publish-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/web
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile.frontend
+    - name: build-pi-analysis
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/pi-analysis
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile.pi-analysis
+    - name: build-pi-scrape
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/pi-scrape
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: docker/Dockerfile.pi-scrape
+    - name: build-pi-mailsum
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/pi-mailsum
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/pi-mailsum/Dockerfile
+        - name: context
+          value: apps/backend/pi-mailsum
+    - name: build-pi-mailgen
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/pi-mailgen
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/pi-mailgen/Dockerfile
+        - name: context
+          value: apps/backend/pi-mailgen
+    - name: build-boolgen-generator
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/boolgen-generator
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/pi-boolgen/services/generator/Dockerfile
+        - name: context
+          value: apps/backend/pi-boolgen/services/generator
+    - name: build-boolgen-parser
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/boolgen-parser
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/pi-boolgen/services/parser/Dockerfile
+        - name: context
+          value: apps/backend/pi-boolgen/services/parser
+    - name: build-boolgen-validator
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/boolgen-validator
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/pi-boolgen/services/validator/Dockerfile
+        - name: context
+          value: apps/backend/pi-boolgen/services/validator
+    - name: build-boolgen-orchestrator
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/boolgen-orchestrator
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/pi-boolgen/services/orchestrator/Dockerfile
+        - name: context
+          value: apps/backend/pi-boolgen/services/orchestrator
+    - name: build-tasks
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/tasks
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/tasks-reminders/tasks/Dockerfile
+        - name: context
+          value: apps/backend/tasks-reminders/tasks
+    - name: build-reminders
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/reminders
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/tasks-reminders/reminders/Dockerfile
+        - name: context
+          value: apps/backend/tasks-reminders/reminders
+    - name: build-audit-timeline
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/audit-timeline
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/audit-service/activity-timeline-service/Dockerfile
+        - name: context
+          value: apps/backend/audit-service/activity-timeline-service
+    - name: build-audit-api
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/audit-api
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/audit-service/api-service/Dockerfile
+        - name: context
+          value: apps/backend/audit-service/api-service
+    - name: build-audit-cdc
+      taskRef:
+        name: kaniko-build
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: image
+          value: registry.pnats.cloud/pnats/audit-cdc
+        - name: tag
+          value: $(params.image-tag)
+        - name: dockerfile
+          value: apps/backend/audit-service/cdc-service/Dockerfile
+        - name: context
+          value: apps/backend/audit-service/cdc-service
+    - name: update-tags
+      taskRef:
+        name: update-image-tag
+      runAfter:
+        - build-api-gateway
+        - build-auth-service
+        - build-backend-main
+        - build-integrations-service
+        - build-mailer
+        - build-web
+        - build-pi-analysis
+        - build-pi-scrape
+        - build-pi-mailsum
+        - build-pi-mailgen
+        - build-boolgen-generator
+        - build-boolgen-parser
+        - build-boolgen-validator
+        - build-boolgen-orchestrator
+        - build-tasks
+        - build-reminders
+        - build-audit-timeline
+        - build-audit-api
+        - build-audit-cdc
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+        - name: ssh-credentials
+          workspace: ssh-credentials
+      params:
+        - name: image-tag
+          value: $(params.image-tag)
+        - name: environment
+          value: $(params.target-environment)
+  finally:
+    - name: create-github-release
+      when:
+        - input: $(params.create-release)
+          operator: in
+          values: ["true"]
+      taskRef:
+        name: github-release
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: github-token
+          workspace: github-token
+      params:
+        - name: tag
+          value: v$(params.image-tag)
+        - name: repo
+          value: ProficientnowTech/pnow-ats-v2

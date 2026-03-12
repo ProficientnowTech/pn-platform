@@ -1,6 +1,6 @@
 {{/*
 Crossplane Provider Installation
-Declarative provider management for Keycloak, Kubernetes, and Helm
+Declarative provider management for Keycloak, Kubernetes, Helm, Harbor, and more
 */}}
 
 {{- if .Values.providers.keycloak.enabled }}
@@ -78,6 +78,19 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: {{ .Values.providers.argocd.package }}:{{ .Values.providers.argocd.version }}
+  packagePullPolicy: IfNotPresent
+{{- end }}
+
+{{- if .Values.providers.harbor.enabled }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-harbor
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  package: {{ .Values.providers.harbor.package }}:{{ .Values.providers.harbor.version }}
   packagePullPolicy: IfNotPresent
 {{- end }}
 

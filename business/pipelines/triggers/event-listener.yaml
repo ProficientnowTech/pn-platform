@@ -1,0 +1,82 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pnats-webhook
+  namespace: tekton-pipelines
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    # Staging: PR merged to develop
+    - name: staging-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value: ["pull_request"]
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.action == 'closed' &&
+                body.pull_request.merged == true &&
+                body.pull_request.base.ref == 'develop'
+      bindings:
+        - ref: pnats-develop-binding
+      template:
+        ref: pnats-ci-template
+    # Production: PR merged to main
+    - name: production-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value: ["pull_request"]
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.action == 'closed' &&
+                body.pull_request.merged == true &&
+                body.pull_request.base.ref == 'main'
+      bindings:
+        - ref: pnats-main-binding
+      template:
+        ref: pnats-ci-template
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pnats-webhook
+  namespace: tekton-pipelines
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    external-dns.alpha.kubernetes.io/hostname: webhooks.pnats.cloud
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - webhooks.pnats.cloud
+      secretName: pnats-webhook-tls
+  rules:
+    - host: webhooks.pnats.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: el-pnats-webhook
+                port:
+                  number: 8080

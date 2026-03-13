@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pnats
+  labels:
+    app.kubernetes.io/part-of: pnats
+    environment: production

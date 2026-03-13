@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pnats-staging
+  labels:
+    app.kubernetes.io/part-of: pnats
+    environment: staging

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pi-analysis
+  labels:
+    app.kubernetes.io/name: pi-analysis
+    app.kubernetes.io/component: ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pi-analysis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pi-analysis
+        app.kubernetes.io/component: ai
+    spec:
+      containers:
+        - name: pi-analysis
+          image: registry.pnats.cloud/pnats/pi-analysis
+          ports:
+            - containerPort: 8132
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: 8132
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api
+              port: 8132
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pi-analysis
+  labels:
+    app.kubernetes.io/name: pi-analysis
+    app.kubernetes.io/component: ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: pi-analysis
+  ports:
+    - port: 8132
+      targetPort: 8132
+      protocol: TCP

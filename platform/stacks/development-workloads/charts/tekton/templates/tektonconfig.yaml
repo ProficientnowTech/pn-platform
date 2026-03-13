@@ -4,7 +4,7 @@ kind: TektonConfig
 metadata:
   name: config
   annotations:
-    argocd.argoproj.io/sync-wave: '0'
+    argocd.argoproj.io/sync-options: Replace=true
 spec:
   profile: all
   targetNamespace: tekton-pipelines

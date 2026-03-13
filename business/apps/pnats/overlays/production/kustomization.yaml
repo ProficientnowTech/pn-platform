@@ -53,8 +53,6 @@ images:
     newTag: latest
   - name: registry.pnats.cloud/pnats/pi-mailsum
     newTag: latest
-  - name: registry.pnats.cloud/pnats/pi-mailgen
-    newTag: latest
   - name: registry.pnats.cloud/pnats/boolgen-generator
     newTag: latest
   - name: registry.pnats.cloud/pnats/boolgen-parser

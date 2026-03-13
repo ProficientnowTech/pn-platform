@@ -11,8 +11,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: git@github.com:ProficientnowTech/pn-infra-main.git
-    targetRevision: main
+    repoURL: https://github.com/ProficientnowTech/pn-infra.git
+    targetRevision: v2
     path: business/apps/pnats/overlays/staging
 
   destination:
@@ -53,8 +53,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: git@github.com:ProficientnowTech/pn-infra-main.git
-    targetRevision: main
+    repoURL: https://github.com/ProficientnowTech/pn-infra.git
+    targetRevision: v2
     path: business/apps/pnats/overlays/production
 
   destination:
@@ -78,3 +78,39 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pnats-ci-pipelines
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: pnats
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ProficientnowTech/pn-infra.git
+    targetRevision: v2
+    path: business/pipelines
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pnats-ci
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

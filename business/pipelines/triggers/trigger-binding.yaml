@@ -1,0 +1,35 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: pnats-develop-binding
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: git-revision
+      value: develop
+    - name: git-url
+      value: git@github.com:ProficientnowTech/pnow-ats-v2.git
+    - name: image-tag
+      value: $(body.pull_request.merge_commit_sha)
+    - name: target-environment
+      value: staging
+    - name: create-release
+      value: "false"
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: pnats-main-binding
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: git-revision
+      value: main
+    - name: git-url
+      value: git@github.com:ProficientnowTech/pnow-ats-v2.git
+    - name: image-tag
+      value: $(body.pull_request.merge_commit_sha)
+    - name: target-environment
+      value: production
+    - name: create-release
+      value: "true"

@@ -1,0 +1,59 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: pnats-ci-template
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: git-revision
+      description: The git revision (branch or tag)
+    - name: git-url
+      description: The git repository URL
+    - name: image-tag
+      description: Tag for Docker images
+    - name: target-environment
+      description: Target deployment environment
+    - name: create-release
+      description: Whether to create a GitHub release
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: pnats-ci-
+        namespace: tekton-pipelines
+      spec:
+        pipelineRef:
+          name: pnats-ci
+        params:
+          - name: git-url
+            value: $(tt.params.git-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          - name: image-tag
+            value: $(tt.params.image-tag)
+          - name: target-environment
+            value: $(tt.params.target-environment)
+          - name: create-release
+            value: $(tt.params.create-release)
+        workspaces:
+          - name: shared-workspace
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                storageClassName: app-blk-hdd-repl
+                resources:
+                  requests:
+                    storage: 10Gi
+          - name: ssh-credentials
+            secret:
+              secretName: github-ssh-key
+          - name: docker-credentials
+            secret:
+              secretName: harbor-registry-credentials
+          - name: npm-credentials
+            secret:
+              secretName: verdaccio-credentials
+          - name: github-token
+            secret:
+              secretName: github-token

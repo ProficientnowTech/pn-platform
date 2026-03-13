@@ -46,5 +46,14 @@ applications:
     - .metadata.generation
     - .spec.preserveUnknownFields
 
+- name: pnats-apps
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+  path: business/apps/pnats
+  destinationNamespaceOverwrite: argocd
+  syncOptions:
+  - CreateNamespace=false
+  - RespectIgnoreDifferences=true
+
 commonLabels:
   platform.pnats.cloud/environment: 'production'

@@ -193,12 +193,57 @@
     - app_deploy_state == 'present'
     - app_deploy_env_content | default('') | length > 0 or app_deploy_env_src_local_path | default('') | length > 0
 
+- name: Resolve primary env source path on controller
+  set_fact:
+    app_deploy_env_src_local_path_resolved: >-
+      {{
+        (
+          app_deploy_env_src_local_path
+          if (app_deploy_env_src_local_path | regex_search('^/'))
+          else (app_deploy_src_local_path ~ '/' ~ app_deploy_env_src_local_path)
+        )
+        if (app_deploy_env_src_local_path | default('') | length > 0)
+        else ''
+      }}
+  when: app_deploy_state == 'present'
+
+- name: Initialize resolved extra env file list
+  set_fact:
+    app_deploy_env_files_resolved: []
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Resolve extra env file source paths on controller
+  set_fact:
+    app_deploy_env_files_resolved: >-
+      {{
+        (app_deploy_env_files_resolved | default([]))
+        + [
+            item
+            | combine(
+                {
+                  'src_resolved': (
+                    item.src
+                    if (item.src | regex_search('^/'))
+                    else (app_deploy_src_local_path ~ '/' ~ item.src)
+                  )
+                },
+                recursive=True
+              )
+          ]
+      }}
+  loop: "{{ app_deploy_env_files }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
 - name: Check local env file sources exist on controller
   delegate_to: localhost
   become: false
   stat:
-    path: "{{ item.src }}"
-  loop: "{{ app_deploy_env_files }}"
+    path: "{{ item.src_resolved }}"
+  loop: "{{ app_deploy_env_files_resolved | default([]) }}"
   register: app_deploy_env_file_stats
   when:
     - app_deploy_state == 'present'
@@ -209,7 +254,7 @@
     that:
       - item.stat.exists
       - item.stat.isreg
-    fail_msg: "Required env source file is missing: {{ item.item.src }}"
+    fail_msg: "Required env source file is missing: {{ item.item.src }} (resolved: {{ item.item.src_resolved }})"
   loop: "{{ app_deploy_env_file_stats.results | default([]) }}"
   when:
     - app_deploy_state == 'present'
@@ -233,7 +278,7 @@
 
 - name: Log skipped optional env files
   debug:
-    msg: "Skipping optional missing env file: {{ item.item.src }}"
+    msg: "Skipping optional missing env file: {{ item.item.src }} (resolved: {{ item.item.src_resolved }})"
   loop: "{{ app_deploy_env_file_stats.results | default([]) }}"
   when:
     - app_deploy_state == 'present'
@@ -267,7 +312,7 @@
 
 - name: Sync environment file to target
   ansible.posix.synchronize:
-    src: "{{ app_deploy_env_src_local_path }}"
+    src: "{{ app_deploy_env_src_local_path_resolved }}"
     dest: "{{ app_deploy_dest_path }}/{{ app_deploy_env_dest_relpath }}"
     archive: false
     perms: true
@@ -275,7 +320,7 @@
   when:
     - app_deploy_state == 'present'
     - app_deploy_env_content | default('') | length == 0
-    - app_deploy_env_src_local_path | default('') | length > 0
+    - app_deploy_env_src_local_path_resolved | default('') | length > 0
 
 - name: Set secure permissions on env file
   file:
@@ -285,11 +330,11 @@
     mode: "0600"
   when:
     - app_deploy_state == 'present'
-    - app_deploy_env_content | default('') | length > 0 or app_deploy_env_src_local_path | default('') | length > 0
+    - app_deploy_env_content | default('') | length > 0 or app_deploy_env_src_local_path_resolved | default('') | length > 0
 
 - name: Sync extra local environment files to target
   ansible.posix.synchronize:
-    src: "{{ item.src }}"
+    src: "{{ item.src_resolved }}"
     dest: "{{ app_deploy_dest_path }}/{{ item.dest }}"
     archive: false
     perms: true
@@ -476,9 +521,9 @@
   file:
     path: "{{ item }}"
     state: directory
-    owner: root
-    group: root
-    mode: "0755"
+    owner: "{{ (app_deploy_prereq_dir_attrs[item].owner if (item in app_deploy_prereq_dir_attrs and (app_deploy_prereq_dir_attrs[item].owner is defined)) else app_deploy_prereq_dir_owner) }}"
+    group: "{{ (app_deploy_prereq_dir_attrs[item].group if (item in app_deploy_prereq_dir_attrs and (app_deploy_prereq_dir_attrs[item].group is defined)) else app_deploy_prereq_dir_group) }}"
+    mode: "{{ (app_deploy_prereq_dir_attrs[item].mode if (item in app_deploy_prereq_dir_attrs and (app_deploy_prereq_dir_attrs[item].mode is defined)) else app_deploy_prereq_dir_mode) }}"
   loop: "{{ app_deploy_effective_prereq_dirs | default([]) }}"
   when:
     - app_deploy_state == 'present'

@@ -2,7 +2,7 @@
 app_deploy_state: present
 app_deploy_project_name: pnow-ats-v2
 app_deploy_source_mode: git
-app_deploy_src_local_path: /home/doxbox/pnow-ats-v2
+app_deploy_src_local_path: "{{ lookup('env', 'HOME') }}/pnow-ats-v2"
 app_deploy_repo_url: git@github.com:YOUR_ORG/pnow-ats-v2.git
 app_deploy_repo_version: main
 app_deploy_repo_key_path: /root/.ssh/id_ed25519_pnow_ats
@@ -303,7 +303,7 @@ app_deploy_selector_map:
       - reminders_worker
 app_deploy_sync_delete: false
 app_deploy_pull_images: false
-app_deploy_env_src_local_path: /home/doxbox/pnow-ats-v2/docker/.env
+app_deploy_env_src_local_path: docker/.env
 app_deploy_env_content: ""
 app_deploy_env_dest_relpath: docker/.env
 app_deploy_env_files: []
@@ -313,6 +313,10 @@ app_deploy_external_network_env_compose_files:
   - docker/pi-scrape.docker-compose.yml
 app_deploy_create_prereq_dirs: true
 app_deploy_prereq_dirs: []
+app_deploy_prereq_dir_owner: root
+app_deploy_prereq_dir_group: root
+app_deploy_prereq_dir_mode: "0755"
+app_deploy_prereq_dir_attrs: {}
 app_deploy_require_wireguard: true
 app_deploy_wireguard_interface: wg0
 app_deploy_sync_excludes:

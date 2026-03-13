@@ -54,42 +54,42 @@ app_deploy_target_compose_files: []
 app_deploy_env_src_local_path: ""
 app_deploy_env_dest_relpath: ""
 app_deploy_env_files:
-    - src: /home/doxbox/pnow-ats-v2/docker/.env
+    - src: docker/.env
       dest: docker/.env
       mode: "0600"
-    - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-scrape/.env
+    - src: apps/backend/pi-scrape/.env
       dest: apps/backend/pi-scrape/.env
       mode: "0600"
-    - src: /home/doxbox/pnow-ats-v2/apps/backend/audit-service/.env
+    - src: apps/backend/audit-service/.env
       dest: apps/backend/audit-service/.env
       mode: "0600"
-    - src: /home/doxbox/pnow-ats-v2/apps/backend/tasks-reminders/.env
+    - src: apps/backend/tasks-reminders/.env
       dest: apps/backend/tasks-reminders/.env
       mode: "0600"
-    - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-boolgen/.env
+    - src: apps/backend/pi-boolgen/.env
       dest: apps/backend/pi-boolgen/.env
       mode: "0600"
-    - src: /home/doxbox/pnow-ats-v2/apps/backend/pi-mailsum/.env
+    - src: apps/backend/pi-mailsum/.env
       dest: apps/backend/pi-mailsum/.env
       mode: "0600"
       required: false
-    - src: /home/doxbox/pnow-ats-v2/apps/backend/mailer/.env
+    - src: apps/backend/mailer/.env
       dest: apps/backend/mailer/.env
       mode: "0600"
       required: false
-    - src: /home/doxbox/pnow-ats-v2/apps/legacy/automation-service/.env
+    - src: apps/legacy/automation-service/.env
       dest: apps/legacy/automation-service/.env
       mode: "0600"
       required: false
-    - src: /home/doxbox/pnow-ats-v2/apps/legacy/dbt-pipelines/.env
+    - src: apps/legacy/dbt-pipelines/.env
       dest: apps/legacy/dbt-pipelines/.env
       mode: "0600"
       required: false
-    - src: /home/doxbox/pnow-ats-v2/apps/legacy/leads-gen-service/.env
+    - src: apps/legacy/leads-gen-service/.env
       dest: apps/legacy/leads-gen-service/.env
       mode: "0600"
       required: false
-    - src: /home/doxbox/pnow-ats-v2/apps/legacy/notify/.env
+    - src: apps/legacy/notify/.env
       dest: apps/legacy/notify/.env
       mode: "0600"
       required: false
@@ -114,6 +114,31 @@ app_deploy_prereq_dirs:
     - /databases/automation
     - /databases/airflow-logs
     - /backups
+app_deploy_prereq_dir_attrs:
+    /databases/kafka-controller-1:
+        owner: "1000"
+        group: "1000"
+        mode: "0775"
+    /databases/kafka-controller-2:
+        owner: "1000"
+        group: "1000"
+        mode: "0775"
+    /databases/kafka-controller-3:
+        owner: "1000"
+        group: "1000"
+        mode: "0775"
+    /databases/kafka-broker-1:
+        owner: "1000"
+        group: "1000"
+        mode: "0775"
+    /databases/kafka-broker-2:
+        owner: "1000"
+        group: "1000"
+        mode: "0775"
+    /databases/kafka-broker-3:
+        owner: "1000"
+        group: "1000"
+        mode: "0775"
 # Alternative to file copy: store full docker/.env in vault
 # app_deploy_env_content: |
 #   ATS_DB_HOST=...

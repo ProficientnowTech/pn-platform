@@ -4,10 +4,9 @@ global:
   project: development-workloads
 
 tektonConfig:
-  # Disabled by default because `tekton-operator` Helm release already creates
-  # `TektonConfig/config` as a Helm hook. Enabling this here would cause ArgoCD
-  # shared-resource conflicts between the `tekton` and `tekton-operator` apps.
-  enabled: false
+  # Manages the TektonConfig/config resource. Set profile to 'all' to install
+  # pipelines, triggers, and dashboard components.
+  enabled: true
 
 tektonDashboardCR:
   # Disabled by default because the Tekton Operator deploys the dashboard using

@@ -211,7 +211,7 @@ providerSecretRefs:
     namespace: crossplane-system
     vaultPath: applications/security/crossplane/providers/grafana
     property: credentials
-  - enabled: false
+  - enabled: true
     name: provider-harbor-credentials
     namespace: crossplane-system
     vaultPath: applications/security/crossplane/providers/harbor

@@ -1,0 +1,68 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-clone
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  params:
+    - name: url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      default: develop
+      description: Git revision to checkout
+    - name: subdirectory
+      type: string
+      default: ""
+      description: Subdirectory to clone into
+  workspaces:
+    - name: output
+      description: Workspace to clone the repo into
+    - name: ssh-credentials
+      description: SSH key for git auth
+      optional: true
+  results:
+    - name: commit
+      description: The precise commit SHA that was fetched
+    - name: committer-date
+      description: The epoch timestamp of the commit
+  steps:
+    - name: clone
+      image: alpine/git:2.43.0
+      env:
+        - name: PARAM_URL
+          value: $(params.url)
+        - name: PARAM_REVISION
+          value: $(params.revision)
+        - name: PARAM_SUBDIRECTORY
+          value: $(params.subdirectory)
+        - name: WORKSPACE_OUTPUT_PATH
+          value: $(workspaces.output.path)
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        if [ -d "$(workspaces.ssh-credentials.path)" ] 2>/dev/null; then
+          cp -R "$(workspaces.ssh-credentials.path)" /root/.ssh
+          chmod 700 /root/.ssh
+          chmod -R 400 /root/.ssh/*
+          ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
+        fi
+
+        CHECKOUT_DIR="${WORKSPACE_OUTPUT_PATH}/${PARAM_SUBDIRECTORY}"
+        mkdir -p "${CHECKOUT_DIR}"
+
+        # Depth 50 to support changeset version detection and changelog generation
+        git clone --depth 50 --branch "${PARAM_REVISION}" "${PARAM_URL}" "${CHECKOUT_DIR}"
+        cd "${CHECKOUT_DIR}"
+
+        RESULT_SHA="$(git rev-parse HEAD)"
+        RESULT_DATE="$(git log -1 --format=%ct)"
+
+        printf "%s" "${RESULT_SHA}" > "$(results.commit.path)"
+        printf "%s" "${RESULT_DATE}" > "$(results.committer-date.path)"
+
+        echo "Cloned ${PARAM_URL} @ ${RESULT_SHA}"

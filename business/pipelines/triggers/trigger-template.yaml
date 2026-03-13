@@ -16,7 +16,7 @@ spec:
     - name: create-release
       description: Whether to create a GitHub release
   resourcetemplates:
-    - apiVersion: tekton.dev/v1
+    - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
         generateName: pnats-ci-

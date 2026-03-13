@@ -58,6 +58,15 @@ Crossplane extends Kubernetes with infrastructure management capabilities, allow
 - Repository and cluster registration
 - Authentication: ArgoCD API token
 
+### Container Registry Provider
+
+**provider-harbor** (v3.11.2)
+- Declarative Harbor project management
+- Robot account lifecycle management
+- Retention policy and webhook configuration
+- Project member and label management
+- Authentication: Harbor admin credentials from Vault
+
 ## Composition Functions
 
 **function-environment-configs** (v0.3.0)
@@ -91,6 +100,10 @@ graph TB
             PAR[provider-argocd]
         end
 
+        subgraph "Container Registry"
+            PHB[provider-harbor]
+        end
+
         subgraph "Functions"
             FEC[function-environment-configs]
         end
@@ -101,6 +114,7 @@ graph TB
         CP --> PHM
         CP --> PVT
         CP --> PAR
+        CP --> PHB
         CP --> FEC
     end
 
@@ -110,6 +124,7 @@ graph TB
         K8S[Kubernetes]
         VT[Vault]
         ACD[ArgoCD]
+        HBR[Harbor]
     end
 
     PKC --> KC
@@ -117,6 +132,7 @@ graph TB
     PK8 --> K8S
     PVT --> VT
     PAR --> ACD
+    PHB --> HBR
 ```
 
 ## Configuration
@@ -139,6 +155,8 @@ providers:
     enabled: true  # Set to true to enable
   argocd:
     enabled: true
+  harbor:
+    enabled: true
 
 providerConfig:
   vault:
@@ -155,6 +173,11 @@ providerConfig:
     enabled: true
     serverAddr: "argocd-server.argocd.svc:443"
     tokenSecretName: "argocd-admin-token"
+
+  harbor:
+    enabled: true
+    url: "https://registry.pnats.cloud"
+    vaultPath: "applications/developer-platform/harbor/core"
 ```
 
 ### Required Secrets

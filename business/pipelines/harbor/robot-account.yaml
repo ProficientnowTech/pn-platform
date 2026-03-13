@@ -1,0 +1,27 @@
+apiVersion: robotaccount.harbor.crossplane.io/v1alpha1
+kind: RobotAccount
+metadata:
+  name: pnats-ci-robot
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  forProvider:
+    name: pnats-ci-robot
+    description: CI/CD robot account for pnats — used by Tekton/Kaniko to push and pull images
+    level: system
+    permissions:
+      - access:
+          - action: push
+            resource: repository
+          - action: pull
+            resource: repository
+          - action: list
+            resource: repository
+        kind: project
+        namespace: pnats
+    secretSecretRef:
+      key: token
+      name: harbor-robot-pnats-ci
+      namespace: crossplane-system
+  providerConfigRef:
+    name: default

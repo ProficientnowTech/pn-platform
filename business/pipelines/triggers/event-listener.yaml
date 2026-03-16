@@ -7,6 +7,14 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   serviceAccountName: tekton-triggers-sa
+  resources:
+    kubernetesResource:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: event-listener
+                image: ghcr.io/tektoncd/triggers/cmd/eventlistenersink:v0.22.0
   triggers:
     # Staging: PR merged to develop
     - name: staging-trigger

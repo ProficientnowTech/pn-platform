@@ -3,25 +3,32 @@ kind: ClusterPolicy
 metadata:
   name: rewrite-gcr-tekton-images
   annotations:
-    policies.kyverno.io/title: Rewrite gcr.io Tekton images to ghcr.io
+    policies.kyverno.io/title: Rewrite gcr.io Tekton images to pixiuio mirrors
     policies.kyverno.io/description: >-
       The kubebb tekton-operator chart references gcr.io for EventListener
       sink images, but gcr.io has deprecated anonymous access (403).
-      This policy rewrites gcr.io/tekton-releases/github.com/tektoncd/*
-      to ghcr.io/tektoncd/* at pod admission time.
+      This policy rewrites gcr.io eventlistenersink images to the
+      pixiuio Docker Hub mirror (verified pullable from cluster).
 spec:
   rules:
-    - name: rewrite-gcr-tekton-to-ghcr
+    - name: rewrite-gcr-eventlistenersink
       match:
         any:
           - resources:
               kinds:
                 - Pod
+              namespaces:
+                - tekton-pipelines
       mutate:
         foreach:
           - list: "request.object.spec.containers"
+            preconditions:
+              all:
+                - key: "{{ contains(element.image, 'gcr.io/tekton-releases') }}"
+                  operator: Equals
+                  value: true
             patchStrategicMerge:
               spec:
                 containers:
                   - name: "{{ element.name }}"
-                    image: "{{ regex_replace_all('gcr\\.io/tekton-releases/github\\.com/tektoncd/', element.image, 'ghcr.io/tektoncd/') }}"
+                    image: pixiuio/eventlistenersink:v0.22.0

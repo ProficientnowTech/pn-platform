@@ -4,9 +4,11 @@ global:
   project: development-workloads
 
 tektonConfig:
-  # Manages the TektonConfig/config resource. Set profile to 'all' to install
-  # pipelines, triggers, and dashboard components.
-  enabled: true
+  # Managed by the tekton-operator Helm chart's post-install hook.
+  # Do NOT enable here — it creates a shared resource conflict with ArgoCD.
+  # To change the profile, patch TektonConfig directly:
+  #   kubectl patch tektonconfig config --type=merge -p '{"spec":{"profile":"all"}}'
+  enabled: false
 
 tektonDashboardCR:
   # Disabled by default because the Tekton Operator deploys the dashboard using

@@ -1,0 +1,21 @@
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+spec:
+  profile: all
+  targetNamespace: tekton-pipelines
+  pipeline:
+    enable-api-fields: stable
+  trigger:
+    enable-api-fields: stable
+    options:
+      configMaps:
+        config-defaults-triggers:
+          el-image: ghcr.io/tektoncd/triggers/cmd/eventlistenersink:v0.22.0
+  pruner:
+    resources:
+    - pipelinerun
+    - taskrun
+    keep: 100
+    schedule: "0 8 * * *"

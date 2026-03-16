@@ -3,6 +3,9 @@ kind: Pipeline
 metadata:
   name: pnats-ci
   namespace: tekton-pipelines
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/part-of: pnats-ci
 spec:

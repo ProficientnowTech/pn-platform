@@ -3,6 +3,9 @@ kind: TriggerBinding
 metadata:
   name: pnats-develop-binding
   namespace: tekton-pipelines
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   params:
     - name: git-revision
@@ -21,6 +24,9 @@ kind: TriggerBinding
 metadata:
   name: pnats-main-binding
   namespace: tekton-pipelines
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   params:
     - name: git-revision

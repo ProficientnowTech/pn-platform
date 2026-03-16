@@ -12,6 +12,9 @@ applications:
   targetRevision: 0.64.0
   helm:
     releaseName: tekton-operator
+    parameters:
+    - name: operator.autoInstallComponents
+      value: "true"
   # CRDs are mutated by the apiserver (status/managedFields/annotations), which
   # makes ArgoCD show them as OutOfSync even though the desired spec matches.
   ignoreDifferences:

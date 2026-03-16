@@ -5,6 +5,9 @@ metadata:
   labels:
     app.kubernetes.io/part-of: pnats-ci
 spec:
+  writeConnectionSecretToRef:
+    name: harbor-robot-pnats-ci
+    namespace: crossplane-system
   forProvider:
     name: pnats-ci-robot
     description: CI/CD robot account for pnats — used by Tekton/Kaniko to push and pull images

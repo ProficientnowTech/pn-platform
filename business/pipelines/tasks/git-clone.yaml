@@ -52,6 +52,8 @@ spec:
           chmod 700 /root/.ssh
           # SSH expects id_rsa/id_ed25519, not ssh-privatekey
           cp "$(workspaces.ssh-credentials.path)/ssh-privatekey" /root/.ssh/id_rsa
+          # Vault may strip trailing newline — SSH/libcrypto requires it
+          echo "" >> /root/.ssh/id_rsa
           chmod 400 /root/.ssh/id_rsa
           if [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ]; then
             cp "$(workspaces.ssh-credentials.path)/known_hosts" /root/.ssh/known_hosts

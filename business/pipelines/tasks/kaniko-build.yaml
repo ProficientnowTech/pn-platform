@@ -40,7 +40,7 @@ spec:
       description: Full URL of the pushed image
   steps:
     - name: build-and-push
-      image: gcr.io/kaniko-project/executor:v1.23.2
+      image: gcr.io/kaniko-project/executor:v1.23.2@sha256:8a4f9af8ef55ef8bfaf4cfd7b15dc956609e14a4402efefd5fb2e49a0c06e2c8
       resources: {}
       args:
         - --dockerfile=$(params.dockerfile)

@@ -202,9 +202,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/pi-mailsum
+          value: apps/backend/pi-mailsum/Dockerfile
     - name: build-pi-mailgen
       taskRef:
         name: kaniko-build
@@ -218,9 +216,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/pi-mailgen
+          value: apps/backend/pi-mailgen/Dockerfile
     - name: build-boolgen-generator
       taskRef:
         name: kaniko-build
@@ -234,9 +230,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/pi-boolgen/services/generator
+          value: apps/backend/pi-boolgen/services/generator/Dockerfile
     - name: build-boolgen-parser
       taskRef:
         name: kaniko-build
@@ -250,9 +244,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/pi-boolgen/services/parser
+          value: apps/backend/pi-boolgen/services/parser/Dockerfile
     - name: build-boolgen-validator
       taskRef:
         name: kaniko-build
@@ -266,9 +258,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/pi-boolgen/services/validator
+          value: apps/backend/pi-boolgen/services/validator/Dockerfile
     - name: build-boolgen-orchestrator
       taskRef:
         name: kaniko-build
@@ -282,9 +272,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/pi-boolgen/services/orchestrator
+          value: apps/backend/pi-boolgen/services/orchestrator/Dockerfile
     - name: build-tasks
       taskRef:
         name: kaniko-build
@@ -298,9 +286,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/tasks-reminders/tasks
+          value: apps/backend/tasks-reminders/tasks/Dockerfile
     - name: build-reminders
       taskRef:
         name: kaniko-build
@@ -314,9 +300,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/tasks-reminders/reminders
+          value: apps/backend/tasks-reminders/reminders/Dockerfile
     - name: build-audit-timeline
       taskRef:
         name: kaniko-build
@@ -330,9 +314,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/audit-service/activity-timeline-service
+          value: apps/backend/audit-service/activity-timeline-service/Dockerfile
     - name: build-audit-api
       taskRef:
         name: kaniko-build
@@ -346,9 +328,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/audit-service/api-service
+          value: apps/backend/audit-service/api-service/Dockerfile
     - name: build-audit-cdc
       taskRef:
         name: kaniko-build
@@ -362,9 +342,7 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: Dockerfile
-        - name: context
-          value: apps/backend/audit-service/cdc-service
+          value: apps/backend/audit-service/cdc-service/Dockerfile
     - name: update-tags
       taskRef:
         name: update-image-tag

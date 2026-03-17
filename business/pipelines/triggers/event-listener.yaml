@@ -63,7 +63,7 @@ metadata:
   name: pnats-webhook
   namespace: tekton-pipelines
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-production
     external-dns.alpha.kubernetes.io/hostname: webhooks.pnats.cloud
 spec:
   ingressClassName: nginx

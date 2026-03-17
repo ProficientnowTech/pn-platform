@@ -48,9 +48,14 @@ spec:
         set -eu
 
         if [ -d "$(workspaces.ssh-credentials.path)" ] 2>/dev/null; then
-          cp -R "$(workspaces.ssh-credentials.path)" /root/.ssh
+          mkdir -p /root/.ssh
           chmod 700 /root/.ssh
-          chmod -R 400 /root/.ssh/*
+          # SSH expects id_rsa/id_ed25519, not ssh-privatekey
+          cp "$(workspaces.ssh-credentials.path)/ssh-privatekey" /root/.ssh/id_rsa
+          chmod 400 /root/.ssh/id_rsa
+          if [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ]; then
+            cp "$(workspaces.ssh-credentials.path)/known_hosts" /root/.ssh/known_hosts
+          fi
           ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
         fi
 

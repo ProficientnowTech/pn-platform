@@ -33,8 +33,10 @@ spec:
       description: Source code workspace
   results:
     - name: image-digest
+      type: string
       description: Digest of the built image
     - name: image-url
+      type: string
       description: Full URL of the pushed image
   steps:
     - name: build-and-push
@@ -63,4 +65,3 @@ spec:
         items:
           - key: .dockerconfigjson
             path: config.json
-  sidecars: []

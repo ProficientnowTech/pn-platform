@@ -55,8 +55,13 @@ spec:
         fi
 
         CHECKOUT_DIR="${WORKSPACE_OUTPUT_PATH}/${PARAM_SUBDIRECTORY}"
-        # Clean target dir (fresh PVCs have lost+found which breaks git clone)
-        rm -rf "${CHECKOUT_DIR}"
+        # Clean workspace contents (matches Tekton catalog cleandir pattern)
+        # Cannot rm the dir itself — it's a volume mount
+        if [ -d "${CHECKOUT_DIR}" ]; then
+          rm -rf "${CHECKOUT_DIR:?}"/*
+          rm -rf "${CHECKOUT_DIR}"/.[!.]*
+          rm -rf "${CHECKOUT_DIR}"/..?*
+        fi
         mkdir -p "${CHECKOUT_DIR}"
 
         # Depth 50 to support changeset version detection and changelog generation

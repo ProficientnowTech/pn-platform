@@ -203,20 +203,6 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/pi-mailsum/Dockerfile
-    - name: build-pi-mailgen
-      taskRef:
-        name: kaniko-build
-      runAfter: ["clone"]
-      workspaces:
-        - name: source
-          workspace: shared-workspace
-      params:
-        - name: image
-          value: registry.pnats.cloud/pnats/pi-mailgen
-        - name: tag
-          value: $(params.image-tag)
-        - name: dockerfile
-          value: apps/backend/pi-mailgen/Dockerfile
     - name: build-boolgen-generator
       taskRef:
         name: kaniko-build
@@ -356,7 +342,6 @@ spec:
         - build-pi-analysis
         - build-pi-scrape
         - build-pi-mailsum
-        - build-pi-mailgen
         - build-boolgen-generator
         - build-boolgen-parser
         - build-boolgen-validator

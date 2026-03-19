@@ -64,6 +64,8 @@ spec:
           workspace: shared-workspace
         - name: npm-credentials
           workspace: npm-credentials
+        - name: ssh-credentials
+          workspace: ssh-credentials
       params:
         - name: registry-url
           value: https://npm.pnats.cloud

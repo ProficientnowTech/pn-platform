@@ -24,6 +24,9 @@ spec:
     - name: github-token
       description: GitHub token for changelog generation
       optional: true
+    - name: ssh-credentials
+      description: SSH key for git push
+      optional: true
   steps:
     - name: configure-registry
       image: node:24-alpine
@@ -76,11 +79,15 @@ spec:
         # Publish to Verdaccio
         pnpm changeset publish
 
-        # Commit version bumps back to repo
-        if [ -d "$(workspaces.npm-credentials.path)/../ssh" ]; then
-          cp -R "$(workspaces.npm-credentials.path)/../ssh" /root/.ssh
+        # Setup SSH for git push
+        if [ -d "$(workspaces.ssh-credentials.path)" ] 2>/dev/null; then
+          mkdir -p /root/.ssh
           chmod 700 /root/.ssh
-          chmod -R 400 /root/.ssh/*
+          cp "$(workspaces.ssh-credentials.path)/ssh-privatekey" /root/.ssh/id_rsa
+          chmod 400 /root/.ssh/id_rsa
+          if [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ]; then
+            cp "$(workspaces.ssh-credentials.path)/known_hosts" /root/.ssh/known_hosts
+          fi
           ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
         fi
 

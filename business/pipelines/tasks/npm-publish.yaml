@@ -21,6 +21,9 @@ spec:
       description: Source code with packages
     - name: npm-credentials
       description: Workspace containing .npmrc with auth token
+    - name: github-token
+      description: GitHub token for changelog generation
+      optional: true
   steps:
     - name: configure-registry
       image: node:24-alpine
@@ -43,6 +46,12 @@ spec:
 
     - name: version-and-publish
       image: node:24-alpine
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
       script: |
         #!/usr/bin/env sh
         set -eu

@@ -93,7 +93,8 @@ spec:
 
         git config user.email "tekton@pnats.cloud"
         git config user.name "Tekton CI"
-        git add -A
+        # Only stage changeset version bumps — git add -A is too slow (scans node_modules)
+        git add .changeset/ '**/package.json' '**/CHANGELOG.md' pnpm-lock.yaml
         if ! git diff --cached --quiet; then
           git commit -m "chore: version packages"
           git push origin HEAD

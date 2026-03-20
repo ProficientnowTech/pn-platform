@@ -24,6 +24,9 @@ spec:
         generateName: pnats-ci-
         namespace: tekton-pipelines
       spec:
+        timeouts:
+          pipeline: "3h"
+          tasks: "2h"
         pipelineRef:
           name: pnats-ci
         params:
@@ -42,8 +45,8 @@ spec:
             volumeClaimTemplate:
               spec:
                 accessModes:
-                  - ReadWriteOnce
-                storageClassName: app-blk-hdd-repl
+                  - ReadWriteMany
+                storageClassName: ceph-filesystem
                 resources:
                   requests:
                     storage: 10Gi

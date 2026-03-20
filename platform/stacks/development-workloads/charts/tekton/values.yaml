@@ -4,11 +4,10 @@ global:
   project: development-workloads
 
 tektonConfig:
-  # Managed by the tekton-operator Helm chart's post-install hook.
-  # Do NOT enable here — it creates a shared resource conflict with ArgoCD.
-  # To change the profile, patch TektonConfig directly:
-  #   kubectl patch tektonconfig config --type=merge -p '{"spec":{"profile":"all"}}'
-  enabled: false
+  # The operator auto-creates TektonConfig via autoInstallComponents=true.
+  # We enable this to customize pruner settings (keep 5, prune every 6h).
+  # Uses Replace=true sync option to update the existing config.
+  enabled: true
 
 tektonDashboardCR:
   # Disabled by default because the Tekton Operator deploys the dashboard using

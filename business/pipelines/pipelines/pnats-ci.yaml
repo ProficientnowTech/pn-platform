@@ -108,7 +108,7 @@ spec:
         - name: build-args
           value:
             - "--build-arg=APP_NAME=api-gateway"
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
             - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
             - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-auth-service
@@ -132,7 +132,7 @@ spec:
         - name: build-args
           value:
             - "--build-arg=APP_NAME=auth-service"
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
             - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
             - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-backend-main
@@ -156,7 +156,7 @@ spec:
         - name: build-args
           value:
             - "--build-arg=APP_NAME=backend-main"
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
             - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
             - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-integrations-service
@@ -180,7 +180,7 @@ spec:
         - name: build-args
           value:
             - "--build-arg=APP_NAME=integrations-service"
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
             - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
             - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-mailer
@@ -204,7 +204,7 @@ spec:
         - name: build-args
           value:
             - "--build-arg=APP_NAME=mailer"
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
             - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
             - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-web
@@ -227,7 +227,7 @@ spec:
           value: docker/Dockerfile.frontend
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
             - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
             - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-pi-analysis
@@ -250,7 +250,7 @@ spec:
           value: docker/Dockerfile.pi-analysis
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-pi-scrape
       when:
         - input: $(tasks.detect-changes.results.pi-scrape)
@@ -271,7 +271,7 @@ spec:
           value: docker/Dockerfile.pi-scrape
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-pi-mailsum
       when:
         - input: $(tasks.detect-changes.results.pi-mailsum)
@@ -292,7 +292,7 @@ spec:
           value: apps/backend/pi-mailsum/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-boolgen-generator
       when:
         - input: $(tasks.detect-changes.results.boolgen-generator)
@@ -313,7 +313,7 @@ spec:
           value: apps/backend/pi-boolgen/services/generator/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-boolgen-parser
       when:
         - input: $(tasks.detect-changes.results.boolgen-parser)
@@ -334,7 +334,7 @@ spec:
           value: apps/backend/pi-boolgen/services/parser/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-boolgen-validator
       when:
         - input: $(tasks.detect-changes.results.boolgen-validator)
@@ -355,7 +355,7 @@ spec:
           value: apps/backend/pi-boolgen/services/validator/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-boolgen-orchestrator
       when:
         - input: $(tasks.detect-changes.results.boolgen-orchestrator)
@@ -376,7 +376,7 @@ spec:
           value: apps/backend/pi-boolgen/services/orchestrator/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-tasks
       when:
         - input: $(tasks.detect-changes.results.tasks)
@@ -397,7 +397,7 @@ spec:
           value: apps/backend/tasks-reminders/tasks/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-reminders
       when:
         - input: $(tasks.detect-changes.results.reminders)
@@ -418,7 +418,7 @@ spec:
           value: apps/backend/tasks-reminders/reminders/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-audit-timeline
       when:
         - input: $(tasks.detect-changes.results.audit-timeline)
@@ -439,7 +439,7 @@ spec:
           value: apps/backend/audit-service/activity-timeline-service/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-audit-api
       when:
         - input: $(tasks.detect-changes.results.audit-api)
@@ -460,7 +460,7 @@ spec:
           value: apps/backend/audit-service/api-service/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: build-audit-cdc
       when:
         - input: $(tasks.detect-changes.results.audit-cdc)
@@ -481,7 +481,7 @@ spec:
           value: apps/backend/audit-service/cdc-service/Dockerfile
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
     - name: update-tags
       taskRef:
         name: update-image-tag

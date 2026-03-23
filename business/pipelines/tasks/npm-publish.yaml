@@ -9,8 +9,8 @@ metadata:
     app.kubernetes.io/part-of: pnats-ci
 spec:
   description: |
-    Runs changeset version + publish to Verdaccio.
-    Publishes Layer 0 packages first (no deps), then Layer 1 (with deps).
+    Versions and publishes shared packages to Verdaccio using Nx Release.
+    Uses conventional commits for automatic version bumps.
   params:
     - name: registry-url
       type: string
@@ -22,13 +22,13 @@ spec:
     - name: npm-credentials
       description: Workspace containing .npmrc with auth token
     - name: github-token
-      description: GitHub token for changelog generation
+      description: GitHub token for releases
       optional: true
     - name: ssh-credentials
       description: SSH key for git push
       optional: true
   steps:
-    - name: configure-registry
+    - name: install
       image: node:24-alpine
       env:
         - name: AWS_ACCESS_KEY_ID
@@ -54,18 +54,14 @@ spec:
 
         cd "$(workspaces.source.path)"
 
-        # Copy npmrc with auth token
         if [ -f "$(workspaces.npm-credentials.path)/.npmrc" ]; then
           cp "$(workspaces.npm-credentials.path)/.npmrc" .npmrc
         fi
 
-        # Install pnpm
         corepack enable && corepack prepare pnpm@9.15.4 --activate
-
-        # Install dependencies
         pnpm install --frozen-lockfile
 
-    - name: version-and-publish
+    - name: release
       image: node:24-alpine
       env:
         - name: GITHUB_TOKEN
@@ -99,41 +95,38 @@ spec:
         cd "$(workspaces.source.path)"
         corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-        # Check if there are pending changesets
-        if [ -z "$(ls .changeset/*.md 2>/dev/null | grep -v README)" ]; then
-          echo "No pending changesets, skipping publish"
-          exit 0
-        fi
-
-        # Apply changeset versions
-        pnpm changeset version
-
-        # Build all packages
-        pnpm --recursive --filter './shared/*' --filter './plugins/*' run build
-
-        # Publish to Verdaccio
-        pnpm changeset publish
-
-        # Setup SSH for git push
+        # SSH setup for git push
         if [ -d "$(workspaces.ssh-credentials.path)" ] 2>/dev/null; then
-          mkdir -p /root/.ssh
-          chmod 700 /root/.ssh
+          mkdir -p /root/.ssh && chmod 700 /root/.ssh
           cp "$(workspaces.ssh-credentials.path)/ssh-privatekey" /root/.ssh/id_rsa
           chmod 400 /root/.ssh/id_rsa
-          if [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ]; then
+          [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ] && \
             cp "$(workspaces.ssh-credentials.path)/known_hosts" /root/.ssh/known_hosts
-          fi
           ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
         fi
 
         git config user.email "tekton@pnats.cloud"
         git config user.name "Tekton CI"
-        # Only stage changeset version bumps — git add -A is too slow (scans node_modules)
-        git add .changeset/ '**/package.json' '**/CHANGELOG.md' pnpm-lock.yaml
+
+        # Build shared packages
+        pnpm --recursive --filter './shared/*' --filter './plugins/*' run build
+
+        # Version + changelog (conventional commits, skip publish)
+        npx nx release version --skip-publish --yes || {
+          echo "No version changes detected — skipping publish"
+          exit 0
+        }
+
+        # Publish to Verdaccio
+        npx nx release publish --yes
+
+        # Push version commits + tags back to repo
+        git add '**/package.json' '**/CHANGELOG.md'
         if ! git diff --cached --quiet; then
-          git commit -m "chore: version packages"
+          git commit -m "chore(release): version packages"
           git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" || true
           git push origin HEAD
+          git push origin --tags
         fi
 
-        echo "Packages published successfully"
+        echo "Release complete"

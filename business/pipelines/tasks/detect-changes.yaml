@@ -9,13 +9,12 @@ metadata:
     app.kubernetes.io/part-of: pnats-ci
 spec:
   description: |
-    Detects which services have changed compared to the base branch.
-    Outputs per-service booleans so downstream tasks can skip unchanged builds.
+    Uses `nx affected` to detect which services changed.
+    Outputs per-service booleans for pipeline when expressions.
   params:
     - name: base-branch
       type: string
       default: develop
-      description: Branch to diff against (e.g., develop, main)
   workspaces:
     - name: source
       description: Cloned source repo
@@ -23,290 +22,102 @@ spec:
       description: SSH key for git fetch
       optional: true
   results:
-    # NestJS services
-    - name: api-gateway
-      type: string
-      description: Whether api-gateway needs rebuilding
-    - name: auth-service
-      type: string
-      description: Whether auth-service needs rebuilding
-    - name: backend-main
-      type: string
-      description: Whether backend-main needs rebuilding
-    - name: integrations-service
-      type: string
-      description: Whether integrations-service needs rebuilding
-    - name: mailer
-      type: string
-      description: Whether mailer needs rebuilding
-    # Frontend
-    - name: web
-      type: string
-      description: Whether web frontend needs rebuilding
-    # Python services
-    - name: pi-analysis
-      type: string
-      description: Whether pi-analysis needs rebuilding
-    - name: pi-scrape
-      type: string
-      description: Whether pi-scrape needs rebuilding
-    - name: pi-mailsum
-      type: string
-      description: Whether pi-mailsum needs rebuilding
-    # Boolgen services
-    - name: boolgen-generator
-      type: string
-      description: Whether boolgen-generator needs rebuilding
-    - name: boolgen-parser
-      type: string
-      description: Whether boolgen-parser needs rebuilding
-    - name: boolgen-validator
-      type: string
-      description: Whether boolgen-validator needs rebuilding
-    - name: boolgen-orchestrator
-      type: string
-      description: Whether boolgen-orchestrator needs rebuilding
-    # Tasks/Reminders
-    - name: tasks
-      type: string
-      description: Whether tasks service needs rebuilding
-    - name: reminders
-      type: string
-      description: Whether reminders service needs rebuilding
-    # Audit services
-    - name: audit-api
-      type: string
-      description: Whether audit-api needs rebuilding
-    - name: audit-timeline
-      type: string
-      description: Whether audit-timeline needs rebuilding
-    - name: audit-cdc
-      type: string
-      description: Whether audit-cdc needs rebuilding
-    # Packages
-    - name: publish-packages
-      type: string
-      description: Whether shared/plugin packages need publishing
+    - { name: api-gateway, type: string }
+    - { name: auth-service, type: string }
+    - { name: backend-main, type: string }
+    - { name: integrations-service, type: string }
+    - { name: mailer, type: string }
+    - { name: web, type: string }
+    - { name: pi-analysis, type: string }
+    - { name: pi-scrape, type: string }
+    - { name: pi-mailsum, type: string }
+    - { name: boolgen-generator, type: string }
+    - { name: boolgen-parser, type: string }
+    - { name: boolgen-validator, type: string }
+    - { name: boolgen-orchestrator, type: string }
+    - { name: tasks, type: string }
+    - { name: reminders, type: string }
+    - { name: audit-api, type: string }
+    - { name: audit-timeline, type: string }
+    - { name: audit-cdc, type: string }
+    - { name: publish-packages, type: string }
   steps:
     - name: detect
-      image: alpine/git:2.43.0
+      image: node:24-alpine
       script: |
         #!/usr/bin/env sh
         set -eu
 
-        # Setup SSH for git fetch
+        apk add --no-cache git openssh > /dev/null 2>&1
+
+        # SSH setup for git fetch
         if [ -d "$(workspaces.ssh-credentials.path)" ] 2>/dev/null; then
-          mkdir -p /root/.ssh
-          chmod 700 /root/.ssh
+          mkdir -p /root/.ssh && chmod 700 /root/.ssh
           cp "$(workspaces.ssh-credentials.path)/ssh-privatekey" /root/.ssh/id_rsa
           chmod 400 /root/.ssh/id_rsa
-          if [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ]; then
+          [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ] && \
             cp "$(workspaces.ssh-credentials.path)/known_hosts" /root/.ssh/known_hosts
-          fi
           ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
         fi
 
         cd "$(workspaces.source.path)"
+        corepack enable && corepack prepare pnpm@9.15.4 --activate > /dev/null 2>&1
 
-        # Fetch the base branch for comparison
-        BASE="$(params.base-branch)"
-        DIFF_OK="true"
+        # Fetch base branch for nx affected comparison
+        git fetch origin "$(params.base-branch)" --depth=1 2>/dev/null || true
 
-        git fetch origin "${BASE}" --depth=1 2>/dev/null || DIFF_OK="false"
+        # Get affected projects from Nx
+        AFFECTED=$(npx nx show projects --affected \
+          --base="origin/$(params.base-branch)" --head=HEAD \
+          --type=app 2>/dev/null || echo "FALLBACK")
 
-        CHANGED_FILES=""
-        if [ "${DIFF_OK}" = "true" ]; then
-          CHANGED_FILES=$(git diff --name-only "origin/${BASE}...HEAD" 2>/dev/null) || DIFF_OK="false"
+        if [ "$AFFECTED" = "FALLBACK" ]; then
+          echo "WARNING: nx affected failed — rebuilding everything"
         fi
 
-        if [ "${DIFF_OK}" = "false" ]; then
-          echo "WARNING: diff failed — falling back to rebuild everything"
-        fi
+        echo "Affected projects:"
+        echo "$AFFECTED"
+        echo "---"
 
-        # Helper: check if any changed file matches a given prefix
-        # Returns "true" if matched or if diff failed, "false" otherwise
-        matches() {
-          if [ "${DIFF_OK}" = "false" ]; then
-            echo "true"
-            return
+        # Nx name → pipeline result name mapping
+        # (Nx uses directory basename, pipeline uses short names)
+        check() {
+          local nx_name="$1"
+          local result_name="$2"
+          if [ "$AFFECTED" = "FALLBACK" ] || echo "$AFFECTED" | grep -q "$nx_name"; then
+            printf "true" > "$(results.${result_name}.path)"
+            echo "  ${result_name}: true"
+          else
+            printf "false" > "$(results.${result_name}.path)"
           fi
-          for prefix in "$@"; do
-            if echo "${CHANGED_FILES}" | grep -q "^${prefix}"; then
-              echo "true"
-              return
-            fi
-          done
-          echo "false"
         }
 
-        # ── Shared patterns ──────────────────────────────────────────────
-        NEST_SHARED="false"
-        if [ "$(matches "shared/" "plugins/" "docker/Dockerfile" "pnpm-lock.yaml" "package.json")" = "true" ]; then
-          NEST_SHARED="true"
+        check "@pnats/api-gateway"                    api-gateway
+        check "@pnats/auth-service"                   auth-service
+        check "@pnats/backend-main"                   backend-main
+        check "@pnats/integrations-service"           integrations-service
+        check "@pnats/mailer"                         mailer
+        check "@pnats/web"                            web
+        check "@pnats/pi-analysis"                    pi-analysis
+        check "@pnats/pi-scrape"                      pi-scrape
+        check "@pnats/pi-mailsum"                     pi-mailsum
+        check "@pnats/pi-boolgen-generator"           boolgen-generator
+        check "@pnats/pi-boolgen-parser"              boolgen-parser
+        check "@pnats/pi-boolgen-validator"           boolgen-validator
+        check "@pnats/pi-boolgen-orchestrator"        boolgen-orchestrator
+        check "@pnats/tasks"                          tasks
+        check "@pnats/reminders"                      reminders
+        check "@pnats/audit-api-service"              audit-api
+        check "@pnats/audit-activity-timeline-service" audit-timeline
+        check "@pnats/audit-cdc-service"              audit-cdc
+
+        # publish-packages: true if any shared lib is affected
+        LIBS=$(npx nx show projects --affected \
+          --base="origin/$(params.base-branch)" --head=HEAD \
+          --type=lib 2>/dev/null || echo "FALLBACK")
+        if [ "$LIBS" = "FALLBACK" ] || [ -n "$LIBS" ]; then
+          printf "true" > "$(results.publish-packages.path)"
+          echo "  publish-packages: true"
+        else
+          printf "false" > "$(results.publish-packages.path)"
         fi
-
-        PI_SHARED="false"
-        if [ "$(matches "shared/pi-secrets/")" = "true" ]; then
-          PI_SHARED="true"
-        fi
-
-        # ── NestJS services ──────────────────────────────────────────────
-        svc_api_gateway="false"
-        if [ "${NEST_SHARED}" = "true" ] || [ "$(matches "apps/backend/api-gateway/")" = "true" ]; then
-          svc_api_gateway="true"
-        fi
-
-        svc_auth_service="false"
-        if [ "${NEST_SHARED}" = "true" ] || [ "$(matches "apps/backend/auth-service/")" = "true" ]; then
-          svc_auth_service="true"
-        fi
-
-        svc_backend_main="false"
-        if [ "${NEST_SHARED}" = "true" ] || [ "$(matches "apps/backend/backend-main/")" = "true" ]; then
-          svc_backend_main="true"
-        fi
-
-        svc_integrations_service="false"
-        if [ "${NEST_SHARED}" = "true" ] || [ "$(matches "apps/backend/integrations-service/")" = "true" ]; then
-          svc_integrations_service="true"
-        fi
-
-        svc_mailer="false"
-        if [ "${NEST_SHARED}" = "true" ] || [ "$(matches "apps/backend/mailer/")" = "true" ]; then
-          svc_mailer="true"
-        fi
-
-        # ── Frontend ─────────────────────────────────────────────────────
-        svc_web="false"
-        if [ "$(matches "apps/frontend/web/" "shared/" "docker/Dockerfile.frontend")" = "true" ]; then
-          svc_web="true"
-        fi
-
-        # ── Python services ──────────────────────────────────────────────
-        svc_pi_analysis="false"
-        if [ "${PI_SHARED}" = "true" ] || [ "$(matches "apps/backend/pi-analysis/" "docker/Dockerfile.pi-analysis")" = "true" ]; then
-          svc_pi_analysis="true"
-        fi
-
-        svc_pi_scrape="false"
-        if [ "${PI_SHARED}" = "true" ] || [ "$(matches "apps/backend/pi-scrape/" "docker/Dockerfile.pi-scrape")" = "true" ]; then
-          svc_pi_scrape="true"
-        fi
-
-        svc_pi_mailsum="false"
-        if [ "${PI_SHARED}" = "true" ] || [ "$(matches "apps/backend/pi-mailsum/" "apps/backend/pi-mailsum/Dockerfile")" = "true" ]; then
-          svc_pi_mailsum="true"
-        fi
-
-        # ── Boolgen services ─────────────────────────────────────────────
-        BOOLGEN_COMMON="false"
-        if [ "${PI_SHARED}" = "true" ] || [ "$(matches "apps/backend/pi-boolgen/")" = "true" ]; then
-          BOOLGEN_COMMON="true"
-        fi
-
-        svc_boolgen_generator="false"
-        if [ "${BOOLGEN_COMMON}" = "true" ] || [ "$(matches "apps/backend/pi-boolgen/services/generator/")" = "true" ]; then
-          svc_boolgen_generator="true"
-        fi
-
-        svc_boolgen_parser="false"
-        if [ "${BOOLGEN_COMMON}" = "true" ] || [ "$(matches "apps/backend/pi-boolgen/services/parser/")" = "true" ]; then
-          svc_boolgen_parser="true"
-        fi
-
-        svc_boolgen_validator="false"
-        if [ "${BOOLGEN_COMMON}" = "true" ] || [ "$(matches "apps/backend/pi-boolgen/services/validator/")" = "true" ]; then
-          svc_boolgen_validator="true"
-        fi
-
-        svc_boolgen_orchestrator="false"
-        if [ "${BOOLGEN_COMMON}" = "true" ] || [ "$(matches "apps/backend/pi-boolgen/services/orchestrator/")" = "true" ]; then
-          svc_boolgen_orchestrator="true"
-        fi
-
-        # ── Tasks/Reminders ──────────────────────────────────────────────
-        TASKS_REMINDERS_COMMON="false"
-        if [ "${PI_SHARED}" = "true" ] || [ "$(matches "apps/backend/tasks-reminders/")" = "true" ]; then
-          TASKS_REMINDERS_COMMON="true"
-        fi
-
-        svc_tasks="false"
-        if [ "${TASKS_REMINDERS_COMMON}" = "true" ] || [ "$(matches "apps/backend/tasks-reminders/tasks/")" = "true" ]; then
-          svc_tasks="true"
-        fi
-
-        svc_reminders="false"
-        if [ "${TASKS_REMINDERS_COMMON}" = "true" ] || [ "$(matches "apps/backend/tasks-reminders/reminders/")" = "true" ]; then
-          svc_reminders="true"
-        fi
-
-        # ── Audit services ───────────────────────────────────────────────
-        AUDIT_COMMON="false"
-        if [ "${PI_SHARED}" = "true" ] || [ "$(matches "apps/backend/audit-service/")" = "true" ]; then
-          AUDIT_COMMON="true"
-        fi
-
-        svc_audit_api="false"
-        if [ "${AUDIT_COMMON}" = "true" ] || [ "$(matches "apps/backend/audit-service/api-service/")" = "true" ]; then
-          svc_audit_api="true"
-        fi
-
-        svc_audit_timeline="false"
-        if [ "${AUDIT_COMMON}" = "true" ] || [ "$(matches "apps/backend/audit-service/activity-timeline-service/")" = "true" ]; then
-          svc_audit_timeline="true"
-        fi
-
-        svc_audit_cdc="false"
-        if [ "${AUDIT_COMMON}" = "true" ] || [ "$(matches "apps/backend/audit-service/cdc-service/")" = "true" ]; then
-          svc_audit_cdc="true"
-        fi
-
-        # ── Publish packages ─────────────────────────────────────────────
-        svc_publish_packages="false"
-        if [ "$(matches "shared/" "plugins/" ".changeset/")" = "true" ]; then
-          svc_publish_packages="true"
-        fi
-
-        # ── Write results ────────────────────────────────────────────────
-        printf "%s" "${svc_api_gateway}"            > "$(results.api-gateway.path)"
-        printf "%s" "${svc_auth_service}"            > "$(results.auth-service.path)"
-        printf "%s" "${svc_backend_main}"             > "$(results.backend-main.path)"
-        printf "%s" "${svc_integrations_service}"     > "$(results.integrations-service.path)"
-        printf "%s" "${svc_mailer}"                   > "$(results.mailer.path)"
-        printf "%s" "${svc_web}"                      > "$(results.web.path)"
-        printf "%s" "${svc_pi_analysis}"              > "$(results.pi-analysis.path)"
-        printf "%s" "${svc_pi_scrape}"                > "$(results.pi-scrape.path)"
-        printf "%s" "${svc_pi_mailsum}"               > "$(results.pi-mailsum.path)"
-        printf "%s" "${svc_boolgen_generator}"        > "$(results.boolgen-generator.path)"
-        printf "%s" "${svc_boolgen_parser}"           > "$(results.boolgen-parser.path)"
-        printf "%s" "${svc_boolgen_validator}"        > "$(results.boolgen-validator.path)"
-        printf "%s" "${svc_boolgen_orchestrator}"     > "$(results.boolgen-orchestrator.path)"
-        printf "%s" "${svc_tasks}"                    > "$(results.tasks.path)"
-        printf "%s" "${svc_reminders}"                > "$(results.reminders.path)"
-        printf "%s" "${svc_audit_api}"                > "$(results.audit-api.path)"
-        printf "%s" "${svc_audit_timeline}"           > "$(results.audit-timeline.path)"
-        printf "%s" "${svc_audit_cdc}"                > "$(results.audit-cdc.path)"
-        printf "%s" "${svc_publish_packages}"         > "$(results.publish-packages.path)"
-
-        # Summary
-        echo ""
-        echo "=== Change Detection Summary ==="
-        echo "api-gateway:            ${svc_api_gateway}"
-        echo "auth-service:           ${svc_auth_service}"
-        echo "backend-main:           ${svc_backend_main}"
-        echo "integrations-service:   ${svc_integrations_service}"
-        echo "mailer:                 ${svc_mailer}"
-        echo "web:                    ${svc_web}"
-        echo "pi-analysis:            ${svc_pi_analysis}"
-        echo "pi-scrape:              ${svc_pi_scrape}"
-        echo "pi-mailsum:             ${svc_pi_mailsum}"
-        echo "boolgen-generator:      ${svc_boolgen_generator}"
-        echo "boolgen-parser:         ${svc_boolgen_parser}"
-        echo "boolgen-validator:      ${svc_boolgen_validator}"
-        echo "boolgen-orchestrator:   ${svc_boolgen_orchestrator}"
-        echo "tasks:                  ${svc_tasks}"
-        echo "reminders:              ${svc_reminders}"
-        echo "audit-api:              ${svc_audit_api}"
-        echo "audit-timeline:         ${svc_audit_timeline}"
-        echo "audit-cdc:              ${svc_audit_cdc}"
-        echo "publish-packages:       ${svc_publish_packages}"

@@ -30,6 +30,24 @@ spec:
   steps:
     - name: configure-registry
       image: node:24-alpine
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_SECRET_ACCESS_KEY
+        - name: NX_CACHE_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: nx-cache
+              key: BUCKET_NAME
+        - name: NX_CACHE_S3_ENDPOINT
+          value: "http://rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
       script: |
         #!/usr/bin/env sh
         set -eu
@@ -55,6 +73,23 @@ spec:
             secretKeyRef:
               name: github-token
               key: token
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_SECRET_ACCESS_KEY
+        - name: NX_CACHE_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: nx-cache
+              key: BUCKET_NAME
+        - name: NX_CACHE_S3_ENDPOINT
+          value: "http://rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
       script: |
         #!/usr/bin/env sh
         set -eu

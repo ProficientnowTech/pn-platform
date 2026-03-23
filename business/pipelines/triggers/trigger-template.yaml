@@ -40,6 +40,8 @@ spec:
             value: $(tt.params.target-environment)
           - name: create-release
             value: $(tt.params.create-release)
+          - name: npm-registry-auth
+            value: "cG5wbS1yb2JvdDpZU09IQXphOXpqaDBGR3E2eW43TWdNdjA2MUxMNmtUOA=="
         workspaces:
           - name: shared-workspace
             volumeClaimTemplate:

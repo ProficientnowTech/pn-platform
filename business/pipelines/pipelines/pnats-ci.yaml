@@ -11,9 +11,10 @@ spec:
   description: |
     CI pipeline for pnats monorepo. Triggered on PR merge.
     1. Clone source
-    2. Publish npm packages to Verdaccio (changesets)
-    3. Build all Docker images (Kaniko, parallel)
-    4. Update image tags in infra repo (triggers ArgoCD)
+    2. Detect changed services
+    3. Publish npm packages to Verdaccio (changesets) — only if needed
+    4. Build changed Docker images (Kaniko, parallel)
+    5. Update image tags in infra repo (triggers ArgoCD)
   params:
     - name: git-url
       type: string
@@ -30,6 +31,10 @@ spec:
     - name: create-release
       type: string
       default: "false"
+    - name: npm-registry-auth
+      type: string
+      description: Base64 user:pass for Verdaccio registry
+      default: ""
   workspaces:
     - name: shared-workspace
       description: Shared workspace for source code
@@ -55,10 +60,23 @@ spec:
           value: $(params.git-url)
         - name: revision
           value: $(params.git-revision)
+    - name: detect-changes
+      taskRef:
+        name: detect-changes
+      runAfter: ["clone"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: ssh-credentials
+          workspace: ssh-credentials
     - name: publish-packages
+      when:
+        - input: $(tasks.detect-changes.results.publish-packages)
+          operator: in
+          values: ["true"]
       taskRef:
         name: npm-publish
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -70,6 +88,10 @@ spec:
         - name: registry-url
           value: https://npm.pnats.cloud
     - name: build-api-gateway
+      when:
+        - input: $(tasks.detect-changes.results.api-gateway)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
       runAfter: ["publish-packages"]
@@ -84,8 +106,16 @@ spec:
         - name: dockerfile
           value: docker/Dockerfile
         - name: build-args
-          value: ["--build-arg=APP_NAME=api-gateway"]
+          value:
+            - "--build-arg=APP_NAME=api-gateway"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
+            - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-auth-service
+      when:
+        - input: $(tasks.detect-changes.results.auth-service)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
       runAfter: ["publish-packages"]
@@ -100,8 +130,16 @@ spec:
         - name: dockerfile
           value: docker/Dockerfile
         - name: build-args
-          value: ["--build-arg=APP_NAME=auth-service"]
+          value:
+            - "--build-arg=APP_NAME=auth-service"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
+            - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-backend-main
+      when:
+        - input: $(tasks.detect-changes.results.backend-main)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
       runAfter: ["publish-packages"]
@@ -116,8 +154,16 @@ spec:
         - name: dockerfile
           value: docker/Dockerfile
         - name: build-args
-          value: ["--build-arg=APP_NAME=backend-main"]
+          value:
+            - "--build-arg=APP_NAME=backend-main"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
+            - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-integrations-service
+      when:
+        - input: $(tasks.detect-changes.results.integrations-service)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
       runAfter: ["publish-packages"]
@@ -132,8 +178,16 @@ spec:
         - name: dockerfile
           value: docker/Dockerfile
         - name: build-args
-          value: ["--build-arg=APP_NAME=integrations-service"]
+          value:
+            - "--build-arg=APP_NAME=integrations-service"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
+            - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-mailer
+      when:
+        - input: $(tasks.detect-changes.results.mailer)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
       runAfter: ["publish-packages"]
@@ -148,8 +202,16 @@ spec:
         - name: dockerfile
           value: docker/Dockerfile
         - name: build-args
-          value: ["--build-arg=APP_NAME=mailer"]
+          value:
+            - "--build-arg=APP_NAME=mailer"
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
+            - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-web
+      when:
+        - input: $(tasks.detect-changes.results.web)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
       runAfter: ["publish-packages"]
@@ -163,10 +225,19 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: docker/Dockerfile.frontend
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
+            - "--build-arg=NPM_REGISTRY_URL=https://npm.pnats.cloud"
+            - "--build-arg=NPM_REGISTRY_AUTH=$(params.npm-registry-auth)"
     - name: build-pi-analysis
+      when:
+        - input: $(tasks.detect-changes.results.pi-analysis)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -177,10 +248,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: docker/Dockerfile.pi-analysis
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-pi-scrape
+      when:
+        - input: $(tasks.detect-changes.results.pi-scrape)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -191,10 +269,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: docker/Dockerfile.pi-scrape
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-pi-mailsum
+      when:
+        - input: $(tasks.detect-changes.results.pi-mailsum)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -205,10 +290,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/pi-mailsum/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-boolgen-generator
+      when:
+        - input: $(tasks.detect-changes.results.boolgen-generator)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -219,10 +311,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/pi-boolgen/services/generator/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-boolgen-parser
+      when:
+        - input: $(tasks.detect-changes.results.boolgen-parser)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -233,10 +332,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/pi-boolgen/services/parser/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-boolgen-validator
+      when:
+        - input: $(tasks.detect-changes.results.boolgen-validator)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -247,10 +353,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/pi-boolgen/services/validator/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-boolgen-orchestrator
+      when:
+        - input: $(tasks.detect-changes.results.boolgen-orchestrator)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -261,10 +374,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/pi-boolgen/services/orchestrator/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-tasks
+      when:
+        - input: $(tasks.detect-changes.results.tasks)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -275,10 +395,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/tasks-reminders/tasks/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-reminders
+      when:
+        - input: $(tasks.detect-changes.results.reminders)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -289,10 +416,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/tasks-reminders/reminders/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-audit-timeline
+      when:
+        - input: $(tasks.detect-changes.results.audit-timeline)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -303,10 +437,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/audit-service/activity-timeline-service/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-audit-api
+      when:
+        - input: $(tasks.detect-changes.results.audit-api)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -317,10 +458,17 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/audit-service/api-service/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: build-audit-cdc
+      when:
+        - input: $(tasks.detect-changes.results.audit-cdc)
+          operator: in
+          values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["clone"]
+      runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -331,6 +479,9 @@ spec:
           value: $(params.image-tag)
         - name: dockerfile
           value: apps/backend/audit-service/cdc-service/Dockerfile
+        - name: build-args
+          value:
+            - "--build-arg=REGISTRY=registry.pnats.cloud/library"
     - name: update-tags
       taskRef:
         name: update-image-tag

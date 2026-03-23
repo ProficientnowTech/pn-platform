@@ -69,24 +69,42 @@ spec:
           workspace: shared-workspace
         - name: ssh-credentials
           workspace: ssh-credentials
-    - name: publish-packages
+    - name: build-shared-libs
       when:
         - input: $(tasks.detect-changes.results.publish-packages)
           operator: in
           values: ["true"]
       taskRef:
-        name: npm-publish
+        name: build-shared-libs
       runAfter: ["detect-changes"]
       workspaces:
         - name: source
           workspace: shared-workspace
         - name: npm-credentials
           workspace: npm-credentials
-        - name: ssh-credentials
-          workspace: ssh-credentials
       params:
         - name: registry-url
           value: https://npm.pnats.cloud
+    - name: release-packages
+      taskRef:
+        name: release-packages
+      runAfter: ["build-shared-libs"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: npm-credentials
+          workspace: npm-credentials
+        - name: github-token
+          workspace: github-token
+    - name: git-push-release
+      taskRef:
+        name: git-push-release
+      runAfter: ["release-packages"]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: ssh-credentials
+          workspace: ssh-credentials
     - name: build-api-gateway
       when:
         - input: $(tasks.detect-changes.results.api-gateway)
@@ -94,7 +112,7 @@ spec:
           values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["publish-packages"]
+      runAfter: ["git-push-release"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -118,7 +136,7 @@ spec:
           values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["publish-packages"]
+      runAfter: ["git-push-release"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -142,7 +160,7 @@ spec:
           values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["publish-packages"]
+      runAfter: ["git-push-release"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -166,7 +184,7 @@ spec:
           values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["publish-packages"]
+      runAfter: ["git-push-release"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -190,7 +208,7 @@ spec:
           values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["publish-packages"]
+      runAfter: ["git-push-release"]
       workspaces:
         - name: source
           workspace: shared-workspace
@@ -214,7 +232,7 @@ spec:
           values: ["true"]
       taskRef:
         name: kaniko-build
-      runAfter: ["publish-packages"]
+      runAfter: ["git-push-release"]
       workspaces:
         - name: source
           workspace: shared-workspace

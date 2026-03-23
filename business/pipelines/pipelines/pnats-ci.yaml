@@ -268,10 +268,12 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: docker/Dockerfile.pi-scrape
+          value: docker/Dockerfile.python
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+            - "--build-arg=SERVICE_DIR=apps/backend/pi-scrape"
+            - "--build-arg=BUILD_DEPS=build-essential python3-dev libffi-dev libssl-dev pkg-config librdkafka-dev"
+            - "--build-arg=RUNTIME_DEPS=librdkafka1"
     - name: build-pi-mailsum
       when:
         - input: $(tasks.detect-changes.results.pi-mailsum)
@@ -289,10 +291,12 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/pi-mailsum/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+            - "--build-arg=SERVICE_DIR=apps/backend/pi-mailsum"
+            - "--build-arg=BUILD_DEPS=build-essential python3-dev libffi-dev libssl-dev pkg-config librdkafka-dev"
+            - "--build-arg=RUNTIME_DEPS=librdkafka1"
     - name: build-boolgen-generator
       when:
         - input: $(tasks.detect-changes.results.boolgen-generator)
@@ -310,10 +314,9 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/pi-boolgen/services/generator/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
-          value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+          value: ["--build-arg=SERVICE_DIR=apps/backend/pi-boolgen/services/generator"]
     - name: build-boolgen-parser
       when:
         - input: $(tasks.detect-changes.results.boolgen-parser)
@@ -331,10 +334,9 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/pi-boolgen/services/parser/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
-          value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+          value: ["--build-arg=SERVICE_DIR=apps/backend/pi-boolgen/services/parser"]
     - name: build-boolgen-validator
       when:
         - input: $(tasks.detect-changes.results.boolgen-validator)
@@ -352,10 +354,9 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/pi-boolgen/services/validator/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
-          value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+          value: ["--build-arg=SERVICE_DIR=apps/backend/pi-boolgen/services/validator"]
     - name: build-boolgen-orchestrator
       when:
         - input: $(tasks.detect-changes.results.boolgen-orchestrator)
@@ -373,10 +374,9 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/pi-boolgen/services/orchestrator/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
-          value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+          value: ["--build-arg=SERVICE_DIR=apps/backend/pi-boolgen/services/orchestrator"]
     - name: build-tasks
       when:
         - input: $(tasks.detect-changes.results.tasks)
@@ -394,10 +394,12 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/tasks-reminders/tasks/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+            - "--build-arg=SERVICE_DIR=apps/backend/tasks-reminders/tasks"
+            - "--build-arg=BUILD_DEPS=build-essential libpq-dev"
+            - "--build-arg=RUNTIME_DEPS=libpq5"
     - name: build-reminders
       when:
         - input: $(tasks.detect-changes.results.reminders)
@@ -415,10 +417,12 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/tasks-reminders/reminders/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+            - "--build-arg=SERVICE_DIR=apps/backend/tasks-reminders/reminders"
+            - "--build-arg=BUILD_DEPS=build-essential libpq-dev"
+            - "--build-arg=RUNTIME_DEPS=libpq5"
     - name: build-audit-timeline
       when:
         - input: $(tasks.detect-changes.results.audit-timeline)
@@ -436,10 +440,9 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/audit-service/activity-timeline-service/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
-          value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+          value: ["--build-arg=SERVICE_DIR=apps/backend/audit-service/activity-timeline-service"]
     - name: build-audit-api
       when:
         - input: $(tasks.detect-changes.results.audit-api)
@@ -457,10 +460,9 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/audit-service/api-service/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
-          value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+          value: ["--build-arg=SERVICE_DIR=apps/backend/audit-service/api-service"]
     - name: build-audit-cdc
       when:
         - input: $(tasks.detect-changes.results.audit-cdc)
@@ -478,10 +480,12 @@ spec:
         - name: tag
           value: $(params.image-tag)
         - name: dockerfile
-          value: apps/backend/audit-service/cdc-service/Dockerfile
+          value: docker/Dockerfile.python
         - name: build-args
           value:
-            - "--build-arg=REGISTRY=registry.pnats.cloud/pnats/base"
+            - "--build-arg=SERVICE_DIR=apps/backend/audit-service/cdc-service"
+            - "--build-arg=BUILD_DEPS=build-essential python3-dev librdkafka-dev"
+            - "--build-arg=RUNTIME_DEPS=librdkafka1"
     - name: update-tags
       taskRef:
         name: update-image-tag

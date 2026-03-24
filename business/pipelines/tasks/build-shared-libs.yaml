@@ -1,0 +1,58 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-shared-libs
+  namespace: tekton-pipelines
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  description: |
+    Installs dependencies and builds shared packages (shared/* and plugins/*).
+  params:
+    - name: registry-url
+      type: string
+      default: https://npm.pnats.cloud
+      description: Verdaccio registry URL
+  workspaces:
+    - name: source
+      description: Source code with packages
+    - name: npm-credentials
+      description: Workspace containing .npmrc with auth token
+  steps:
+    - name: install-and-build
+      image: node:24-alpine
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_SECRET_ACCESS_KEY
+        - name: NX_CACHE_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: nx-cache
+              key: BUCKET_NAME
+        - name: NX_CACHE_S3_ENDPOINT
+          value: "http://rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        cd "$(workspaces.source.path)"
+
+        if [ -f "$(workspaces.npm-credentials.path)/.npmrc" ]; then
+          cp "$(workspaces.npm-credentials.path)/.npmrc" .npmrc
+        fi
+
+        corepack enable && corepack prepare pnpm@9.15.4 --activate
+        pnpm install --frozen-lockfile
+
+        # Build shared packages
+        pnpm --recursive --filter './shared/*' --filter './plugins/*' run build

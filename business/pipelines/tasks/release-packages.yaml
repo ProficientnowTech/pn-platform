@@ -1,0 +1,64 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: release-packages
+  namespace: tekton-pipelines
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  description: |
+    Versions and publishes shared packages to Verdaccio using Nx Release.
+    Uses conventional commits for automatic version bumps.
+  workspaces:
+    - name: source
+      description: Source code with packages
+    - name: npm-credentials
+      description: Workspace containing .npmrc with auth token
+    - name: github-token
+      description: GitHub token for releases
+      optional: true
+  steps:
+    - name: version-and-publish
+      image: node:24-alpine
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nx-cache
+              key: AWS_SECRET_ACCESS_KEY
+        - name: NX_CACHE_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: nx-cache
+              key: BUCKET_NAME
+        - name: NX_CACHE_S3_ENDPOINT
+          value: "http://rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        cd "$(workspaces.source.path)"
+        corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+        # Version + changelog (conventional commits, skip publish)
+        npx nx release version --skip-publish --yes || {
+          echo "No version changes detected — skipping publish"
+          exit 0
+        }
+
+        # Publish to Verdaccio
+        npx nx release publish --yes
+
+        echo "Version and publish complete"

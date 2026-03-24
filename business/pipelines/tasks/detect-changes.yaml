@@ -1,0 +1,123 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: detect-changes
+  namespace: tekton-pipelines
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    app.kubernetes.io/part-of: pnats-ci
+spec:
+  description: |
+    Uses `nx affected` to detect which services changed.
+    Outputs per-service booleans for pipeline when expressions.
+  params:
+    - name: base-branch
+      type: string
+      default: develop
+  workspaces:
+    - name: source
+      description: Cloned source repo
+    - name: ssh-credentials
+      description: SSH key for git fetch
+      optional: true
+  results:
+    - { name: api-gateway, type: string }
+    - { name: auth-service, type: string }
+    - { name: backend-main, type: string }
+    - { name: integrations-service, type: string }
+    - { name: mailer, type: string }
+    - { name: web, type: string }
+    - { name: pi-analysis, type: string }
+    - { name: pi-scrape, type: string }
+    - { name: pi-mailsum, type: string }
+    - { name: boolgen-generator, type: string }
+    - { name: boolgen-parser, type: string }
+    - { name: boolgen-validator, type: string }
+    - { name: boolgen-orchestrator, type: string }
+    - { name: tasks, type: string }
+    - { name: reminders, type: string }
+    - { name: audit-api, type: string }
+    - { name: audit-timeline, type: string }
+    - { name: audit-cdc, type: string }
+    - { name: publish-packages, type: string }
+  steps:
+    - name: detect
+      image: node:24-alpine
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        apk add --no-cache git openssh > /dev/null 2>&1
+
+        # SSH setup for git fetch
+        if [ -d "$(workspaces.ssh-credentials.path)" ] 2>/dev/null; then
+          mkdir -p /root/.ssh && chmod 700 /root/.ssh
+          cp "$(workspaces.ssh-credentials.path)/ssh-privatekey" /root/.ssh/id_rsa
+          chmod 400 /root/.ssh/id_rsa
+          [ -f "$(workspaces.ssh-credentials.path)/known_hosts" ] && \
+            cp "$(workspaces.ssh-credentials.path)/known_hosts" /root/.ssh/known_hosts
+          ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
+        fi
+
+        cd "$(workspaces.source.path)"
+        corepack enable && corepack prepare pnpm@9.15.4 --activate > /dev/null 2>&1
+
+        # Fetch base branch for nx affected comparison
+        git fetch origin "$(params.base-branch)" --depth=1 2>/dev/null || true
+
+        # Get affected projects from Nx
+        AFFECTED=$(npx nx show projects --affected \
+          --base="origin/$(params.base-branch)" --head=HEAD \
+          --type=app 2>/dev/null || echo "FALLBACK")
+
+        if [ "$AFFECTED" = "FALLBACK" ]; then
+          echo "WARNING: nx affected failed — rebuilding everything"
+        fi
+
+        echo "Affected projects:"
+        echo "$AFFECTED"
+        echo "---"
+
+        # Nx name → pipeline result name mapping
+        # (Nx uses directory basename, pipeline uses short names)
+        check() {
+          local nx_name="$1"
+          local result_name="$2"
+          if [ "$AFFECTED" = "FALLBACK" ] || echo "$AFFECTED" | grep -q "$nx_name"; then
+            printf "true" > "$(results.${result_name}.path)"
+            echo "  ${result_name}: true"
+          else
+            printf "false" > "$(results.${result_name}.path)"
+          fi
+        }
+
+        check "@pnats/api-gateway"                    api-gateway
+        check "@pnats/auth-service"                   auth-service
+        check "@pnats/backend-main"                   backend-main
+        check "@pnats/integrations-service"           integrations-service
+        check "@pnats/mailer"                         mailer
+        check "@pnats/web"                            web
+        check "@pnats/pi-analysis"                    pi-analysis
+        check "@pnats/pi-scrape"                      pi-scrape
+        check "@pnats/pi-mailsum"                     pi-mailsum
+        check "@pnats/pi-boolgen-generator"           boolgen-generator
+        check "@pnats/pi-boolgen-parser"              boolgen-parser
+        check "@pnats/pi-boolgen-validator"           boolgen-validator
+        check "@pnats/pi-boolgen-orchestrator"        boolgen-orchestrator
+        check "@pnats/tasks"                          tasks
+        check "@pnats/reminders"                      reminders
+        check "@pnats/audit-api-service"              audit-api
+        check "@pnats/audit-activity-timeline-service" audit-timeline
+        check "@pnats/audit-cdc-service"              audit-cdc
+
+        # publish-packages: true if any shared lib is affected
+        LIBS=$(npx nx show projects --affected \
+          --base="origin/$(params.base-branch)" --head=HEAD \
+          --type=lib 2>/dev/null || echo "FALLBACK")
+        if [ "$LIBS" = "FALLBACK" ] || [ -n "$LIBS" ]; then
+          printf "true" > "$(results.publish-packages.path)"
+          echo "  publish-packages: true"
+        else
+          printf "false" > "$(results.publish-packages.path)"
+        fi

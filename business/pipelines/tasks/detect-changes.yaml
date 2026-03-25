@@ -21,6 +21,9 @@ spec:
     - name: ssh-credentials
       description: SSH key for git fetch
       optional: true
+    - name: npm-credentials
+      description: npm credentials for pnpm install
+      optional: true
   results:
     - { name: api-gateway, type: string }
     - { name: auth-service, type: string }
@@ -61,7 +64,16 @@ spec:
         fi
 
         cd "$(workspaces.source.path)"
+
+        # Copy npmrc for pnpm install (needed for Nx to resolve project graph)
+        if [ -f "$(workspaces.npm-credentials.path)/.npmrc" ] 2>/dev/null; then
+          cp "$(workspaces.npm-credentials.path)/.npmrc" .npmrc
+        fi
+
         corepack enable && corepack prepare pnpm@9.15.4 --activate > /dev/null 2>&1
+
+        # Install deps so Nx can resolve the project graph
+        pnpm install --frozen-lockfile > /dev/null 2>&1 || pnpm install --no-frozen-lockfile > /dev/null 2>&1
 
         # Fetch base branch for nx affected comparison
         git fetch origin "$(params.base-branch)" --depth=1 2>/dev/null || true
@@ -79,45 +91,37 @@ spec:
         echo "$AFFECTED"
         echo "---"
 
-        # Nx name → pipeline result name mapping
-        # (Nx uses directory basename, pipeline uses short names)
-        check() {
-          local nx_name="$1"
-          local result_name="$2"
-          if [ "$AFFECTED" = "FALLBACK" ] || echo "$AFFECTED" | grep -q "$nx_name"; then
-            printf "true" > "$(results.${result_name}.path)"
-            echo "  ${result_name}: true"
-          else
-            printf "false" > "$(results.${result_name}.path)"
-          fi
-        }
+        # Check if a project is affected and write result
+        # Note: Tekton interpolates $(results.X.path) at template time,
+        # so each result must be written explicitly (not via shell variable)
+        is_affected() { [ "$AFFECTED" = "FALLBACK" ] || echo "$AFFECTED" | grep -q "$1"; }
 
-        check "@pnats/api-gateway"                    api-gateway
-        check "@pnats/auth-service"                   auth-service
-        check "@pnats/backend-main"                   backend-main
-        check "@pnats/integrations-service"           integrations-service
-        check "@pnats/mailer"                         mailer
-        check "@pnats/web"                            web
-        check "@pnats/pi-analysis"                    pi-analysis
-        check "@pnats/pi-scrape"                      pi-scrape
-        check "@pnats/pi-mailsum"                     pi-mailsum
-        check "@pnats/pi-boolgen-generator"           boolgen-generator
-        check "@pnats/pi-boolgen-parser"              boolgen-parser
-        check "@pnats/pi-boolgen-validator"           boolgen-validator
-        check "@pnats/pi-boolgen-orchestrator"        boolgen-orchestrator
-        check "@pnats/tasks"                          tasks
-        check "@pnats/reminders"                      reminders
-        check "@pnats/audit-api-service"              audit-api
-        check "@pnats/audit-activity-timeline-service" audit-timeline
-        check "@pnats/audit-cdc-service"              audit-cdc
+        if is_affected "@pnats/api-gateway"; then printf true > $(results.api-gateway.path); echo "  api-gateway: true"; else printf false > $(results.api-gateway.path); fi
+        if is_affected "@pnats/auth-service"; then printf true > $(results.auth-service.path); echo "  auth-service: true"; else printf false > $(results.auth-service.path); fi
+        if is_affected "@pnats/backend-main"; then printf true > $(results.backend-main.path); echo "  backend-main: true"; else printf false > $(results.backend-main.path); fi
+        if is_affected "@pnats/integrations-service"; then printf true > $(results.integrations-service.path); echo "  integrations-service: true"; else printf false > $(results.integrations-service.path); fi
+        if is_affected "@pnats/mailer"; then printf true > $(results.mailer.path); echo "  mailer: true"; else printf false > $(results.mailer.path); fi
+        if is_affected "@pnats/web"; then printf true > $(results.web.path); echo "  web: true"; else printf false > $(results.web.path); fi
+        if is_affected "@pnats/pi-analysis"; then printf true > $(results.pi-analysis.path); echo "  pi-analysis: true"; else printf false > $(results.pi-analysis.path); fi
+        if is_affected "@pnats/pi-scrape"; then printf true > $(results.pi-scrape.path); echo "  pi-scrape: true"; else printf false > $(results.pi-scrape.path); fi
+        if is_affected "@pnats/pi-mailsum"; then printf true > $(results.pi-mailsum.path); echo "  pi-mailsum: true"; else printf false > $(results.pi-mailsum.path); fi
+        if is_affected "@pnats/pi-boolgen-generator"; then printf true > $(results.boolgen-generator.path); echo "  boolgen-generator: true"; else printf false > $(results.boolgen-generator.path); fi
+        if is_affected "@pnats/pi-boolgen-parser"; then printf true > $(results.boolgen-parser.path); echo "  boolgen-parser: true"; else printf false > $(results.boolgen-parser.path); fi
+        if is_affected "@pnats/pi-boolgen-validator"; then printf true > $(results.boolgen-validator.path); echo "  boolgen-validator: true"; else printf false > $(results.boolgen-validator.path); fi
+        if is_affected "@pnats/pi-boolgen-orchestrator"; then printf true > $(results.boolgen-orchestrator.path); echo "  boolgen-orchestrator: true"; else printf false > $(results.boolgen-orchestrator.path); fi
+        if is_affected "@pnats/tasks"; then printf true > $(results.tasks.path); echo "  tasks: true"; else printf false > $(results.tasks.path); fi
+        if is_affected "@pnats/reminders"; then printf true > $(results.reminders.path); echo "  reminders: true"; else printf false > $(results.reminders.path); fi
+        if is_affected "@pnats/audit-api-service"; then printf true > $(results.audit-api.path); echo "  audit-api: true"; else printf false > $(results.audit-api.path); fi
+        if is_affected "@pnats/audit-activity-timeline-service"; then printf true > $(results.audit-timeline.path); echo "  audit-timeline: true"; else printf false > $(results.audit-timeline.path); fi
+        if is_affected "@pnats/audit-cdc-service"; then printf true > $(results.audit-cdc.path); echo "  audit-cdc: true"; else printf false > $(results.audit-cdc.path); fi
 
         # publish-packages: true if any shared lib is affected
         LIBS=$(npx nx show projects --affected \
           --base="origin/$(params.base-branch)" --head=HEAD \
           --type=lib 2>/dev/null || echo "FALLBACK")
         if [ "$LIBS" = "FALLBACK" ] || [ -n "$LIBS" ]; then
-          printf "true" > "$(results.publish-packages.path)"
+          printf true > $(results.publish-packages.path)
           echo "  publish-packages: true"
         else
-          printf "false" > "$(results.publish-packages.path)"
+          printf false > $(results.publish-packages.path)
         fi

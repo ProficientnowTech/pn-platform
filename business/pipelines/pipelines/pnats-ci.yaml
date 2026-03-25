@@ -69,6 +69,8 @@ spec:
           workspace: shared-workspace
         - name: ssh-credentials
           workspace: ssh-credentials
+        - name: npm-credentials
+          workspace: npm-credentials
     - name: build-shared-libs
       when:
         - input: $(tasks.detect-changes.results.publish-packages)

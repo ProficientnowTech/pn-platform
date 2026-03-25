@@ -4,10 +4,15 @@ global:
   project: development-workloads
 
 tektonConfig:
-  # The operator auto-creates TektonConfig via autoInstallComponents=true.
-  # We enable this to customize pruner settings (keep 5, prune every 6h).
-  # Uses Replace=true sync option to update the existing config.
-  enabled: true
+  # Disabled — operator auto-creates TektonConfig via autoInstallComponents=true.
+  # Enabling causes ArgoCD sync error: "expected kind, but got map"
+  # (TektonConfig CRD uses x-kubernetes-preserve-unknown-fields which
+  # confuses ArgoCD's resource normalization).
+  enabled: false
+  # PostSync Job patches the operator's auto-created TektonConfig with pruner settings
+  patchEnabled: true
+  prunerKeep: 5
+  prunerSchedule: "0 */6 * * *"
 
 tektonDashboardCR:
   # Disabled by default because the Tekton Operator deploys the dashboard using

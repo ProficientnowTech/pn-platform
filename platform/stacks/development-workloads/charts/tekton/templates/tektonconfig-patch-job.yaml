@@ -1,0 +1,26 @@
+{{- if .Values.tektonConfig.patchEnabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tektonconfig-patch
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      serviceAccountName: tekton-operator
+      restartPolicy: OnFailure
+      containers:
+        - name: patch
+          image: bitnami/kubectl:latest
+          command:
+            - kubectl
+            - patch
+            - tektonconfig
+            - config
+            - --type=merge
+            - -p
+            - |
+              {"spec":{"pruner":{"resources":["pipelinerun","taskrun"],"keep":{{ .Values.tektonConfig.prunerKeep }},"schedule":"{{ .Values.tektonConfig.prunerSchedule }}"}}}
+{{- end }}

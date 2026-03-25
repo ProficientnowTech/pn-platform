@@ -62,8 +62,9 @@ spec:
 
         cd "$(workspaces.source.path)"
 
-        # Install only nx (not the full monorepo) — just enough to resolve the project graph
-        npm install --no-save nx@21 @nx/devkit@21 > /dev/null 2>&1
+        # Install Nx + plugins to resolve the full project graph
+        # (~1 min vs ~15 min for full pnpm install)
+        npm install --no-save nx@21 @nx/devkit@21 @nx/eslint@21 @nx/jest@21 @nx/next@21 @nx/storybook@21 @nx/js@21 > /dev/null 2>&1
 
         # Fetch base branch for nx affected comparison
         git fetch origin "$(params.base-branch)" --depth=1 2>/dev/null || true
@@ -95,15 +96,15 @@ spec:
         if is_affected "@pnats/pi-analysis"; then printf true > $(results.pi-analysis.path); echo "  pi-analysis: true"; else printf false > $(results.pi-analysis.path); fi
         if is_affected "@pnats/pi-scrape"; then printf true > $(results.pi-scrape.path); echo "  pi-scrape: true"; else printf false > $(results.pi-scrape.path); fi
         if is_affected "@pnats/pi-mailsum"; then printf true > $(results.pi-mailsum.path); echo "  pi-mailsum: true"; else printf false > $(results.pi-mailsum.path); fi
-        if is_affected "@pnats/pi-boolgen-generator"; then printf true > $(results.boolgen-generator.path); echo "  boolgen-generator: true"; else printf false > $(results.boolgen-generator.path); fi
-        if is_affected "@pnats/pi-boolgen-parser"; then printf true > $(results.boolgen-parser.path); echo "  boolgen-parser: true"; else printf false > $(results.boolgen-parser.path); fi
-        if is_affected "@pnats/pi-boolgen-validator"; then printf true > $(results.boolgen-validator.path); echo "  boolgen-validator: true"; else printf false > $(results.boolgen-validator.path); fi
-        if is_affected "@pnats/pi-boolgen-orchestrator"; then printf true > $(results.boolgen-orchestrator.path); echo "  boolgen-orchestrator: true"; else printf false > $(results.boolgen-orchestrator.path); fi
+        if is_affected "@pnats/generator"; then printf true > $(results.boolgen-generator.path); echo "  boolgen-generator: true"; else printf false > $(results.boolgen-generator.path); fi
+        if is_affected "@pnats/parser"; then printf true > $(results.boolgen-parser.path); echo "  boolgen-parser: true"; else printf false > $(results.boolgen-parser.path); fi
+        if is_affected "@pnats/validator"; then printf true > $(results.boolgen-validator.path); echo "  boolgen-validator: true"; else printf false > $(results.boolgen-validator.path); fi
+        if is_affected "@pnats/orchestrator"; then printf true > $(results.boolgen-orchestrator.path); echo "  boolgen-orchestrator: true"; else printf false > $(results.boolgen-orchestrator.path); fi
         if is_affected "@pnats/tasks"; then printf true > $(results.tasks.path); echo "  tasks: true"; else printf false > $(results.tasks.path); fi
         if is_affected "@pnats/reminders"; then printf true > $(results.reminders.path); echo "  reminders: true"; else printf false > $(results.reminders.path); fi
-        if is_affected "@pnats/audit-api-service"; then printf true > $(results.audit-api.path); echo "  audit-api: true"; else printf false > $(results.audit-api.path); fi
-        if is_affected "@pnats/audit-activity-timeline-service"; then printf true > $(results.audit-timeline.path); echo "  audit-timeline: true"; else printf false > $(results.audit-timeline.path); fi
-        if is_affected "@pnats/audit-cdc-service"; then printf true > $(results.audit-cdc.path); echo "  audit-cdc: true"; else printf false > $(results.audit-cdc.path); fi
+        if is_affected "@pnats/api-service"; then printf true > $(results.audit-api.path); echo "  audit-api: true"; else printf false > $(results.audit-api.path); fi
+        if is_affected "@pnats/activity-timeline-service"; then printf true > $(results.audit-timeline.path); echo "  audit-timeline: true"; else printf false > $(results.audit-timeline.path); fi
+        if is_affected "@pnats/cdc-service"; then printf true > $(results.audit-cdc.path); echo "  audit-cdc: true"; else printf false > $(results.audit-cdc.path); fi
 
         # publish-packages: true if any shared lib is affected
         LIBS=$(npx nx show projects --affected \

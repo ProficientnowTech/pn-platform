@@ -18,7 +18,7 @@ spec:
   params:
     - name: git-url
       type: string
-      default: git@github.com:ProficientnowTech/pnow-ats-v2.git
+      default: git@github.com:snoorullah/pnow-ats-v2.git
     - name: git-revision
       type: string
       default: develop
@@ -553,4 +553,4 @@ spec:
         - name: tag
           value: v$(params.image-tag)
         - name: repo
-          value: ProficientnowTech/pnow-ats-v2
+          value: snoorullah/pnow-ats-v2

@@ -10,7 +10,7 @@ spec:
     - name: git-revision
       value: develop
     - name: git-url
-      value: git@github.com:ProficientnowTech/pnow-ats-v2.git
+      value: git@github.com:snoorullah/pnow-ats-v2.git
     - name: image-tag
       value: $(body.pull_request.merge_commit_sha)
     - name: target-environment
@@ -30,7 +30,7 @@ spec:
     - name: git-revision
       value: main
     - name: git-url
-      value: git@github.com:ProficientnowTech/pnow-ats-v2.git
+      value: git@github.com:snoorullah/pnow-ats-v2.git
     - name: image-tag
       value: $(body.pull_request.merge_commit_sha)
     - name: target-environment

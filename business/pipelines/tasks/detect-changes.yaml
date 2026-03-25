@@ -21,9 +21,6 @@ spec:
     - name: ssh-credentials
       description: SSH key for git fetch
       optional: true
-    - name: npm-credentials
-      description: npm credentials for pnpm install
-      optional: true
   results:
     - { name: api-gateway, type: string }
     - { name: auth-service, type: string }
@@ -65,15 +62,8 @@ spec:
 
         cd "$(workspaces.source.path)"
 
-        # Copy npmrc for pnpm install (needed for Nx to resolve project graph)
-        if [ -f "$(workspaces.npm-credentials.path)/.npmrc" ] 2>/dev/null; then
-          cp "$(workspaces.npm-credentials.path)/.npmrc" .npmrc
-        fi
-
-        corepack enable && corepack prepare pnpm@9.15.4 --activate > /dev/null 2>&1
-
-        # Install deps so Nx can resolve the project graph
-        pnpm install --frozen-lockfile > /dev/null 2>&1 || pnpm install --no-frozen-lockfile > /dev/null 2>&1
+        # Install only nx (not the full monorepo) — just enough to resolve the project graph
+        npm install --no-save nx@21 @nx/devkit@21 > /dev/null 2>&1
 
         # Fetch base branch for nx affected comparison
         git fetch origin "$(params.base-branch)" --depth=1 2>/dev/null || true

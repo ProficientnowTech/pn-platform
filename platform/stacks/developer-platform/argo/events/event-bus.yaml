@@ -8,6 +8,6 @@ spec:
     version: '2.10.10'
     replicas: 3
     persistence:
-      storageClassName: rook-ceph-block
+      storageClassName: plt-blk-hdd-repl
       accessMode: ReadWriteOnce
       volumeSize: 20Gi

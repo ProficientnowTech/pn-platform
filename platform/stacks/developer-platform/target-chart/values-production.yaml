@@ -71,8 +71,6 @@ applications:
   - CreateNamespace=true
 
 - name: argo-workflows
-  annotations:
-    argocd.argoproj.io/sync-wave: "25"
   destinationNamespaceOverwrite: argo
   repoURL: https://argoproj.github.io/argo-helm
   chart: argo-workflows
@@ -135,8 +133,6 @@ applications:
   - ServerSideApply=true
 
 - name: argo-events
-  annotations:
-    argocd.argoproj.io/sync-wave: "26"
   destinationNamespaceOverwrite: argo-events
   repoURL: https://argoproj.github.io/argo-helm
   chart: argo-events
@@ -148,8 +144,6 @@ applications:
   - ServerSideApply=true
 
 - name: argo-ci-infra
-  annotations:
-    argocd.argoproj.io/sync-wave: "27"
   destinationNamespaceOverwrite: argo
   path: platform/stacks/developer-platform/argo/infra
   syncOptions:
@@ -157,8 +151,6 @@ applications:
   - ServerSideApply=true
 
 - name: argo-ci-events
-  annotations:
-    argocd.argoproj.io/sync-wave: "28"
   destinationNamespaceOverwrite: argo-events
   path: platform/stacks/developer-platform/argo/events
   syncOptions:
@@ -166,8 +158,6 @@ applications:
   - ServerSideApply=true
 
 - name: argo-ci-workflows
-  annotations:
-    argocd.argoproj.io/sync-wave: "29"
   destinationNamespaceOverwrite: argo
   path: platform/stacks/developer-platform/argo/workflows
   syncOptions:

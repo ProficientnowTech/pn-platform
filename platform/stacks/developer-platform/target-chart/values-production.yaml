@@ -105,9 +105,9 @@ applications:
     - name: controller.persistence.postgresql.port
       value: "5432"
     - name: controller.persistence.postgresql.database
-      value: "argo_workflows"
+      value: "argoworkflows"
     - name: controller.persistence.postgresql.tableName
-      value: "argo_workflows"
+      value: "argoworkflows"
     - name: controller.persistence.postgresql.userNameSecret.name
       value: "argo-workflows-db"
     - name: controller.persistence.postgresql.userNameSecret.key

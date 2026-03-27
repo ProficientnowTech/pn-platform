@@ -98,8 +98,24 @@ applications:
       value: "7200"
     - name: controller.workflowDefaults.spec.podGC.strategy
       value: "OnWorkflowCompletion"
-    - name: controller.persistence.enabled
-      value: "false"
+    - name: controller.persistence.archive
+      value: "true"
+    - name: controller.persistence.postgresql.host
+      value: "platform-postgres.platform-data.svc"
+    - name: controller.persistence.postgresql.port
+      value: "5432"
+    - name: controller.persistence.postgresql.database
+      value: "argo_workflows"
+    - name: controller.persistence.postgresql.tableName
+      value: "argo_workflows"
+    - name: controller.persistence.postgresql.userNameSecret.name
+      value: "argo-workflows-db"
+    - name: controller.persistence.postgresql.userNameSecret.key
+      value: "username"
+    - name: controller.persistence.postgresql.passwordSecret.name
+      value: "argo-workflows-db"
+    - name: controller.persistence.postgresql.passwordSecret.key
+      value: "password"
     - name: artifactRepository.s3.bucket
       value: "argo-artifacts"
     - name: artifactRepository.s3.endpoint

@@ -98,7 +98,7 @@ applications:
       value: "7200"
     - name: controller.workflowDefaults.spec.podGC.strategy
       value: "OnWorkflowCompletion"
-    - name: controller.persistence.archive
+    - name: controller.persistence.enabled
       value: "false"
     - name: artifactRepository.s3.bucket
       value: "argo-artifacts"

@@ -63,7 +63,7 @@ pgClusters:
       keycloak:
         - login
         - createdb
-      argo_workflows:
+      argoworkflows:
         - login
         - createdb
 
@@ -74,7 +74,7 @@ pgClusters:
       - argocd
       - harbor
       - keycloak
-      - argo_workflows
+      - argoworkflows
 
     # Databases
     databases:
@@ -84,7 +84,7 @@ pgClusters:
       argocd: argocd
       harbor: harbor
       keycloak: keycloak
-      argo_workflows: argo_workflows
+      argoworkflows: argoworkflows
 
     # Patroni HA configuration
     patroni:
@@ -147,7 +147,7 @@ pgClusters:
       - argocd
       - harbor
       - keycloak
-      - argo_workflows
+      - argoworkflows
 
     # Publish config (endpoints) to Vault
     # Apps use ExternalSecret to pull config from Vault

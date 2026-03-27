@@ -33,7 +33,7 @@ commonLabels:
 commonAnnotations:
   platform.pnats.cloud/managed-by: 'platform-core'
   platform.pnats.cloud/generated-by: 'platform-core-chart'
-  platform.pnats.cloud/deploys: '["backstage","clusterapi","harbor","kubevirt","kubevirt-cloud-controller-manager","kubevirt-manager","verdaccio"]'
+  platform.pnats.cloud/deploys: '["argo-workflows","argo-events","argo-ci-infra","argo-ci-events","argo-ci-workflows","backstage","clusterapi","harbor","kubevirt","kubevirt-cloud-controller-manager","kubevirt-manager","verdaccio"]'
   platform.pnats.cloud/dependencies: '["ingress-nginx","cert-manager","external-dns","metallb","keycloak","vault","exteral-secrets","databases"]'
 # Applications list - override in values-{environment}.yaml
 applications: []

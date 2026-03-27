@@ -70,6 +70,96 @@ applications:
   - ServerSideApply=true
   - CreateNamespace=true
 
+- name: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+  destinationNamespaceOverwrite: argo
+  repoURL: https://argoproj.github.io/argo-helm
+  chart: argo-workflows
+  targetRevision: 0.42.x
+  project: platform
+  helm:
+    releaseName: argo-workflows
+    parameters:
+    - name: server.extraArgs[0]
+      value: "--auth-mode=server"
+    - name: server.ingress.enabled
+      value: "true"
+    - name: server.ingress.hosts[0]
+      value: "argo.pnats.cloud"
+    - name: server.ingress.tls[0].secretName
+      value: "argo-tls"
+    - name: server.ingress.tls[0].hosts[0]
+      value: "argo.pnats.cloud"
+    - name: controller.workflowDefaults.spec.serviceAccountName
+      value: "ci-workflow"
+    - name: controller.workflowDefaults.spec.activeDeadlineSeconds
+      value: "10800"
+    - name: controller.workflowDefaults.spec.ttlStrategy.secondsAfterCompletion
+      value: "7200"
+    - name: controller.workflowDefaults.spec.podGC.strategy
+      value: "OnWorkflowCompletion"
+    - name: controller.persistence.archive
+      value: "false"
+    - name: artifactRepository.s3.bucket
+      value: "argo-artifacts"
+    - name: artifactRepository.s3.endpoint
+      value: "rook-ceph-rgw-store.rook-ceph.svc:80"
+    - name: artifactRepository.s3.insecure
+      value: "true"
+    - name: artifactRepository.s3.accessKeySecret.name
+      value: "argo-s3-creds"
+    - name: artifactRepository.s3.accessKeySecret.key
+      value: "access-key"
+    - name: artifactRepository.s3.secretKeySecret.name
+      value: "argo-s3-creds"
+    - name: artifactRepository.s3.secretKeySecret.key
+      value: "secret-key"
+  syncOptions:
+  - CreateNamespace=true
+  - ServerSideApply=true
+
+- name: argo-events
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+  destinationNamespaceOverwrite: argo-events
+  repoURL: https://argoproj.github.io/argo-helm
+  chart: argo-events
+  targetRevision: 2.4.x
+  project: platform
+  helm:
+    releaseName: argo-events
+  syncOptions:
+  - CreateNamespace=true
+  - ServerSideApply=true
+
+- name: argo-ci-infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "27"
+  destinationNamespaceOverwrite: argo
+  path: platform/stacks/developer-platform/argo/infra
+  syncOptions:
+  - CreateNamespace=true
+  - ServerSideApply=true
+
+- name: argo-ci-events
+  annotations:
+    argocd.argoproj.io/sync-wave: "28"
+  destinationNamespaceOverwrite: argo-events
+  path: platform/stacks/developer-platform/argo/events
+  syncOptions:
+  - CreateNamespace=true
+  - ServerSideApply=true
+
+- name: argo-ci-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "29"
+  destinationNamespaceOverwrite: argo
+  path: platform/stacks/developer-platform/argo/workflows
+  syncOptions:
+  - CreateNamespace=true
+  - ServerSideApply=true
+
 - name: clusterapi
   annotations:
     argocd.argoproj.io/sync-wave: "30"

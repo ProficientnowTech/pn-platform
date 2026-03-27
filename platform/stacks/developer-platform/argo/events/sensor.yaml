@@ -73,7 +73,7 @@ spec:
                   name: pr-validation
                 arguments:
                   parameters:
-                    - name: sha
+                    - name: head-sha
                     - name: branch
                     - name: pr-number
                     - name: base-branch
@@ -114,7 +114,7 @@ spec:
                   name: post-merge-build
                 arguments:
                   parameters:
-                    - name: sha
+                    - name: commit-sha
                     - name: base-branch
           parameters:
             - src:
@@ -145,7 +145,7 @@ spec:
                   name: post-merge-build
                 arguments:
                   parameters:
-                    - name: sha
+                    - name: commit-sha
                     - name: base-branch
           parameters:
             - src:

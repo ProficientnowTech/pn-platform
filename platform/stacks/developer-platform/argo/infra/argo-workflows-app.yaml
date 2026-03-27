@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-workflows
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-workflows
+    targetRevision: 0.42.x
+    helm:
+      values: |
+        server:
+          extraArgs:
+            - --auth-mode=server
+          ingress:
+            enabled: true
+            hosts:
+              - argo.pnats.cloud
+            tls:
+              - secretName: argo-tls
+                hosts:
+                  - argo.pnats.cloud
+        controller:
+          workflowDefaults:
+            spec:
+              serviceAccountName: ci-workflow
+              activeDeadlineSeconds: 10800
+              ttlStrategy:
+                secondsAfterCompletion: 7200
+              podGC:
+                strategy: OnWorkflowCompletion
+          persistence:
+            archive: false
+        artifactRepository:
+          s3:
+            bucket: argo-artifacts
+            endpoint: rook-ceph-rgw-store.rook-ceph.svc:80
+            insecure: true
+            accessKeySecret:
+              name: argo-s3-creds
+              key: access-key
+            secretKeySecret:
+              name: argo-s3-creds
+              key: secret-key
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

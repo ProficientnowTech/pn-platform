@@ -10,7 +10,7 @@ spec:
   dependencies:
     - name: pr-opened
       eventSourceName: github-webhook
-      eventName: pnow-ats-v2
+      eventName: github
       filters:
         data:
           - path: body.action
@@ -21,7 +21,7 @@ spec:
               - reopened
     - name: pr-merged-develop
       eventSourceName: github-webhook
-      eventName: pnow-ats-v2
+      eventName: github
       filters:
         data:
           - path: body.action
@@ -38,7 +38,7 @@ spec:
               - develop
     - name: pr-merged-main
       eventSourceName: github-webhook
-      eventName: pnow-ats-v2
+      eventName: github
       filters:
         data:
           - path: body.action

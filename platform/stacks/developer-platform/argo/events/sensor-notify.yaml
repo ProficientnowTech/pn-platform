@@ -1,0 +1,186 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: slack-notifier
+  namespace: argo-events
+spec:
+  eventBusName: default
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: pr-opened
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - opened
+        exprs:
+          - expr: header_event == "pull_request"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: pr-merged
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - closed
+          - path: body.pull_request.merged
+            type: bool
+            value:
+              - 'true'
+        exprs:
+          - expr: header_event == "pull_request"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: review-requested
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - review_requested
+        exprs:
+          - expr: header_event == "pull_request"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: security-alert
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        exprs:
+          - expr: header_event == "secret_scanning_alert" || header_event == "code_scanning_alert" || header_event == "dependabot_alert"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+  triggers:
+    - template:
+        name: notify-pr-opened
+        conditions: pr-opened
+        http:
+          url: https://hooks.slack.com/services/placeholder
+          method: POST
+          headers:
+            Content-Type: application/json
+          secureHeaders:
+            - name: url-override
+              valueFrom:
+                secretKeyRef:
+                  name: slack-webhook
+                  key: url
+          payload:
+            - src:
+                dependencyName: pr-opened
+                dataTemplate: |
+                  {
+                    "blocks": [
+                      {
+                        "type": "section",
+                        "text": {
+                          "type": "mrkdwn",
+                          "text": "*New PR opened* #{{ .Input.body.number }}\n*{{ .Input.body.pull_request.title }}*\nby {{ .Input.body.sender.login }} in `{{ .Input.body.repository.name }}`\n<{{ .Input.body.pull_request.html_url }}|View PR>"
+                        }
+                      }
+                    ]
+                  }
+              dest: body
+    - template:
+        name: notify-pr-merged
+        conditions: pr-merged
+        http:
+          url: https://hooks.slack.com/services/placeholder
+          method: POST
+          headers:
+            Content-Type: application/json
+          secureHeaders:
+            - name: url-override
+              valueFrom:
+                secretKeyRef:
+                  name: slack-webhook
+                  key: url
+          payload:
+            - src:
+                dependencyName: pr-merged
+                dataTemplate: |
+                  {
+                    "blocks": [
+                      {
+                        "type": "section",
+                        "text": {
+                          "type": "mrkdwn",
+                          "text": "*PR merged* #{{ .Input.body.number }}\n*{{ .Input.body.pull_request.title }}*\nby {{ .Input.body.sender.login }} into `{{ .Input.body.pull_request.base.ref }}`\n<{{ .Input.body.pull_request.html_url }}|View PR>"
+                        }
+                      }
+                    ]
+                  }
+              dest: body
+    - template:
+        name: notify-review-requested
+        conditions: review-requested
+        http:
+          url: https://hooks.slack.com/services/placeholder
+          method: POST
+          headers:
+            Content-Type: application/json
+          secureHeaders:
+            - name: url-override
+              valueFrom:
+                secretKeyRef:
+                  name: slack-webhook
+                  key: url
+          payload:
+            - src:
+                dependencyName: review-requested
+                dataTemplate: |
+                  {
+                    "blocks": [
+                      {
+                        "type": "section",
+                        "text": {
+                          "type": "mrkdwn",
+                          "text": "*Review requested* on PR #{{ .Input.body.number }}\n*{{ .Input.body.pull_request.title }}*\nReviewer: {{ .Input.body.requested_reviewer.login }}\n<{{ .Input.body.pull_request.html_url }}|View PR>"
+                        }
+                      }
+                    ]
+                  }
+              dest: body
+    - template:
+        name: notify-security-alert
+        conditions: security-alert
+        http:
+          url: https://hooks.slack.com/services/placeholder
+          method: POST
+          headers:
+            Content-Type: application/json
+          secureHeaders:
+            - name: url-override
+              valueFrom:
+                secretKeyRef:
+                  name: slack-webhook
+                  key: url
+          payload:
+            - src:
+                dependencyName: security-alert
+                dataTemplate: |
+                  {
+                    "blocks": [
+                      {
+                        "type": "section",
+                        "text": {
+                          "type": "mrkdwn",
+                          "text": ":rotating_light: *Security Alert*\nType: `{{ .Input.header.X-Github-Event }}`\nAction: `{{ .Input.body.action }}`\nRepo: `{{ .Input.body.repository.full_name }}`\nSender: {{ .Input.body.sender.login }}"
+                        }
+                      }
+                    ]
+                  }
+              dest: body

@@ -1,0 +1,282 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: security-enforcer
+  namespace: argo-events
+spec:
+  eventBusName: default
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: secret-scanning-alert
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - created
+              - reopened
+        context:
+          - source: github-webhook
+            subject: github
+        exprLogicalOperator: "and"
+        exprs:
+          - expr: header_event == "secret_scanning_alert"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: code-scanning-alert
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - created
+              - reopened
+              - appeared_in_branch
+        exprs:
+          - expr: header_event == "code_scanning_alert"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: branch-protection-disabled
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - deleted
+              - edited
+        exprs:
+          - expr: header_event == "branch_protection_rule"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: repo-made-public
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - publicized
+        exprs:
+          - expr: header_event == "repository"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: member-added-admin
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - added
+          - path: body.membership.role
+            type: string
+            value:
+              - admin
+        exprs:
+          - expr: header_event == "organization"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+    - name: push-event
+      eventSourceName: github-webhook
+      eventName: github
+      filters:
+        exprs:
+          - expr: header_event == "push"
+            fields:
+              - name: header_event
+                path: header.X-Github-Event
+  triggers:
+    - template:
+        name: handle-secret-alert
+        conditions: secret-scanning-alert
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: security-secret-alert-
+                namespace: argo
+                labels:
+                  pipeline: security
+              spec:
+                workflowTemplateRef:
+                  name: security-response
+                arguments:
+                  parameters:
+                    - name: event-type
+                      value: secret_scanning_alert
+                    - name: payload
+          parameters:
+            - src:
+                dependencyName: secret-scanning-alert
+                dataTemplate: '{{ toJson .Input }}'
+              dest: spec.arguments.parameters.1.value
+    - template:
+        name: handle-code-scanning
+        conditions: code-scanning-alert
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: security-code-scan-
+                namespace: argo
+                labels:
+                  pipeline: security
+              spec:
+                workflowTemplateRef:
+                  name: security-response
+                arguments:
+                  parameters:
+                    - name: event-type
+                      value: code_scanning_alert
+                    - name: payload
+          parameters:
+            - src:
+                dependencyName: code-scanning-alert
+                dataTemplate: '{{ toJson .Input }}'
+              dest: spec.arguments.parameters.1.value
+    - template:
+        name: handle-branch-protection
+        conditions: branch-protection-disabled
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: security-branch-protect-
+                namespace: argo
+                labels:
+                  pipeline: security
+              spec:
+                workflowTemplateRef:
+                  name: security-response
+                arguments:
+                  parameters:
+                    - name: event-type
+                      value: branch_protection_disabled
+                    - name: payload
+          parameters:
+            - src:
+                dependencyName: branch-protection-disabled
+                dataTemplate: '{{ toJson .Input }}'
+              dest: spec.arguments.parameters.1.value
+    - template:
+        name: handle-repo-public
+        conditions: repo-made-public
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: security-repo-public-
+                namespace: argo
+                labels:
+                  pipeline: security
+              spec:
+                workflowTemplateRef:
+                  name: security-response
+                arguments:
+                  parameters:
+                    - name: event-type
+                      value: repo_made_public
+                    - name: payload
+          parameters:
+            - src:
+                dependencyName: repo-made-public
+                dataTemplate: '{{ toJson .Input }}'
+              dest: spec.arguments.parameters.1.value
+    - template:
+        name: handle-admin-added
+        conditions: member-added-admin
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: security-admin-added-
+                namespace: argo
+                labels:
+                  pipeline: security
+              spec:
+                workflowTemplateRef:
+                  name: security-response
+                arguments:
+                  parameters:
+                    - name: event-type
+                      value: admin_member_added
+                    - name: payload
+          parameters:
+            - src:
+                dependencyName: member-added-admin
+                dataTemplate: '{{ toJson .Input }}'
+              dest: spec.arguments.parameters.1.value
+    - template:
+        name: secret-scan-push
+        conditions: push-event
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: secret-scan-
+                namespace: argo
+                labels:
+                  pipeline: security
+              spec:
+                workflowTemplateRef:
+                  name: secret-scan-push
+                arguments:
+                  parameters:
+                    - name: repo
+                    - name: before-sha
+                    - name: after-sha
+                    - name: ref
+                    - name: pusher
+          parameters:
+            - src:
+                dependencyName: push-event
+                dataKey: body.repository.full_name
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: push-event
+                dataKey: body.before
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: push-event
+                dataKey: body.after
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: push-event
+                dataKey: body.ref
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: push-event
+                dataKey: body.pusher.name
+              dest: spec.arguments.parameters.4.value

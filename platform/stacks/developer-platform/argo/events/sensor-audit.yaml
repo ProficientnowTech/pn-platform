@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: audit-logger
+  namespace: argo-events
+spec:
+  eventBusName: default
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: all-events
+      eventSourceName: github-webhook
+      eventName: github
+  triggers:
+    - template:
+        name: log-to-loki
+        conditions: all-events
+        http:
+          url: http://loki-gateway.monitoring.svc:80/loki/api/v1/push
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: all-events
+                dataTemplate: |
+                  {
+                    "streams": [{
+                      "stream": {
+                        "job": "github-audit",
+                        "org": "ProficientnowTech",
+                        "event_type": "{{ .Input.header.X-Github-Event }}",
+                        "repo": "{{ .Input.body.repository.full_name }}",
+                        "sender": "{{ .Input.body.sender.login }}"
+                      },
+                      "values": [
+                        ["{{ now | unixEpochNano }}", {{ toJson (toJson .Input.body) }}]
+                      ]
+                    }]
+                  }
+              dest: body

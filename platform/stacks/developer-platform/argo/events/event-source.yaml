@@ -8,25 +8,11 @@ spec:
     ports:
       - port: 12000
         targetPort: 12000
-  github:
-    pnow-ats-v2:
-      repositories:
-        - owner: snoorullah
-          names:
-            - pnow-ats-v2
-      webhook:
-        endpoint: /push
-        port: '12000'
-        method: POST
-        url: https://ci-webhooks.pnats.cloud
-      events:
-        - pull_request
-        - push
-      apiToken:
-        name: github-token
-        key: token
-      webhookSecret:
+  webhook:
+    github:
+      endpoint: /github
+      port: '12000'
+      method: POST
+      authSecret:
         name: github-webhook-secret
         key: secret
-      contentType: json
-      active: true

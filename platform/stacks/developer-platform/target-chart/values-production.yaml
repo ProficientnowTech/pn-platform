@@ -115,9 +115,9 @@ applications:
     - name: controller.persistence.postgresql.passwordSecret.key
       value: "password"
     - name: artifactRepository.s3.bucket
-      value: "argo-artifacts"
+      value: "argo-artifacts-196a861a-8f9d-4f47-a489-bb03cbea9f12"
     - name: artifactRepository.s3.endpoint
-      value: "rook-ceph-rgw-store.rook-ceph.svc:80"
+      value: "rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
     - name: artifactRepository.s3.insecure
       value: "true"
     - name: artifactRepository.s3.accessKeySecret.name

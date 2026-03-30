@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ci-webhooks
+  namespace: argo-events
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ci-webhooks.pnats.cloud
+      http:
+        paths:
+          - backend:
+              service:
+                name: github-webhook-eventsource-svc
+                port:
+                  number: 12000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - ci-webhooks.pnats.cloud
+      secretName: ci-webhooks-tls

@@ -34,7 +34,7 @@ spec:
             arguments:
               parameters:
                 - name: sha
-                  value: '{{workflow.parameters.commit-sha}}'
+                  value: '{{`{{workflow.parameters.commit-sha}}`}}'
           - name: install
             template: pnpm-install
             depends: git-sync
@@ -44,9 +44,9 @@ spec:
             arguments:
               parameters:
                 - name: base
-                  value: 'origin/{{workflow.parameters.base-branch}}~1'
+                  value: 'origin/{{`{{workflow.parameters.base-branch}}`}}~1'
                 - name: head
-                  value: '{{workflow.parameters.commit-sha}}'
+                  value: '{{`{{workflow.parameters.commit-sha}}`}}'
                 - name: targets
                   value: 'build'
           - name: run-tasks
@@ -55,7 +55,7 @@ spec:
             arguments:
               parameters:
                 - name: workflow-spec
-                  value: '{{tasks.generate-dag.outputs.parameters.workflow-yaml}}'
+                  value: '{{`{{tasks.generate-dag.outputs.parameters.workflow-yaml}}`}}'
           - name: publish-packages
             template: npm-publish
             depends: run-tasks
@@ -65,25 +65,25 @@ spec:
             arguments:
               parameters:
                 - name: services
-                  value: '{{tasks.generate-dag.outputs.parameters.affected-apps}}'
+                  value: '{{`{{tasks.generate-dag.outputs.parameters.affected-apps}}`}}'
                 - name: tag
-                  value: '{{workflow.parameters.commit-sha}}'
+                  value: '{{`{{workflow.parameters.commit-sha}}`}}'
           - name: update-gitops
             template: gitops-update
             depends: docker-builds
             arguments:
               parameters:
                 - name: services
-                  value: '{{tasks.generate-dag.outputs.parameters.affected-apps}}'
+                  value: '{{`{{tasks.generate-dag.outputs.parameters.affected-apps}}`}}'
                 - name: tag
-                  value: '{{workflow.parameters.commit-sha}}'
+                  value: '{{`{{workflow.parameters.commit-sha}}`}}'
           - name: notify
             template: slack-notify
             depends: update-gitops
             arguments:
               parameters:
                 - name: services
-                  value: '{{tasks.generate-dag.outputs.parameters.affected-apps}}'
+                  value: '{{`{{tasks.generate-dag.outputs.parameters.affected-apps}}`}}'
                 - name: status
                   value: 'success'
 
@@ -92,7 +92,7 @@ spec:
         parameters:
           - name: sha
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
@@ -102,11 +102,11 @@ spec:
             export GIT_SSH_COMMAND="ssh -i /tmp/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
             cd /workspace
             if [ ! -d ".git" ]; then
-              git clone git@github.com:snoorullah/pnow-ats-v2.git .
+              git clone git@github.com:{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
             else
               git fetch origin --prune
             fi
-            git checkout --force {{inputs.parameters.sha}}
+            git checkout --force {{`{{inputs.parameters.sha}}`}}
             git clean -fd
         volumeMounts:
           - name: workspace
@@ -123,7 +123,7 @@ spec:
           duration: 10s
           factor: 2
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - cd /workspace && pnpm install --prefer-offline --frozen-lockfile
@@ -154,17 +154,17 @@ spec:
             valueFrom:
               path: /tmp/affected-apps.json
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [node, --max-old-space-size=4096, /workspace/tools/ci/generate-argo-dag.mjs]
         env:
           - name: BASE_SHA
-            value: '{{inputs.parameters.base}}'
+            value: '{{`{{inputs.parameters.base}}`}}'
           - name: HEAD_SHA
-            value: '{{inputs.parameters.head}}'
+            value: '{{`{{inputs.parameters.head}}`}}'
           - name: TARGETS
-            value: '{{inputs.parameters.targets}}'
+            value: '{{`{{inputs.parameters.targets}}`}}'
           - name: CI_IMAGE
-            value: 'registry.pnats.cloud/pnats/ci-tools:latest'
+            value: {{ .Values.ciImage | quote }}
           - name: WORKSPACE_PVC
             value: 'ci-workspace'
           - name: NAMESPACE
@@ -188,11 +188,11 @@ spec:
         action: create
         successCondition: status.phase == Succeeded
         failureCondition: status.phase in (Failed, Error)
-        manifest: '{{inputs.parameters.workflow-spec}}'
+        manifest: '{{`{{inputs.parameters.workflow-spec}}`}}'
 
     - name: npm-publish
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - cd /workspace && npx nx release publish --yes
@@ -211,14 +211,14 @@ spec:
             arguments:
               parameters:
                 - name: name
-                  value: '{{item.name}}'
+                  value: '{{`{{item.name}}`}}'
                 - name: dockerfile
-                  value: '{{item.dockerfile}}'
+                  value: '{{`{{item.dockerfile}}`}}'
                 - name: kaniko-args
-                  value: '{{item.kanikoArgs}}'
+                  value: '{{`{{item.kanikoArgs}}`}}'
                 - name: tag
-                  value: '{{inputs.parameters.tag}}'
-            withParam: '{{inputs.parameters.services}}'
+                  value: '{{`{{inputs.parameters.tag}}`}}'
+            withParam: '{{`{{inputs.parameters.services}}`}}'
 
     - name: kaniko-build
       inputs:
@@ -241,15 +241,15 @@ spec:
         command: [/busybox/sh]
         source: |
           /kaniko/executor \
-            --dockerfile={{inputs.parameters.dockerfile}} \
+            --dockerfile={{`{{inputs.parameters.dockerfile}}`}} \
             --context=/workspace \
-            --destination=registry.pnats.cloud/pnats/{{inputs.parameters.name}}:{{inputs.parameters.tag}} \
-            --destination=registry.pnats.cloud/pnats/{{inputs.parameters.name}}:latest \
+            --destination=registry.pnats.cloud/pnats/{{`{{inputs.parameters.name}}`}}:{{`{{inputs.parameters.tag}}`}} \
+            --destination=registry.pnats.cloud/pnats/{{`{{inputs.parameters.name}}`}}:latest \
             --cache=true \
-            --cache-repo=registry.pnats.cloud/pnats/build-cache/{{inputs.parameters.name}} \
+            --cache-repo=registry.pnats.cloud/pnats/build-cache/{{`{{inputs.parameters.name}}`}} \
             --snapshot-mode=redo \
             --compressed-caching=false \
-            {{inputs.parameters.kaniko-args}}
+            {{`{{inputs.parameters.kaniko-args}}`}}
         resources:
           requests:
             cpu: '2'
@@ -275,7 +275,7 @@ spec:
           duration: 5s
           factor: 2
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
@@ -283,9 +283,9 @@ spec:
             git clone --branch v2 git@github.com:ProficientnowTech/pn-infra.git /tmp/pn-infra
             cd /tmp/pn-infra
 
-            echo '{{inputs.parameters.services}}' | jq -r '.[] | "\(.name) \(.helmValuesPath)"' | while read name values_path; do
+            echo '{{`{{inputs.parameters.services}}`}}' | jq -r '.[] | "\(.name) \(.helmValuesPath)"' | while read name values_path; do
               if [ -f "${values_path}" ]; then
-                sed -i "s|tag:.*|tag: {{inputs.parameters.tag}}|g" "${values_path}"
+                sed -i "s|tag:.*|tag: {{`{{inputs.parameters.tag}}`}}|g" "${values_path}"
               fi
             done
 
@@ -294,7 +294,7 @@ spec:
 
             if ! git diff --quiet; then
               git add -A
-              git commit -m "chore(deploy): update image tags to {{inputs.parameters.tag}}"
+              git commit -m "chore(deploy): update image tags to {{`{{inputs.parameters.tag}}`}}"
 
               ATTEMPT=0
               while [ $ATTEMPT -lt 5 ]; do
@@ -328,11 +328,11 @@ spec:
           - name: services
           - name: status
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
-            SERVICE_NAMES=$(echo '{{inputs.parameters.services}}' | jq -r '[.[].name] | join(", ")')
+            SERVICE_NAMES=$(echo '{{`{{inputs.parameters.services}}`}}' | jq -r '[.[].name] | join(", ")')
             curl -s -X POST \
               -H "Content-Type: application/json" \
               -d "{
@@ -341,7 +341,7 @@ spec:
                     \"type\": \"section\",
                     \"text\": {
                       \"type\": \"mrkdwn\",
-                      \"text\": \"*Build Status:* {{inputs.parameters.status}}\n*SHA:* {{workflow.parameters.commit-sha}}\n*Services:* ${SERVICE_NAMES}\n*Workflow:* <https://argo.pnats.cloud/workflows/argo/{{workflow.name}}|View workflow>\"
+                      \"text\": \"*Build Status:* {{`{{inputs.parameters.status}}`}}\n*SHA:* {{`{{workflow.parameters.commit-sha}}`}}\n*Services:* ${SERVICE_NAMES}\n*Workflow:* <https://argo.pnats.cloud/workflows/argo/{{`{{workflow.name}}`}}|View workflow>\"
                     }
                   }
                 ]
@@ -356,11 +356,11 @@ spec:
 
     - name: report-failure-slack
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
-            if [ "{{workflow.status}}" != "Succeeded" ]; then
+            if [ "{{`{{workflow.status}}`}}" != "Succeeded" ]; then
               curl -s -X POST \
                 -H "Content-Type: application/json" \
                 -d "{
@@ -369,7 +369,7 @@ spec:
                       \"type\": \"section\",
                       \"text\": {
                         \"type\": \"mrkdwn\",
-                        \"text\": \"*Build FAILED*\n*Branch:* {{workflow.parameters.base-branch}}\n*SHA:* {{workflow.parameters.commit-sha}}\n*Workflow:* <https://argo.pnats.cloud/workflows/argo/{{workflow.name}}|View workflow>\"
+                        \"text\": \"*Build FAILED*\n*Branch:* {{`{{workflow.parameters.base-branch}}`}}\n*SHA:* {{`{{workflow.parameters.commit-sha}}`}}\n*Workflow:* <https://argo.pnats.cloud/workflows/argo/{{`{{workflow.name}}`}}|View workflow>\"
                       }
                     }
                   ]

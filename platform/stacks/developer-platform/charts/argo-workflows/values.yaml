@@ -1,0 +1,74 @@
+argo-workflows:
+  server:
+    extraArgs:
+      - --auth-mode=server
+    ingress:
+      enabled: true
+      hosts:
+        - argo.pnats.cloud
+      tls:
+        - secretName: argo-tls
+          hosts:
+            - argo.pnats.cloud
+  controller:
+    workflowDefaults:
+      spec:
+        serviceAccountName: ci-workflow
+        activeDeadlineSeconds: 10800
+        ttlStrategy:
+          secondsAfterCompletion: 7200
+        podGC:
+          strategy: OnWorkflowCompletion
+    persistence:
+      archive: true
+      postgresql:
+        host: platform-postgres.platform-data.svc
+        port: "5432"
+        database: argoworkflows
+        tableName: argoworkflows
+        userNameSecret:
+          name: argo-workflows-db
+          key: username
+        passwordSecret:
+          name: argo-workflows-db
+          key: password
+  artifactRepository:
+    s3:
+      bucket: argo-artifacts-196a861a-8f9d-4f47-a489-bb03cbea9f12
+      endpoint: rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80
+      insecure: true
+      accessKeySecret:
+        name: argo-s3-creds
+        key: access-key
+      secretKeySecret:
+        name: argo-s3-creds
+        key: secret-key
+
+# ExternalSecrets for this chart
+secrets:
+  dbCredentials:
+    enabled: true
+    refreshInterval: 1h
+    target: argo-workflows-db
+    data:
+      - secretKey: username
+        remoteRef:
+          key: platform-data/postgres/argoworkflows
+          property: username
+      - secretKey: password
+        remoteRef:
+          key: platform-data/postgres/argoworkflows
+          property: password
+  s3Credentials:
+    enabled: true
+    refreshInterval: 1h
+    target: argo-s3-creds
+    data:
+      - secretKey: access-key
+        remoteRef:
+          key: ci/rook-ceph
+          property: access-key
+      - secretKey: secret-key
+        remoteRef:
+          key: ci/rook-ceph
+          property: secret-key

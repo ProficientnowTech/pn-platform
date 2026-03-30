@@ -33,7 +33,7 @@ spec:
             arguments:
               parameters:
                 - name: sha
-                  value: '{{workflow.parameters.head-sha}}'
+                  value: '{{`{{workflow.parameters.head-sha}}`}}'
                 - name: state
                   value: pending
                 - name: description
@@ -43,7 +43,7 @@ spec:
             arguments:
               parameters:
                 - name: sha
-                  value: '{{workflow.parameters.head-sha}}'
+                  value: '{{`{{workflow.parameters.head-sha}}`}}'
           - name: install
             template: pnpm-install
             depends: git-sync
@@ -53,9 +53,9 @@ spec:
             arguments:
               parameters:
                 - name: base
-                  value: 'origin/{{workflow.parameters.base-branch}}'
+                  value: 'origin/{{`{{workflow.parameters.base-branch}}`}}'
                 - name: head
-                  value: '{{workflow.parameters.head-sha}}'
+                  value: '{{`{{workflow.parameters.head-sha}}`}}'
                 - name: targets
                   value: 'lint,test,build'
           - name: run-tasks
@@ -64,14 +64,14 @@ spec:
             arguments:
               parameters:
                 - name: workflow-spec
-                  value: '{{tasks.generate-dag.outputs.parameters.workflow-yaml}}'
+                  value: '{{`{{tasks.generate-dag.outputs.parameters.workflow-yaml}}`}}'
           - name: report-success
             template: github-status
             depends: run-tasks
             arguments:
               parameters:
                 - name: sha
-                  value: '{{workflow.parameters.head-sha}}'
+                  value: '{{`{{workflow.parameters.head-sha}}`}}'
                 - name: state
                   value: success
                 - name: description
@@ -82,7 +82,7 @@ spec:
         parameters:
           - name: sha
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
@@ -92,11 +92,11 @@ spec:
             export GIT_SSH_COMMAND="ssh -i /tmp/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
             cd /workspace
             if [ ! -d ".git" ]; then
-              git clone git@github.com:snoorullah/pnow-ats-v2.git .
+              git clone git@github.com:{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
             else
               git fetch origin --prune
             fi
-            git checkout --force {{inputs.parameters.sha}}
+            git checkout --force {{`{{inputs.parameters.sha}}`}}
             git clean -fd
         volumeMounts:
           - name: workspace
@@ -113,7 +113,7 @@ spec:
           duration: 10s
           factor: 2
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - cd /workspace && pnpm install --prefer-offline --frozen-lockfile
@@ -144,17 +144,17 @@ spec:
             valueFrom:
               path: /tmp/affected-apps.json
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [node, --max-old-space-size=4096, /workspace/tools/ci/generate-argo-dag.mjs]
         env:
           - name: BASE_SHA
-            value: '{{inputs.parameters.base}}'
+            value: '{{`{{inputs.parameters.base}}`}}'
           - name: HEAD_SHA
-            value: '{{inputs.parameters.head}}'
+            value: '{{`{{inputs.parameters.head}}`}}'
           - name: TARGETS
-            value: '{{inputs.parameters.targets}}'
+            value: '{{`{{inputs.parameters.targets}}`}}'
           - name: CI_IMAGE
-            value: 'registry.pnats.cloud/pnats/ci-tools:latest'
+            value: {{ .Values.ciImage | quote }}
           - name: WORKSPACE_PVC
             value: 'ci-workspace'
           - name: NAMESPACE
@@ -178,7 +178,7 @@ spec:
         action: create
         successCondition: status.phase == Succeeded
         failureCondition: status.phase in (Failed, Error)
-        manifest: '{{inputs.parameters.workflow-spec}}'
+        manifest: '{{`{{inputs.parameters.workflow-spec}}`}}'
 
     - name: github-status
       inputs:
@@ -187,7 +187,7 @@ spec:
           - name: state
           - name: description
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
@@ -195,12 +195,12 @@ spec:
               -H "Authorization: token ${GITHUB_TOKEN}" \
               -H "Content-Type: application/json" \
               -d "{
-                \"state\": \"{{inputs.parameters.state}}\",
+                \"state\": \"{{`{{inputs.parameters.state}}`}}\",
                 \"target_url\": \"https://argo.pnats.cloud\",
-                \"description\": \"{{inputs.parameters.description}}\",
+                \"description\": \"{{`{{inputs.parameters.description}}`}}\",
                 \"context\": \"argo-ci/validation\"
               }" \
-              "https://api.github.com/repos/snoorullah/pnow-ats-v2/statuses/{{inputs.parameters.sha}}"
+              "https://api.github.com/repos/{{ .Values.github.owner }}/{{ .Values.github.repo }}/statuses/{{`{{inputs.parameters.sha}}`}}"
         env:
           - name: GITHUB_TOKEN
             valueFrom:
@@ -210,11 +210,11 @@ spec:
 
     - name: report-failure
       container:
-        image: registry.pnats.cloud/pnats/ci-tools:latest
+        image: {{ .Values.ciImage }}
         command: [sh, -c]
         args:
           - |
-            if [ "{{workflow.status}}" != "Succeeded" ]; then
+            if [ "{{`{{workflow.status}}`}}" != "Succeeded" ]; then
               curl -s -X POST \
                 -H "Authorization: token ${GITHUB_TOKEN}" \
                 -H "Content-Type: application/json" \
@@ -224,7 +224,7 @@ spec:
                   \"description\": \"CI validation failed\",
                   \"context\": \"argo-ci/validation\"
                 }" \
-                "https://api.github.com/repos/snoorullah/pnow-ats-v2/statuses/{{workflow.parameters.head-sha}}"
+                "https://api.github.com/repos/{{ .Values.github.owner }}/{{ .Values.github.repo }}/statuses/{{`{{workflow.parameters.head-sha}}`}}"
             fi
         env:
           - name: GITHUB_TOKEN

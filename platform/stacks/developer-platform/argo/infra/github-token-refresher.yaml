@@ -1,0 +1,123 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: github-token-refresher
+  namespace: argo
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          serviceAccountName: ci-workflow
+          restartPolicy: OnFailure
+          containers:
+            - name: refresher
+              image: python:3.12-slim
+              command: [python3, -c]
+              args:
+                - |
+                  import json, time, urllib.request, ssl, os, subprocess
+
+                  # Read GitHub App credentials from mounted secret
+                  app_id = open("/github-app/app-id").read().strip()
+                  installation_id = open("/github-app/installation-id").read().strip()
+                  private_key = open("/github-app/app-private-key").read().strip()
+
+                  # Generate JWT (manual RS256 — no pip install needed)
+                  import hashlib, hmac, base64, struct
+
+                  def b64url(data):
+                      return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+                  # Use openssl for RS256 signing
+                  header = b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
+                  now = int(time.time())
+                  payload = b64url(json.dumps({"iat": now - 60, "exp": now + 600, "iss": app_id}).encode())
+                  signing_input = f"{header}.{payload}"
+
+                  # Write key and data to temp files for openssl
+                  with open("/tmp/key.pem", "w") as f:
+                      f.write(private_key)
+                  with open("/tmp/data.txt", "w") as f:
+                      f.write(signing_input)
+
+                  result = subprocess.run(
+                      ["openssl", "dgst", "-sha256", "-sign", "/tmp/key.pem", "/tmp/data.txt"],
+                      capture_output=True
+                  )
+                  signature = b64url(result.stdout)
+                  jwt_token = f"{signing_input}.{signature}"
+
+                  # Request installation token from GitHub
+                  req = urllib.request.Request(
+                      f"https://api.github.com/app/installations/{installation_id}/access_tokens",
+                      method="POST",
+                      headers={
+                          "Authorization": f"Bearer {jwt_token}",
+                          "Accept": "application/vnd.github+json",
+                          "User-Agent": "pnow-ci-token-refresher",
+                      },
+                  )
+                  ctx = ssl.create_default_context()
+                  with urllib.request.urlopen(req, context=ctx) as resp:
+                      data = json.loads(resp.read())
+
+                  token = data["token"]
+                  expires = data.get("expires_at", "unknown")
+                  print(f"Generated installation token, expires: {expires}")
+
+                  # Write token to Vault
+                  vault_addr = os.environ["VAULT_ADDR"]
+                  vault_token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+
+                  # Login to Vault via Kubernetes auth
+                  login_data = json.dumps({
+                      "role": "github-token-refresher",
+                      "jwt": vault_token,
+                  }).encode()
+                  login_req = urllib.request.Request(
+                      f"{vault_addr}/v1/auth/kubernetes/login",
+                      method="POST",
+                      data=login_data,
+                      headers={"Content-Type": "application/json"},
+                  )
+                  with urllib.request.urlopen(login_req, context=ctx) as resp:
+                      vault_client_token = json.loads(resp.read())["auth"]["client_token"]
+
+                  # Patch the token in Vault (KV v2 patch)
+                  patch_data = json.dumps({
+                      "data": {"token": token}
+                  }).encode()
+                  patch_req = urllib.request.Request(
+                      f"{vault_addr}/v1/secret/data/ci/github",
+                      method="PATCH",
+                      data=patch_data,
+                      headers={
+                          "X-Vault-Token": vault_client_token,
+                          "Content-Type": "application/merge-patch+json",
+                      },
+                  )
+                  with urllib.request.urlopen(patch_req, context=ctx) as resp:
+                      result = json.loads(resp.read())
+                      print(f"Updated Vault secret, version: {result['data']['version']}")
+
+                  # Cleanup
+                  os.remove("/tmp/key.pem")
+                  os.remove("/tmp/data.txt")
+              env:
+                - name: VAULT_ADDR
+                  value: "http://vault-active.vault.svc:8200"
+              volumeMounts:
+                - name: github-app
+                  mountPath: /github-app
+                  readOnly: true
+          volumes:
+            - name: github-app
+              secret:
+                secretName: github-app-key

@@ -1,0 +1,35 @@
+apiVersion: vault.vault.upbound.io/v1alpha1
+kind: Policy
+metadata:
+  name: github-token-refresher-policy
+  annotations:
+    crossplane.io/external-name: github-token-refresher-policy
+spec:
+  providerConfigRef:
+    name: vault-admin
+  forProvider:
+    name: github-token-refresher-policy
+    policy: |
+      path "secret/data/ci/github" {
+        capabilities = ["read", "update", "create"]
+      }
+---
+apiVersion: kubernetes.vault.upbound.io/v1alpha1
+kind: AuthBackendRole
+metadata:
+  name: github-token-refresher
+  annotations:
+    crossplane.io/external-name: github-token-refresher
+spec:
+  providerConfigRef:
+    name: vault-admin
+  forProvider:
+    roleName: github-token-refresher
+    backend: kubernetes
+    boundServiceAccountNames:
+      - ci-workflow
+    boundServiceAccountNamespaces:
+      - argo
+    tokenPolicies:
+      - github-token-refresher-policy
+    tokenTtl: 600

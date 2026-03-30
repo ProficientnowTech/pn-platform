@@ -4,6 +4,11 @@ argo-workflows:
       - --auth-mode=server
     ingress:
       enabled: true
+      ingressClassName: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-production
+        external-dns.alpha.kubernetes.io/hostname: argo.pnats.cloud
+        external-dns.alpha.kubernetes.io/ttl: "60"
       hosts:
         - argo.pnats.cloud
       tls:

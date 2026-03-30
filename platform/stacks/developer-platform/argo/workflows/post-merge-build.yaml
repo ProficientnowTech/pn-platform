@@ -139,6 +139,7 @@ spec:
             mountPath: /workspace
 
     - name: generate-task-dag
+      activeDeadlineSeconds: 600
       inputs:
         parameters:
           - name: base
@@ -154,7 +155,7 @@ spec:
               path: /tmp/affected-apps.json
       container:
         image: registry.pnats.cloud/pnats/ci-tools:latest
-        command: [node, /workspace/tools/ci/generate-argo-dag.mjs]
+        command: [node, --max-old-space-size=4096, /workspace/tools/ci/generate-argo-dag.mjs]
         env:
           - name: BASE_SHA
             value: '{{inputs.parameters.base}}'
@@ -168,6 +169,13 @@ spec:
             value: 'ci-workspace'
           - name: NAMESPACE
             value: 'argo'
+        resources:
+          requests:
+            cpu: '2'
+            memory: 4Gi
+          limits:
+            cpu: '2'
+            memory: 4Gi
         volumeMounts:
           - name: workspace
             mountPath: /workspace

@@ -72,97 +72,21 @@ applications:
 
 - name: argo-workflows
   destinationNamespaceOverwrite: argo
-  repoURL: https://argoproj.github.io/argo-helm
-  chart: argo-workflows
-  targetRevision: 0.42.x
-  helm:
-    releaseName: argo-workflows
-    parameters:
-    - name: server.extraArgs[0]
-      value: "--auth-mode=server"
-    - name: server.ingress.enabled
-      value: "true"
-    - name: server.ingress.hosts[0]
-      value: "argo.pnats.cloud"
-    - name: server.ingress.tls[0].secretName
-      value: "argo-tls"
-    - name: server.ingress.tls[0].hosts[0]
-      value: "argo.pnats.cloud"
-    - name: controller.workflowDefaults.spec.serviceAccountName
-      value: "ci-workflow"
-    - name: controller.workflowDefaults.spec.activeDeadlineSeconds
-      value: "10800"
-    - name: controller.workflowDefaults.spec.ttlStrategy.secondsAfterCompletion
-      value: "7200"
-    - name: controller.workflowDefaults.spec.podGC.strategy
-      value: "OnWorkflowCompletion"
-    - name: controller.persistence.archive
-      value: "true"
-    - name: controller.persistence.postgresql.host
-      value: "platform-postgres.platform-data.svc"
-    - name: controller.persistence.postgresql.port
-      value: "5432"
-    - name: controller.persistence.postgresql.database
-      value: "argoworkflows"
-    - name: controller.persistence.postgresql.tableName
-      value: "argoworkflows"
-    - name: controller.persistence.postgresql.userNameSecret.name
-      value: "argo-workflows-db"
-    - name: controller.persistence.postgresql.userNameSecret.key
-      value: "username"
-    - name: controller.persistence.postgresql.passwordSecret.name
-      value: "argo-workflows-db"
-    - name: controller.persistence.postgresql.passwordSecret.key
-      value: "password"
-    - name: artifactRepository.s3.bucket
-      value: "argo-artifacts-196a861a-8f9d-4f47-a489-bb03cbea9f12"
-    - name: artifactRepository.s3.endpoint
-      value: "rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
-    - name: artifactRepository.s3.insecure
-      value: "true"
-    - name: artifactRepository.s3.accessKeySecret.name
-      value: "argo-s3-creds"
-    - name: artifactRepository.s3.accessKeySecret.key
-      value: "access-key"
-    - name: artifactRepository.s3.secretKeySecret.name
-      value: "argo-s3-creds"
-    - name: artifactRepository.s3.secretKeySecret.key
-      value: "secret-key"
   syncOptions:
-  - CreateNamespace=true
   - ServerSideApply=true
+  - CreateNamespace=true
 
 - name: argo-events
   destinationNamespaceOverwrite: argo-events
-  repoURL: https://argoproj.github.io/argo-helm
-  chart: argo-events
-  targetRevision: 2.4.x
-  helm:
-    releaseName: argo-events
   syncOptions:
-  - CreateNamespace=true
   - ServerSideApply=true
+  - CreateNamespace=true
 
-- name: argo-ci-infra
+- name: argo-ci
   destinationNamespaceOverwrite: argo
-  path: platform/stacks/developer-platform/argo/infra
   syncOptions:
-  - CreateNamespace=true
   - ServerSideApply=true
-
-- name: argo-ci-events
-  destinationNamespaceOverwrite: argo-events
-  path: platform/stacks/developer-platform/argo/events
-  syncOptions:
   - CreateNamespace=true
-  - ServerSideApply=true
-
-- name: argo-ci-workflows
-  destinationNamespaceOverwrite: argo
-  path: platform/stacks/developer-platform/argo/workflows
-  syncOptions:
-  - CreateNamespace=true
-  - ServerSideApply=true
 
 - name: clusterapi
   annotations:

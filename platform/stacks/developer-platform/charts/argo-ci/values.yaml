@@ -1,0 +1,107 @@
+# GitHub webhook configuration
+github:
+  owner: snoorullah
+  repo: pnow-ats-v2
+  webhookEndpoint: /push
+  webhookPort: "12000"
+  webhookUrl: https://ci-webhooks.pnats.cloud
+
+# CI tools image
+ciImage: registry.pnats.cloud/pnats/ci-tools:latest
+
+# Workspace PVC
+workspace:
+  storageClassName: ceph-filesystem
+  size: 20Gi
+  accessMode: ReadWriteMany
+
+# EventBus
+eventBus:
+  jetstream:
+    version: "2.10.10"
+    replicas: 3
+    persistence:
+      storageClassName: plt-blk-hdd-repl
+      accessMode: ReadWriteOnce
+      volumeSize: 20Gi
+
+# Ingress
+ingress:
+  enabled: true
+  host: ci-webhooks.pnats.cloud
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+
+# Secrets (ExternalSecrets from Vault)
+secrets:
+  githubToken:
+    enabled: true
+    refreshInterval: 15m
+    target: github-token
+    data:
+      - secretKey: token
+        remoteRef:
+          key: ci/github
+          property: token
+  githubTokenEvents:
+    enabled: true
+    namespace: argo-events
+    refreshInterval: 15m
+    target: github-token
+    data:
+      - secretKey: token
+        remoteRef:
+          key: ci/github
+          property: token
+  githubWebhookSecret:
+    enabled: true
+    namespace: argo-events
+    target: github-webhook-secret
+    data:
+      - secretKey: secret
+        remoteRef:
+          key: ci/github
+          property: secret
+  githubSshKey:
+    enabled: true
+    target: github-ssh-key
+    data:
+      - secretKey: ssh-privatekey
+        remoteRef:
+          key: ci/github
+          property: ssh-privatekey
+  harborDockerConfig:
+    enabled: true
+    target: harbor-docker-config
+    template:
+      type: kubernetes.io/dockerconfigjson
+    data:
+      - secretKey: .dockerconfigjson
+        remoteRef:
+          key: ci/harbor
+          property: .dockerconfigjson
+  slackWebhook:
+    enabled: true
+    target: slack-webhook
+    data:
+      - secretKey: url
+        remoteRef:
+          key: ci/slack
+          property: url
+  githubAppKey:
+    enabled: true
+    target: github-app-key
+    data:
+      - secretKey: app-id
+        remoteRef:
+          key: ci/github
+          property: app-id
+      - secretKey: installation-id
+        remoteRef:
+          key: ci/github
+          property: installation-id
+      - secretKey: app-private-key
+        remoteRef:
+          key: ci/github
+          property: app-private-key

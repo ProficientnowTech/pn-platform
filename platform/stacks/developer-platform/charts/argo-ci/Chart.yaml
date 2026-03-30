@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pn-argo-ci
+description: Argo CI pipeline resources — RBAC, EventBus, EventSource, Sensor, WorkflowTemplates, Ingress
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

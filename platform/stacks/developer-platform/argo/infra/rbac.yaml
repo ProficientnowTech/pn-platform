@@ -3,6 +3,8 @@ kind: ServiceAccount
 metadata:
   name: ci-workflow
   namespace: argo
+imagePullSecrets:
+  - name: harbor-docker-config
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -21,6 +23,16 @@ rules:
       - watch
       - delete
   - apiGroups:
+      - argoproj.io
+    resources:
+      - workflowtaskresults
+    verbs:
+      - create
+      - patch
+      - list
+      - watch
+      - delete
+  - apiGroups:
       - ''
     resources:
       - pods
@@ -29,6 +41,22 @@ rules:
       - get
       - list
       - watch
+      - patch
+      - create
+      - delete
+  - apiGroups:
+      - ''
+    resources:
+      - secrets
+    verbs:
+      - get
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - create
   - apiGroups:
       - ''
     resources:

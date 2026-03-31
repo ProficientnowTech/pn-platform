@@ -28,7 +28,7 @@ argo-workflows:
       archive: true
       postgresql:
         host: platform-postgres.platform-data.svc
-        port: "5432"
+        port: 5432
         database: argoworkflows
         tableName: argoworkflows
         userNameSecret:

@@ -1,0 +1,21 @@
+apiVersion: kubernetes.vault.upbound.io/v1alpha1
+kind: AuthBackendRole
+metadata:
+  name: external-secrets-ci
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+    crossplane.io/external-name: external-secrets
+spec:
+  providerConfigRef:
+    name: vault-admin
+  forProvider:
+    roleName: external-secrets
+    backend: kubernetes
+    boundServiceAccountNames:
+      - external-secrets
+    boundServiceAccountNamespaces:
+      - external-secrets
+    tokenPolicies:
+      - external-secrets-policy
+      - eso-ci-secrets-policy
+    tokenTtl: 3600

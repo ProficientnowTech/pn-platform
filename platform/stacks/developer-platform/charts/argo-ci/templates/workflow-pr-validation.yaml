@@ -20,10 +20,6 @@ spec:
     - name: workspace
       persistentVolumeClaim:
         claimName: ci-workspace
-    - name: ssh-key
-      secret:
-        secretName: github-ssh-key
-        defaultMode: 0400
   templates:
     - name: validate
       dag:
@@ -86,24 +82,24 @@ spec:
         command: [sh, -c]
         args:
           - |
-            mkdir -p /tmp/.ssh
-            cp /secret-ssh/ssh-privatekey /tmp/.ssh/id_rsa
-            chmod 600 /tmp/.ssh/id_rsa
-            export GIT_SSH_COMMAND="ssh -i /tmp/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
             cd /workspace
             if [ ! -d ".git" ]; then
-              git clone git@github.com:{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
+              git clone https://x-access-token:${GITHUB_TOKEN}@github.com/{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
             else
+              git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/{{ .Values.github.owner }}/{{ .Values.github.repo }}.git
               git fetch origin --prune
             fi
             git checkout --force {{`{{inputs.parameters.sha}}`}}
             git clean -fd
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
         volumeMounts:
           - name: workspace
             mountPath: /workspace
-          - name: ssh-key
-            mountPath: /secret-ssh
-            readOnly: true
 
     - name: pnpm-install
       retryStrategy:

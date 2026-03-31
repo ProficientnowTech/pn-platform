@@ -63,14 +63,6 @@ secrets:
         remoteRef:
           key: ci/github
           property: secret
-  githubSshKey:
-    enabled: true
-    target: github-ssh-key
-    data:
-      - secretKey: ssh-privatekey
-        remoteRef:
-          key: ci/github
-          property: ssh-privatekey
   harborDockerConfig:
     enabled: true
     target: harbor-docker-config
@@ -89,19 +81,3 @@ secrets:
         remoteRef:
           key: ci/slack
           property: url
-  githubAppKey:
-    enabled: true
-    target: github-app-key
-    data:
-      - secretKey: app-id
-        remoteRef:
-          key: ci/github
-          property: app-id
-      - secretKey: installation-id
-        remoteRef:
-          key: ci/github
-          property: installation-id
-      - secretKey: app-private-key
-        remoteRef:
-          key: ci/github
-          property: app-private-key

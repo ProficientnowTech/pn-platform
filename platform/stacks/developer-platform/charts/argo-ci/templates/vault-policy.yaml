@@ -1,0 +1,19 @@
+apiVersion: vault.vault.upbound.io/v1alpha1
+kind: Policy
+metadata:
+  name: eso-ci-secrets-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+    crossplane.io/external-name: eso-ci-secrets-policy
+spec:
+  providerConfigRef:
+    name: vault-admin
+  forProvider:
+    name: eso-ci-secrets-policy
+    policy: |
+      path "secret/data/ci/*" {
+        capabilities = ["read", "list"]
+      }
+      path "secret/metadata/ci/*" {
+        capabilities = ["read", "list"]
+      }

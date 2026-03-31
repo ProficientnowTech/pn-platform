@@ -19,6 +19,14 @@ spec:
       # External Secrets Operator Policy
       # Allows ESO to read secrets (ExternalSecret) and write secrets (PushSecret)
 
+      # CI secrets (Argo Workflows/Events)
+      path "secret/data/ci/*" {
+        capabilities = ["read", "list"]
+      }
+      path "secret/metadata/ci/*" {
+        capabilities = ["read", "list"]
+      }
+
       # Application secrets
       path "secret/data/applications/*" {
         capabilities = ["create", "update", "read", "list"]
@@ -41,13 +49,5 @@ spec:
       }
       path "secret/metadata/platform-config/*" {
         capabilities = ["create", "update", "read", "list"]
-      }
-
-      # CI secrets (Argo Workflows/Events)
-      path "secret/data/ci/*" {
-        capabilities = ["read", "list"]
-      }
-      path "secret/metadata/ci/*" {
-        capabilities = ["read", "list"]
       }
 {{- end }}

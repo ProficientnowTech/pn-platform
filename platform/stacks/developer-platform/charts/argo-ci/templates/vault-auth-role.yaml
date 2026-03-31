@@ -4,7 +4,6 @@ metadata:
   name: external-secrets-ci
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
-    crossplane.io/external-name: external-secrets
 spec:
   providerConfigRef:
     name: vault-admin

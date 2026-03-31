@@ -18,10 +18,6 @@ spec:
     - name: workspace
       persistentVolumeClaim:
         claimName: ci-workspace
-    - name: ssh-key
-      secret:
-        secretName: github-ssh-key
-        defaultMode: 0400
     - name: docker-config
       secret:
         secretName: harbor-docker-config
@@ -96,24 +92,24 @@ spec:
         command: [sh, -c]
         args:
           - |
-            mkdir -p /tmp/.ssh
-            cp /secret-ssh/ssh-privatekey /tmp/.ssh/id_rsa
-            chmod 600 /tmp/.ssh/id_rsa
-            export GIT_SSH_COMMAND="ssh -i /tmp/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
             cd /workspace
             if [ ! -d ".git" ]; then
-              git clone git@github.com:{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
+              git clone https://x-access-token:${GITHUB_TOKEN}@github.com/{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
             else
+              git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/{{ .Values.github.owner }}/{{ .Values.github.repo }}.git
               git fetch origin --prune
             fi
             git checkout --force {{`{{inputs.parameters.sha}}`}}
             git clean -fd
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
         volumeMounts:
           - name: workspace
             mountPath: /workspace
-          - name: ssh-key
-            mountPath: /secret-ssh
-            readOnly: true
 
     - name: pnpm-install
       retryStrategy:
@@ -279,8 +275,7 @@ spec:
         command: [sh, -c]
         args:
           - |
-            export GIT_SSH_COMMAND="ssh -i /root/.ssh/ssh-privatekey -o StrictHostKeyChecking=no"
-            git clone --branch v2 git@github.com:ProficientnowTech/pn-infra.git /tmp/pn-infra
+            git clone --branch v2 https://x-access-token:${GITHUB_TOKEN}@github.com/ProficientnowTech/pn-infra.git /tmp/pn-infra
             cd /tmp/pn-infra
 
             echo '{{`{{inputs.parameters.services}}`}}' | jq -r '.[] | "\(.name) \(.helmValuesPath)"' | while read name values_path; do
@@ -316,11 +311,11 @@ spec:
               echo "No changes to commit"
             fi
         env:
-          - name: GIT_SSH_COMMAND
-            value: 'ssh -i /root/.ssh/ssh-privatekey -o StrictHostKeyChecking=no'
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /root/.ssh
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
 
     - name: slack-notify
       inputs:

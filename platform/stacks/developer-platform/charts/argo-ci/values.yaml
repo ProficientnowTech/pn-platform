@@ -11,9 +11,9 @@ ciImage: registry.pnats.cloud/pnats/ci-tools:latest
 
 # Workspace PVC
 workspace:
-  storageClassName: ceph-filesystem
+  storageClassName: app-blk-hdd-repl
   size: 20Gi
-  accessMode: ReadWriteMany
+  accessMode: ReadWriteOnce
 
 # EventBus
 eventBus:

@@ -81,7 +81,6 @@ applications:
 - name: argo-ci
   destinationNamespaceOverwrite: argo
   syncOptions:
-  - ServerSideApply=true
   - CreateNamespace=true
 
 # DISABLED: ClusterAPI — not currently in use

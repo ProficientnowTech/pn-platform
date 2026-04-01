@@ -3,9 +3,9 @@ name: pn-argo-workflows
 description: Argo Workflows CI/CD engine for ProficientNow
 type: application
 version: 0.1.0
-appVersion: "3.5.12"
+appVersion: "3.7.8"
 
 dependencies:
 - name: argo-workflows
-  version: 0.42.7
+  version: 0.47.1
   repository: https://argoproj.github.io/argo-helm

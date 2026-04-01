@@ -1,33 +1,38 @@
 ---
-# Global configuration
-global:
-  repoURL: 'https://github.com/ProficientnowTech/pn-infra.git'
-  targetRevision: 'main'
-
-# Labels configuration
-labels:
-  component: percona-everest
-  component-category: database-management
-  managed-by: argocd
-
-# Percona Everest Configuration
-# Based on: https://docs.percona.com/everest/
-everest:
-  # Namespace override - Everest requires everest-system namespace
+# OpenEverest Configuration (MongoDB-only)
+# Upstream values ref: https://github.com/openeverest/helm-charts/blob/main/charts/openeverest/values.yaml
+openeverest:
   namespaceOverride: everest-system
 
   # Disable telemetry
   telemetry: false
 
+  # Disable preflight checks for ArgoCD compatibility (hooks don't work well)
+  upgrade:
+    preflightChecks: false
+
+  # Database namespace — MongoDB operator only
+  dbNamespace:
+    enabled: true
+    namespaceOverride: everest
+    psmdb: true
+    pxc: false
+    postgresql: false
+
+  # Data importers — MongoDB only
+  dataImporters:
+    perconaPSMDBOperator:
+      enabled: true
+    perconaPGOperator:
+      enabled: false
+    perconaPXCOperator:
+      enabled: false
+
   # Server configuration
   server:
-    image: percona/everest
-
-    # Initial admin password (only applied during fresh install)
-    # After install, use everestctl or API to change password
     initialAdminPassword: "Everest@Pn2026!"
+    apiRequestsRateLimit: 100
 
-    # Resource limits
     resources:
       requests:
         cpu: 100m
@@ -36,22 +41,15 @@ everest:
         cpu: 500m
         memory: 512Mi
 
-    # Service configuration
     service:
-      name: everest
       type: ClusterIP
       port: 8080
 
-    # API rate limiting
-    apiRequestsRateLimit: 100
-
-    # RBAC configuration
     rbac:
       enabled: true
       policy: |
         g, admin, role:admin
 
-    # TLS configuration with cert-manager
     tls:
       enabled: true
       secret:
@@ -59,19 +57,15 @@ everest:
       certificate:
         create: true
         domain: everest.pnats.cloud
-        additionalHosts:
-          - everest.pnats.cloud
         issuer:
-          group: cert-manager.io
           kind: ClusterIssuer
           name: letsencrypt-production
 
-  # Ingress configuration
+  # Ingress
   ingress:
     enabled: true
     ingressClassName: nginx
     annotations:
-      # Backend uses HTTPS
       nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
       nginx.ingress.kubernetes.io/ssl-redirect: "true"
     hosts:
@@ -84,15 +78,13 @@ everest:
         hosts:
           - everest.pnats.cloud
 
-  # Compatibility settings
-  compatibility:
-    openshift: false
-
-  # Upgrade configuration - disable preflight checks for fresh installs
-  # This prevents orphaned hook resources from causing sync failures
-  upgrade:
-    preflightChecks: false
-
-  # Hooks configuration
-  hooks:
-    image: "percona/everest-helmtools:0.0.1"
+  # Monitoring — disable (we use our own Prometheus/Loki stack)
+  createMonitoringResources: false
+  monitoring:
+    enabled: false
+  kube-state-metrics:
+    enabled: false
+  pmm:
+    enabled: false
+  pmm3:
+    enabled: false

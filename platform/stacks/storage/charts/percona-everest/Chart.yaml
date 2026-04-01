@@ -1,18 +1,16 @@
 apiVersion: v2
 name: percona-everest
-description: Percona Everest - Cloud-native database platform with web UI for managing MongoDB, PostgreSQL, and MySQL clusters
+description: OpenEverest - Cloud-native database platform for managing MongoDB clusters
 type: application
-version: 1.0.0
-appVersion: "1.10.0"
+version: 1.1.0
+appVersion: "1.14.0"
 
 keywords:
-- percona
+- openeverest
 - everest
 - database
 - dbaas
 - mongodb
-- postgresql
-- mysql
 - web-ui
 - management
 
@@ -22,17 +20,17 @@ maintainers:
 
 annotations:
   platform.pnats.cloud/category: storage
-  platform.pnats.cloud/component: percona-everest
-  platform.pnats.cloud/docs: 'https://docs.percona.com/everest/'
-  platform.pnats.cloud/deploys: 'percona-everest'
+  platform.pnats.cloud/component: openeverest
+  platform.pnats.cloud/docs: 'https://openeverest.io/'
+  platform.pnats.cloud/deploys: 'openeverest'
   platform.pnats.cloud/resource-type: Application
-  platform.pnats.cloud/dependencies: '["percona-mongodb-operator", "percona-postgres-operator"]'
+  platform.pnats.cloud/dependencies: '["percona-mongodb-operator"]'
 
 labels:
-  platform.pnats.cloud/component: percona-everest
+  platform.pnats.cloud/component: openeverest
   platform.pnats.cloud/component-category: 'storage/management-ui'
 
 dependencies:
-- name: everest
-  version: 1.10.0
-  repository: https://percona.github.io/percona-helm-charts/
+- name: openeverest
+  version: 1.14.0
+  repository: https://openeverest.github.io/helm-charts/

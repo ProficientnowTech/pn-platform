@@ -99,6 +99,12 @@ harbor:
         # ExternalDNS for DNS management - will create records for registry.pnats.cloud
         external-dns.alpha.kubernetes.io/hostname: "registry.pnats.cloud"
 
+  # Recreate strategy for deployments with RWO PVCs (jobservice, registry)
+  # RollingUpdate causes Multi-Attach deadlock: new pod can't mount PVC
+  # while old pod still holds it. Recreate terminates old pod first.
+  updateStrategy:
+    type: Recreate
+
   externalURL: https://registry.pnats.cloud
 
   # CA Secret - use the same TLS secret for CA (Let's Encrypt CA is in the chain)

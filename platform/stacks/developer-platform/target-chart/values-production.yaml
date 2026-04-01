@@ -1,50 +1,46 @@
 # Production Environment
 # Platform Developer Platform applications with sync wave ordering
 applications:
-# Tekton Operator must deploy first - provides CRDs for TektonConfig/TektonDashboard
-# Uses Helm chart from kubebb repository (faster than GitHub clone)
-- name: tekton-operator
-  annotations:
-    argocd.argoproj.io/sync-wave: "-5"
-  destinationNamespaceOverwrite: tekton-operator
-  repoURL: https://kubebb.github.io/components
-  chart: tekton-operator
-  targetRevision: 0.64.0
-  helm:
-    releaseName: tekton-operator
-    parameters:
-    - name: operator.autoInstallComponents
-      value: "true"
-  # CRDs are mutated by the apiserver (status/managedFields/annotations), which
-  # makes ArgoCD show them as OutOfSync even though the desired spec matches.
-  ignoreDifferences:
-  - group: apiextensions.k8s.io
-    kind: CustomResourceDefinition
-    jqPathExpressions:
-    - .status
-    - .metadata.annotations
-    - .metadata.generation
-    - .metadata.managedFields
-    - .spec.preserveUnknownFields
-  syncOptions:
-  - CreateNamespace=true
-  - ServerSideApply=true
-  # Replace=true needed because kubebb Helm chart has managedFields baked into CRD templates
-  - Replace=true
-
-- name: tekton-dashboard
-  annotations:
-    argocd.argoproj.io/sync-wave: "-4"
-  destinationNamespaceOverwrite: tekton-pipelines
-  ignoreDifferences:
-  - group: apiextensions.k8s.io
-    kind: CustomResourceDefinition
-    name: extensions.dashboard.tekton.dev
-    jqPathExpressions:
-    - .spec.preserveUnknownFields
-  syncOptions:
-  - CreateNamespace=true
-  - ServerSideApply=true
+# DISABLED: Tekton — replaced by Argo Workflows
+# - name: tekton-operator
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "-5"
+#   destinationNamespaceOverwrite: tekton-operator
+#   repoURL: https://kubebb.github.io/components
+#   chart: tekton-operator
+#   targetRevision: 0.64.0
+#   helm:
+#     releaseName: tekton-operator
+#     parameters:
+#     - name: operator.autoInstallComponents
+#       value: "true"
+#   ignoreDifferences:
+#   - group: apiextensions.k8s.io
+#     kind: CustomResourceDefinition
+#     jqPathExpressions:
+#     - .status
+#     - .metadata.annotations
+#     - .metadata.generation
+#     - .metadata.managedFields
+#     - .spec.preserveUnknownFields
+#   syncOptions:
+#   - CreateNamespace=true
+#   - ServerSideApply=true
+#   - Replace=true
+#
+# - name: tekton-dashboard
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "-4"
+#   destinationNamespaceOverwrite: tekton-pipelines
+#   ignoreDifferences:
+#   - group: apiextensions.k8s.io
+#     kind: CustomResourceDefinition
+#     name: extensions.dashboard.tekton.dev
+#     jqPathExpressions:
+#     - .spec.preserveUnknownFields
+#   syncOptions:
+#   - CreateNamespace=true
+#   - ServerSideApply=true
 
 - name: backstage
   annotations:
@@ -88,35 +84,37 @@ applications:
   - ServerSideApply=true
   - CreateNamespace=true
 
-- name: clusterapi
-  annotations:
-    argocd.argoproj.io/sync-wave: "30"
-  destinationNamespaceOverwrite: cluster-api
-  syncOptions:
-  - ServerSideApply=true
-  - CreateNamespace=true
+# DISABLED: ClusterAPI — not currently in use
+# - name: clusterapi
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "30"
+#   destinationNamespaceOverwrite: cluster-api
+#   syncOptions:
+#   - ServerSideApply=true
+#   - CreateNamespace=true
 
-- name: kubevirt
-  annotations:
-    argocd.argoproj.io/sync-wave: '40'
-  destinationNamespaceOverwrite: kubevirt
-  syncOptions:
-  - ServerSideApply=true
-  - CreateNamespace=true
-
-- name: kubevirt-cloud-controller-manager
-  annotations:
-    argocd.argoproj.io/sync-wave: '50'
-  destinationNamespaceOverwrite: kubevirt
-  syncOptions:
-  - ServerSideApply=true
-
-- name: kubevirt-manager
-  annotations:
-    argocd.argoproj.io/sync-wave: "60"
-  destinationNamespaceOverwrite: kubevirt
-  syncOptions:
-  - ServerSideApply=true
+# DISABLED: KubeVirt — not currently in use
+# - name: kubevirt
+#   annotations:
+#     argocd.argoproj.io/sync-wave: '40'
+#   destinationNamespaceOverwrite: kubevirt
+#   syncOptions:
+#   - ServerSideApply=true
+#   - CreateNamespace=true
+#
+# - name: kubevirt-cloud-controller-manager
+#   annotations:
+#     argocd.argoproj.io/sync-wave: '50'
+#   destinationNamespaceOverwrite: kubevirt
+#   syncOptions:
+#   - ServerSideApply=true
+#
+# - name: kubevirt-manager
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "60"
+#   destinationNamespaceOverwrite: kubevirt
+#   syncOptions:
+#   - ServerSideApply=true
 
 commonLabels:
   platform.pnats.cloud/environment: 'production'

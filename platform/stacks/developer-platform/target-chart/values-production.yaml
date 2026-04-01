@@ -85,7 +85,6 @@ applications:
 - name: argo-ci
   destinationNamespaceOverwrite: argo
   syncOptions:
-  - ServerSideApply=true
   - CreateNamespace=true
 
 - name: clusterapi

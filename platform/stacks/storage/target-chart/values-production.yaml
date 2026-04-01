@@ -93,13 +93,14 @@ applications:
 #   - ServerSideApply=true
 #   - Replace=true
 
-- name: scylladb-operator
-  annotations:
-    argocd.argoproj.io/sync-wave: '0'
-  destinationNamespaceOverwrite: scylla-operator
-  syncOptions:
-  - ServerSideApply=true
-  - Replace=true
+# DISABLED: ScyllaDB — not currently in use
+# - name: scylladb-operator
+#   annotations:
+#     argocd.argoproj.io/sync-wave: '0'
+#   destinationNamespaceOverwrite: scylla-operator
+#   syncOptions:
+#   - ServerSideApply=true
+#   - Replace=true
 
 - name: percona-everest
   annotations:

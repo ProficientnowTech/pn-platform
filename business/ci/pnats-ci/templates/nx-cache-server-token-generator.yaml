@@ -1,0 +1,27 @@
+{{/*
+  Password Generator: nx-cache-server-token-gen
+  ESO Password generator that creates a random 64-character alphanumeric auth token
+  for the nx-cache-server.
+
+  Part of the Generate-Push-Pull bootstrap pattern (step 1 of 3):
+    1. Password generator (this file) --> creates the token
+    2. ExternalSecret (nx-cache-server-token-generated.yaml) --> materializes as K8s Secret
+    2b. PushSecret (nx-cache-server-token-push.yaml) --> seeds token into Vault
+    3. ExternalSecret (nx-cache-server-token.yaml) --> pulls from Vault (source of truth)
+
+  Dependencies:
+    - Referenced by: nx-cache-server-token-generated.yaml (generatorRef)
+*/}}
+{{- if .Values.nxCacheServer.enabled }}
+# Generate a random token (one-time)
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: nx-cache-server-token-gen
+spec:
+  length: 64
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+{{- end }}

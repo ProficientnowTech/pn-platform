@@ -1,0 +1,16 @@
+{{/*
+  ServiceAccount: argo-events-sa
+  Identity for the Argo Events Sensor pod in the argo-events namespace.
+
+  The Sensor uses this SA to subscribe to the EventBus and submit Workflow
+  resources into the argo namespace.
+
+  Dependencies:
+    - ClusterRoleBinding: argo-events-sa-binding (clusterrolebinding-argo-events.yaml)
+    - Used by: Sensor ci-trigger (sensor.yaml) — template.serviceAccountName
+*/}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-events-sa
+  namespace: argo-events

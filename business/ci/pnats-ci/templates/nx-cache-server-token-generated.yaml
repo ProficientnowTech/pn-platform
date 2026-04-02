@@ -1,0 +1,40 @@
+{{/*
+  ExternalSecret: nx-cache-server-token-generated
+  Materializes the Password generator output as a K8s Secret. One-time creation only
+  (refreshInterval: 0) — the token is generated once, then never rotated by this resource.
+
+  Part of the Generate-Push-Pull bootstrap pattern (step 1b of 3):
+    1.  Password generator (nx-cache-server-token-generator.yaml)
+    1b. This ExternalSecret materializes the generated password as a K8s Secret
+    2.  PushSecret (nx-cache-server-token-push.yaml) syncs it to Vault
+    3.  ExternalSecret (nx-cache-server-token.yaml) pulls from Vault
+
+  Notes:
+    - Sync wave -6 (earliest in the token chain) ensures this exists before PushSecret.
+    - refreshInterval: 0 means the secret is created once and never re-generated.
+    - creationPolicy: Owner means deleting this ExternalSecret deletes the Secret too.
+
+  Dependencies:
+    - Password: nx-cache-server-token-gen (nx-cache-server-token-generator.yaml)
+    - Consumed by: PushSecret (nx-cache-server-token-push.yaml)
+*/}}
+{{- if .Values.nxCacheServer.enabled }}
+# Create K8s Secret from the Password generator (one-time, refreshInterval: 0)
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: nx-cache-server-token-generated
+  annotations:
+    argocd.argoproj.io/sync-wave: "-6"
+spec:
+  refreshInterval: "0"
+  target:
+    name: nx-cache-server-token-generated
+    creationPolicy: Owner
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: nx-cache-server-token-gen
+{{- end }}

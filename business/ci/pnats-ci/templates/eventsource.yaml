@@ -1,3 +1,16 @@
+{{/*
+  EventSource: github-webhook
+  Receives push and pull_request events from GitHub via webhook.
+
+  Auto-creates the webhook on the configured repository using the GitHub API token.
+  The webhook URL is exposed via Ingress (ingress.yaml) at ci-webhooks.pnats.cloud.
+
+  Dependencies:
+    - Secret: github-token (externalsecrets.yaml) — API token for webhook auto-creation
+    - Secret: github-webhook-secret (externalsecrets.yaml) — shared HMAC secret for payload validation
+    - Ingress: ci-webhooks (ingress.yaml) — exposes this EventSource to the internet
+    - EventBus: default (eventbus.yaml) — events are published to this bus
+*/}}
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:

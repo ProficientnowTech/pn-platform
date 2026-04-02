@@ -1,0 +1,24 @@
+{{/*
+  ClusterRoleBinding: argo-events-sa-binding
+  Binds ci-workflow-role to the argo-events-sa ServiceAccount in the argo-events namespace.
+
+  This allows the Argo Events Sensor to submit Workflow resources into the argo
+  namespace. Without this binding, the Sensor pod cannot create Workflows.
+
+  Dependencies:
+    - ClusterRole: ci-workflow-role (clusterrole-ci-workflow.yaml)
+    - ServiceAccount: argo-events-sa (sa-argo-events.yaml)
+    - Sensor: ci-trigger (sensor.yaml) — uses argo-events-sa to submit workflows
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-events-sa-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-workflow-role
+subjects:
+  - kind: ServiceAccount
+    name: argo-events-sa
+    namespace: argo-events

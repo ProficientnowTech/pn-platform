@@ -12,7 +12,7 @@
   Notes:
     - Sync wave -6 (earliest in the token chain) ensures this exists before PushSecret.
     - refreshInterval: 0 means the secret is created once and never re-generated.
-    - creationPolicy: Owner means deleting this ExternalSecret deletes the Secret too.
+    - creationPolicy: Merge allows PushSecret to read this Secret without ownership conflict.
 
   Dependencies:
     - Password: nx-cache-server-token-gen (nx-cache-server-token-generator.yaml)
@@ -30,7 +30,7 @@ spec:
   refreshInterval: "0"
   target:
     name: nx-cache-server-token-generated
-    creationPolicy: Owner
+    creationPolicy: Merge
   dataFrom:
     - sourceRef:
         generatorRef:

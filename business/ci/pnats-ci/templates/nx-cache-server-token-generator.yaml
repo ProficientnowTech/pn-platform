@@ -18,6 +18,8 @@ apiVersion: generators.external-secrets.io/v1alpha1
 kind: Password
 metadata:
   name: nx-cache-server-token-gen
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
 spec:
   length: 64
   digits: 10

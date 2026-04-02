@@ -82,7 +82,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: pnats-ci-pipelines
+  name: pnats-ci
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: pnats
@@ -93,20 +93,18 @@ spec:
   source:
     repoURL: https://github.com/ProficientnowTech/pn-infra.git
     targetRevision: v2
-    path: business/pipelines
-    directory:
-      recurse: true
+    path: business/ci/pnats-ci
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: tekton-pipelines
+    namespace: argo
 
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - PruneLast=true
+      - CreateNamespace=true
       - SkipDryRunOnMissingResource=true
     retry:
       limit: 3

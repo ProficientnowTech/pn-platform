@@ -1,0 +1,29 @@
+{{/*
+  PersistentVolumeClaim: ci-workspace
+  RWO block storage PVC for the CI workspace. Persists git clone, pnpm store,
+  and Nx local cache between workflow runs for faster warm starts.
+
+  Mounted at /workspace in ContainerSet pods by both pr-validation and
+  post-merge-build WorkflowTemplates.
+
+  Notes:
+    - RWO (ReadWriteOnce) means only one pod can mount at a time.
+    - Workflow mutex "ci-workspace" serializes access — only one workflow runs at a time.
+    - PVC spec is IMMUTABLE. Changing storageClassName or accessMode requires deleting
+      the existing PVC before ArgoCD can recreate it.
+
+  Dependencies:
+    - StorageClass: app-blk-hdd-repl (Rook-Ceph block storage)
+    - Consumed by: workflow-pr-validation.yaml, workflow-post-merge-build.yaml
+*/}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ci-workspace
+spec:
+  accessModes:
+    - {{ .Values.workspace.accessMode }}
+  storageClassName: {{ .Values.workspace.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.workspace.size }}

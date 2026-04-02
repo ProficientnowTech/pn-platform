@@ -1,0 +1,18 @@
+{{/*
+  ServiceAccount: ci-workflow
+  Identity for CI workflow pods running in the argo namespace.
+
+  Includes imagePullSecrets for Harbor registry access, allowing workflow pods
+  to pull the ci-tools image and any other private images from registry.pnats.cloud.
+
+  Dependencies:
+    - Secret: harbor-docker-config (externalsecrets.yaml) — Docker registry credentials
+    - ClusterRoleBinding: ci-workflow-binding (clusterrolebinding-ci-workflow.yaml)
+    - Used by: workflow-pr-validation.yaml, workflow-post-merge-build.yaml
+*/}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-workflow
+imagePullSecrets:
+  - name: harbor-docker-config

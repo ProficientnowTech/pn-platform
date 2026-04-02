@@ -1,0 +1,34 @@
+{{/*
+  Policy: eso-ci-secrets-policy (Crossplane-managed Vault resource)
+  Grants read and list access on secret/data/ci/* and secret/metadata/ci/* paths
+  in Vault. This allows ESO to pull CI credentials (GitHub token, Harbor config,
+  Slack webhook, nx-cache-server token, etc.).
+
+  Notes:
+    - Sync wave -10 ensures the policy exists before the auth role references it.
+    - Managed by Crossplane provider-vault (upbound), not applied directly.
+    - The policy name in Vault matches the external-name annotation.
+
+  Dependencies:
+    - AuthBackendRole: external-secrets-ci (vault-auth-role.yaml) — references this policy
+    - Crossplane ProviderConfig: vault-admin
+*/}}
+apiVersion: vault.vault.upbound.io/v1alpha1
+kind: Policy
+metadata:
+  name: eso-ci-secrets-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+    crossplane.io/external-name: eso-ci-secrets-policy
+spec:
+  providerConfigRef:
+    name: vault-admin
+  forProvider:
+    name: eso-ci-secrets-policy
+    policy: |
+      path "secret/data/ci/*" {
+        capabilities = ["read", "list"]
+      }
+      path "secret/metadata/ci/*" {
+        capabilities = ["read", "list"]
+      }

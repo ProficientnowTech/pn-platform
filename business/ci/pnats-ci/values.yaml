@@ -10,10 +10,37 @@ github:
 ciImage: registry.pnats.cloud/pnats/ci-tools:latest
 
 # Workspace PVC
+# NOTE: Changed from ceph-filesystem/ReadWriteMany to app-blk-hdd-repl/ReadWriteOnce
+# PVC spec is immutable — the old PVC must be deleted before ArgoCD can recreate it.
 workspace:
-  storageClassName: ceph-filesystem
+  storageClassName: app-blk-hdd-repl
   size: 20Gi
-  accessMode: ReadWriteMany
+  accessMode: ReadWriteOnce
+
+# Nx remote cache — ObjectBucketClaim (Rook Ceph S3)
+# OBC auto-creates:
+#   Secret "nx-cache"      → AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+#   ConfigMap "nx-cache"    → BUCKET_HOST, BUCKET_NAME, BUCKET_PORT
+nxCache:
+  enabled: true
+  storageClassName: app-obj-s3
+  maxObjects: "100000"
+  maxSize: 10G
+
+# Nx cache server — self-hosted remote cache proxy backed by S3 (OBC)
+nxCacheServer:
+  enabled: true
+  image: ghcr.io/ikatsuba/nx-cache-server:latest
+  s3Endpoint: "http://rook-ceph-rgw-app-objectstore.ceph-cluster.svc:80"
+  s3Region: "ap-south-2"
+
+# Verdaccio — npm registry for @pnats/* shared packages
+# Credentials sourced from Vault via PushSecret (verdaccio namespace → Vault)
+# then pulled into argo namespace via ExternalSecret with template (base64 token)
+verdaccio:
+  enabled: true
+  vaultPath: applications/developer-platform/verdaccio/app
+  refreshInterval: 1h
 
 # EventBus
 eventBus:
@@ -81,3 +108,7 @@ secrets:
         remoteRef:
           key: ci/slack
           property: url
+  # verdaccioToken: handled by dedicated template (externalsecret-verdaccio.yaml)
+  # Pulls username+password from Vault, templates into base64 auth token
+  # nxCacheServerToken: handled by dedicated template (nx-cache-server-token.yaml)
+  # Uses ESO Password generator — no Vault path needed, token auto-generated

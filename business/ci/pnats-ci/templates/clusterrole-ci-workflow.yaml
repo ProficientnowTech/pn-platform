@@ -1,0 +1,30 @@
+{{/*
+  ClusterRole: ci-workflow-role
+  RBAC permissions for the ci-workflow ServiceAccount used by Argo Workflow pods.
+
+  Grants:
+    - Argo Workflows emissary executor needs: pods, pods/log, secrets, configmaps
+    - Workflow management: workflows, workflowtemplates, workflowtaskresults
+    - PVC access: persistentvolumeclaims (get/list for mounting ci-workspace)
+
+  Dependencies:
+    - Bound to ci-workflow SA via clusterrolebinding-ci-workflow.yaml
+    - Bound to argo-events-sa via clusterrolebinding-argo-events.yaml
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ci-workflow-role
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates", "workflowtaskresults"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "patch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]

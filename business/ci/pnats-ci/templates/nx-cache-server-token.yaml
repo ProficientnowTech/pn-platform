@@ -1,0 +1,43 @@
+{{/*
+  ExternalSecret: nx-cache-server-token
+  Pulls the nx-cache-server auth token from Vault (ci/nx-cache-server).
+  This is the Secret consumed by both the nx-cache-server Deployment and workflow pods.
+
+  Part of the Generate-Push-Pull bootstrap pattern (step 3 of 3):
+    1.  Password generator + ExternalSecret (generates and materializes token)
+    2.  PushSecret seeds the token into Vault
+    3.  This ExternalSecret pulls from Vault (the source of truth)
+
+  Notes:
+    - Sync wave -4 (after PushSecret at -5 has seeded the value).
+    - refreshInterval: 1h keeps the K8s Secret in sync if the Vault value is rotated.
+
+  Dependencies:
+    - Vault path: ci/nx-cache-server (seeded by nx-cache-server-token-push.yaml)
+    - Consumed by: nx-cache-server Deployment (nx-cache-server-deployment.yaml)
+    - Consumed by: workflow-pr-validation.yaml and workflow-post-merge-build.yaml
+*/}}
+{{- if .Values.nxCacheServer.enabled }}
+# Pull the token from Vault (source of truth)
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: nx-cache-server-token
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: nx-cache-server-token
+  data:
+    - secretKey: password
+      remoteRef:
+        conversionStrategy: Default
+        decodingStrategy: None
+        key: ci/nx-cache-server
+        metadataPolicy: None
+        property: password
+{{- end }}

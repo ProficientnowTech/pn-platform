@@ -1,0 +1,23 @@
+{{/*
+  ClusterRoleBinding: ci-workflow-binding
+  Binds ci-workflow-role to the ci-workflow ServiceAccount in the release namespace.
+
+  Allows CI workflow pods (running in the argo namespace) to manage sub-resources
+  such as pods, secrets, configmaps, workflows, and workflowtaskresults.
+
+  Dependencies:
+    - ClusterRole: ci-workflow-role (clusterrole-ci-workflow.yaml)
+    - ServiceAccount: ci-workflow (sa-ci-workflow.yaml)
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ci-workflow-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-workflow-role
+subjects:
+  - kind: ServiceAccount
+    name: ci-workflow
+    namespace: {{ .Release.Namespace }}

@@ -1,0 +1,472 @@
+{{/*
+  WorkflowTemplate: post-merge-build
+  Post-merge build pipeline triggered by the Sensor when a PR is merged to develop or main.
+
+  Flow:
+    1. ContainerSet (single pod, RWO PVC at /workspace):
+       git-sync --> pnpm-install --> build-shared-libs --> publish-to-verdaccio
+       --> generate-dag --> rewrite-workspace-refs --> tar-upload
+    2. Kaniko fan-out: one pod per affected service, each downloads workspace tarball
+       from S3 and builds a Docker image pushed to Harbor
+    3. GitOps update: clones pn-infra (branch v2), updates image tags, pushes
+    4. Slack notification on success (and on failure via onExit)
+
+  Parameters (from Sensor):
+    - commit-sha:  merge commit SHA
+    - base-branch: develop or main (determines staging vs production)
+
+  Notes:
+    - Mutex "ci-workspace" serializes runs — only one workflow at a time (RWO PVC).
+    - Kaniko pods use S3 artifact passing (workspace tarball) since they cannot share the RWO PVC.
+    - GitOps update has retry with rebase to handle concurrent pushes to pn-infra v2.
+
+  Dependencies:
+    - ServiceAccount: ci-workflow (sa-ci-workflow.yaml)
+    - PVC: ci-workspace (pvc.yaml)
+    - Secret: github-token (externalsecrets.yaml) — for clone, status API, gitops push
+    - Secret: nx-cache-server-token (nx-cache-server-token.yaml) — for Nx remote cache
+    - Secret: verdaccio-token (externalsecret-verdaccio.yaml) — for npm publish
+    - Secret: harbor-docker-config (externalsecrets.yaml) — for Kaniko registry push
+    - Secret: slack-webhook (externalsecrets.yaml) — for Slack notifications
+    - Service: nx-cache-server (nx-cache-server-service.yaml) — Nx cache endpoint
+*/}}
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: post-merge-build
+  namespace: argo
+spec:
+  arguments:
+    parameters:
+      - name: commit-sha
+      - name: base-branch
+  entrypoint: build-and-deploy
+  onExit: report-failure-slack
+  serviceAccountName: ci-workflow
+  synchronization:
+    mutex:
+      name: ci-workspace
+  templates:
+    # ──────────────────────────────────────────────────────────────────────
+    # Entrypoint DAG — orchestrates ContainerSet → kaniko → gitops → slack
+    # ──────────────────────────────────────────────────────────────────────
+    - name: build-and-deploy
+      dag:
+        tasks:
+          - name: prepare
+            template: prepare-workspace
+          - name: docker-builds
+            template: kaniko-fan-out
+            depends: prepare
+            arguments:
+              parameters:
+                - name: services
+                  value: '{{`{{tasks.prepare.outputs.parameters.affected-apps}}`}}'
+                - name: tag
+                  value: '{{`{{workflow.parameters.commit-sha}}`}}'
+          - name: update-gitops
+            template: gitops-update
+            depends: docker-builds
+            arguments:
+              parameters:
+                - name: services
+                  value: '{{`{{tasks.prepare.outputs.parameters.affected-apps}}`}}'
+                - name: tag
+                  value: '{{`{{workflow.parameters.commit-sha}}`}}'
+          - name: notify
+            template: slack-notify
+            depends: update-gitops
+            arguments:
+              parameters:
+                - name: services
+                  value: '{{`{{tasks.prepare.outputs.parameters.affected-apps}}`}}'
+                - name: status
+                  value: 'success'
+
+    # ──────────────────────────────────────────────────────────────────────
+    # ContainerSet — single pod, RWO block PVC at /workspace
+    # Runs: git-sync → pnpm-install → build-shared-libs → publish-to-verdaccio
+    #       → generate-dag → rewrite-workspace-refs → tar-upload
+    # ──────────────────────────────────────────────────────────────────────
+    - name: prepare-workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: ci-workspace
+      outputs:
+        parameters:
+          - name: workflow-yaml
+            valueFrom:
+              path: /tmp/task-workflow.yaml
+          - name: affected-apps
+            valueFrom:
+              path: /tmp/affected-apps.json
+        artifacts:
+          - name: workspace-tar
+            path: /tmp/workspace.tar.gz
+            s3:
+              key: 'ci/{{`{{workflow.name}}`}}/workspace.tar.gz'
+            archive:
+              none: {}
+      containerSet:
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        containers:
+          # ── 1. Git clone / fetch (HTTPS + PAT) ─────────────────────────
+          - name: git-sync
+            image: {{ .Values.ciImage }}
+            command: [sh, -c]
+            args:
+              - |
+                cd /workspace
+                if [ ! -d ".git" ]; then
+                  echo "Cold PVC — full clone"
+                  git clone https://x-access-token:${GITHUB_TOKEN}@github.com/{{ .Values.github.owner }}/{{ .Values.github.repo }}.git .
+                else
+                  echo "Warm PVC — fast fetch"
+                  git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/{{ .Values.github.owner }}/{{ .Values.github.repo }}.git
+                  git fetch origin --prune
+                fi
+                git checkout --force {{`{{workflow.parameters.commit-sha}}`}}
+                git clean -fd
+            env:
+              - name: GITHUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: github-token
+                    key: token
+
+          # ── 2. pnpm install (cached on PVC, hard links on block) ───────
+          - name: pnpm-install
+            image: {{ .Values.ciImage }}
+            command: [sh, -c]
+            args:
+              - cd /workspace && pnpm install --prefer-offline --frozen-lockfile
+            dependencies:
+              - git-sync
+            resources:
+              requests:
+                cpu: '2'
+                memory: 4Gi
+              limits:
+                cpu: '2'
+                memory: 4Gi
+
+          # ── 3. Build shared libs (publishable packages) ────────────────
+          - name: build-shared-libs
+            image: {{ .Values.ciImage }}
+            command: [sh, -c]
+            args:
+              - |
+                cd /workspace
+                npx nx run-many \
+                  --target=build \
+                  --projects='@pnats/core,@pnats/sdk,@pnats/shared-types,@pnats/utils' \
+                  --parallel=3
+            dependencies:
+              - pnpm-install
+            env:
+              - name: NX_SELF_HOSTED_REMOTE_CACHE_SERVER
+                value: 'http://nx-cache-server.{{ .Release.Namespace }}.svc:3000'
+              - name: NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: nx-cache-server-token
+                    key: password
+            resources:
+              requests:
+                cpu: '2'
+                memory: 4Gi
+              limits:
+                cpu: '2'
+                memory: 4Gi
+
+          # ── 4. Publish to Verdaccio ────────────────────────────────────
+          - name: publish-to-verdaccio
+            image: {{ .Values.ciImage }}
+            command: [sh, -c]
+            args:
+              - |
+                cd /workspace
+                echo "//verdaccio.{{ .Release.Namespace }}.svc:4873/:_authToken=${VERDACCIO_TOKEN}" > .npmrc
+                pnpm publish -r --no-git-checks --registry http://verdaccio.{{ .Release.Namespace }}.svc:4873
+            dependencies:
+              - build-shared-libs
+            env:
+              - name: VERDACCIO_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: verdaccio-token
+                    key: token
+
+          # ── 5. Generate Argo DAG (nx affected → build targets) ─────────
+          - name: generate-dag
+            image: {{ .Values.ciImage }}
+            command: [node, --max-old-space-size=4096, /workspace/tools/ci/generate-argo-dag.mjs]
+            dependencies:
+              - pnpm-install
+            env:
+              - name: BASE_SHA
+                value: 'origin/{{`{{workflow.parameters.base-branch}}`}}~1'
+              - name: HEAD_SHA
+                value: '{{`{{workflow.parameters.commit-sha}}`}}'
+              - name: TARGETS
+                value: 'build'
+              - name: CI_IMAGE
+                value: {{ .Values.ciImage | quote }}
+              - name: WORKSPACE_PVC
+                value: 'ci-workspace'
+              - name: NAMESPACE
+                value: {{ .Release.Namespace | quote }}
+              - name: NX_SELF_HOSTED_REMOTE_CACHE_SERVER
+                value: 'http://nx-cache-server.{{ .Release.Namespace }}.svc:3000'
+              - name: NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: nx-cache-server-token
+                    key: password
+              - name: NX_CACHE_TOKEN_SECRET
+                value: 'nx-cache-server-token'
+            resources:
+              requests:
+                cpu: '2'
+                memory: 4Gi
+              limits:
+                cpu: '2'
+                memory: 4Gi
+
+          # ── 6. Rewrite workspace:* refs to real versions ───────────────
+          - name: rewrite-workspace-refs
+            image: {{ .Values.ciImage }}
+            command: [node, /workspace/tools/ci/rewrite-workspace-refs.mjs]
+            dependencies:
+              - publish-to-verdaccio
+              - generate-dag
+
+          # ── 7. Tar workspace and write to /tmp for S3 artifact upload ──
+          - name: tar-upload
+            image: {{ .Values.ciImage }}
+            command: [sh, -c]
+            args:
+              - |
+                cd /workspace
+                tar czf /tmp/workspace.tar.gz \
+                  --exclude='.git' \
+                  --exclude='node_modules/.cache' \
+                  .
+                echo "Workspace tarball: $(du -sh /tmp/workspace.tar.gz | cut -f1)"
+            dependencies:
+              - rewrite-workspace-refs
+
+          # ── 8. Main container — gate for ContainerSet outputs ──────────
+          - name: main
+            image: {{ .Values.ciImage }}
+            command: [sh, -c]
+            args:
+              - echo "ContainerSet complete"
+            dependencies:
+              - tar-upload
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Kaniko fan-out — one pod per affected service, downloads S3 artifact
+    # ──────────────────────────────────────────────────────────────────────
+    - name: kaniko-fan-out
+      inputs:
+        parameters:
+          - name: services
+          - name: tag
+      steps:
+        - - name: build
+            template: kaniko-build
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{`{{item.name}}`}}'
+                - name: dockerfile
+                  value: '{{`{{item.dockerfile}}`}}'
+                - name: kaniko-args
+                  value: '{{`{{item.kanikoArgs}}`}}'
+                - name: tag
+                  value: '{{`{{inputs.parameters.tag}}`}}'
+            withParam: '{{`{{inputs.parameters.services}}`}}'
+
+    - name: kaniko-build
+      inputs:
+        parameters:
+          - name: name
+          - name: dockerfile
+          - name: kaniko-args
+          - name: tag
+        artifacts:
+          - name: workspace
+            path: /workspace
+            s3:
+              key: 'ci/{{`{{workflow.name}}`}}/workspace.tar.gz'
+            archive:
+              none: {}
+      retryStrategy:
+        limit: '3'
+        retryPolicy: OnError
+        backoff:
+          duration: 30s
+          factor: 2
+          maxDuration: 5m
+        affinity:
+          nodeAntiAffinity: {}
+      volumes:
+        - name: docker-config
+          secret:
+            secretName: harbor-docker-config
+      script:
+        image: gcr.io/kaniko-project/executor:v1.23.2-debug
+        command: [/busybox/sh]
+        source: |
+          /kaniko/executor \
+            --dockerfile={{`{{inputs.parameters.dockerfile}}`}} \
+            --context=/workspace \
+            --destination=registry.pnats.cloud/pnats/{{`{{inputs.parameters.name}}`}}:{{`{{inputs.parameters.tag}}`}} \
+            --destination=registry.pnats.cloud/pnats/{{`{{inputs.parameters.name}}`}}:latest \
+            --cache=true \
+            --cache-repo=registry.pnats.cloud/pnats/build-cache/{{`{{inputs.parameters.name}}`}} \
+            --snapshot-mode=redo \
+            --compressed-caching=false \
+            {{`{{inputs.parameters.kaniko-args}}`}}
+        resources:
+          requests:
+            cpu: '2'
+            memory: 4Gi
+          limits:
+            cpu: '4'
+            memory: 8Gi
+        volumeMounts:
+          - name: docker-config
+            mountPath: /kaniko/.docker
+
+    # ──────────────────────────────────────────────────────────────────────
+    # GitOps update — clone pn-infra, update image tags, push to v2
+    # ──────────────────────────────────────────────────────────────────────
+    - name: gitops-update
+      inputs:
+        parameters:
+          - name: services
+          - name: tag
+      retryStrategy:
+        limit: '5'
+        retryPolicy: OnError
+        backoff:
+          duration: 5s
+          factor: 2
+      container:
+        image: {{ .Values.ciImage }}
+        command: [sh, -c]
+        args:
+          - |
+            git clone --branch v2 https://x-access-token:${GITHUB_TOKEN}@github.com/ProficientnowTech/pn-infra.git /tmp/pn-infra
+            cd /tmp/pn-infra
+
+            echo '{{`{{inputs.parameters.services}}`}}' | jq -r '.[] | "\(.name) \(.helmValuesPath)"' | while read name values_path; do
+              if [ -f "${values_path}" ]; then
+                sed -i "s|tag:.*|tag: {{`{{inputs.parameters.tag}}`}}|g" "${values_path}"
+              fi
+            done
+
+            git config user.name "CI Bot"
+            git config user.email "ci@proficientnow.com"
+
+            if ! git diff --quiet; then
+              git add -A
+              git commit -m "chore(deploy): update image tags to {{`{{inputs.parameters.tag}}`}}"
+
+              ATTEMPT=0
+              while [ $ATTEMPT -lt 5 ]; do
+                if git push origin v2; then
+                  echo "Push succeeded on attempt $((ATTEMPT + 1))"
+                  break
+                fi
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "Push failed, attempt ${ATTEMPT}/5 — rebasing and retrying..."
+                git fetch origin v2
+                git rebase origin/v2
+              done
+
+              if [ $ATTEMPT -eq 5 ]; then
+                echo "Failed to push after 5 attempts"
+                exit 1
+              fi
+            else
+              echo "No changes to commit"
+            fi
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Slack notification — success
+    # ──────────────────────────────────────────────────────────────────────
+    - name: slack-notify
+      inputs:
+        parameters:
+          - name: services
+          - name: status
+      container:
+        image: {{ .Values.ciImage }}
+        command: [sh, -c]
+        args:
+          - |
+            SERVICE_NAMES=$(echo '{{`{{inputs.parameters.services}}`}}' | jq -r '[.[].name] | join(", ")')
+            curl -sf -X POST \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"blocks\": [
+                  {
+                    \"type\": \"section\",
+                    \"text\": {
+                      \"type\": \"mrkdwn\",
+                      \"text\": \"*Build Status:* {{`{{inputs.parameters.status}}`}}\n*SHA:* {{`{{workflow.parameters.commit-sha}}`}}\n*Services:* ${SERVICE_NAMES}\n*Workflow:* <https://argo.pnats.cloud/workflows/argo/{{`{{workflow.name}}`}}|View workflow>\"
+                    }
+                  }
+                ]
+              }" \
+              "${SLACK_WEBHOOK_URL}"
+        env:
+          - name: SLACK_WEBHOOK_URL
+            valueFrom:
+              secretKeyRef:
+                name: slack-webhook
+                key: url
+
+    # ──────────────────────────────────────────────────────────────────────
+    # onExit: Slack notification on failure
+    # ──────────────────────────────────────────────────────────────────────
+    - name: report-failure-slack
+      container:
+        image: {{ .Values.ciImage }}
+        command: [sh, -c]
+        args:
+          - |
+            if [ "{{`{{workflow.status}}`}}" != "Succeeded" ]; then
+              curl -sf -X POST \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"blocks\": [
+                    {
+                      \"type\": \"section\",
+                      \"text\": {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"*Build FAILED*\n*Branch:* {{`{{workflow.parameters.base-branch}}`}}\n*SHA:* {{`{{workflow.parameters.commit-sha}}`}}\n*Workflow:* <https://argo.pnats.cloud/workflows/argo/{{`{{workflow.name}}`}}|View workflow>\"
+                      }
+                    }
+                  ]
+                }" \
+                "${SLACK_WEBHOOK_URL}"
+            fi
+        env:
+          - name: SLACK_WEBHOOK_URL
+            valueFrom:
+              secretKeyRef:
+                name: slack-webhook
+                key: url

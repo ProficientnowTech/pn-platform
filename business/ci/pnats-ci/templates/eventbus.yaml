@@ -1,0 +1,27 @@
+{{/*
+  EventBus: default (NATS JetStream)
+  3-replica persistent NATS JetStream bus for Argo Events in the argo-events namespace.
+
+  All webhook events flow through this bus:
+    EventSource (github-webhook) --> EventBus --> Sensor (ci-trigger)
+
+  Uses persistent storage so in-flight events survive pod restarts.
+
+  Dependencies:
+    - EventSource: github-webhook (eventsource.yaml) publishes to this bus
+    - Sensor: ci-trigger (sensor.yaml) subscribes to this bus
+    - StorageClass: plt-blk-hdd-repl (for JetStream persistence)
+*/}}
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: argo-events
+spec:
+  jetstream:
+    version: {{ .Values.eventBus.jetstream.version | quote }}
+    replicas: {{ .Values.eventBus.jetstream.replicas }}
+    persistence:
+      storageClassName: {{ .Values.eventBus.jetstream.persistence.storageClassName }}
+      accessMode: {{ .Values.eventBus.jetstream.persistence.accessMode }}
+      volumeSize: {{ .Values.eventBus.jetstream.persistence.volumeSize }}

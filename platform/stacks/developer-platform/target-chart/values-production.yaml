@@ -82,10 +82,7 @@ applications:
   - ServerSideApply=true
   - CreateNamespace=true
 
-- name: argo-ci
-  destinationNamespaceOverwrite: argo
-  syncOptions:
-  - CreateNamespace=true
+# argo-ci: moved to business/ci/pnats-ci (managed by pnats-ci Application in business/apps/pnats/)
 
 - name: clusterapi
   annotations:

@@ -1,0 +1,31 @@
+{{/*
+  ObjectBucketClaim: nx-cache
+  Claims an S3 bucket from Rook-Ceph for the Nx remote cache server.
+
+  Rook-Ceph auto-creates two companion resources with the same name ("nx-cache"):
+    - Secret "nx-cache"    --> AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+    - ConfigMap "nx-cache"  --> BUCKET_NAME, BUCKET_HOST, BUCKET_PORT
+
+  These are consumed by the nx-cache-server Deployment (nx-cache-server-deployment.yaml).
+
+  Notes:
+    - storageClassName "app-obj-s3" maps to the Rook-Ceph object store.
+    - maxObjects and maxSize set quota limits on the bucket.
+*/}}
+{{- if .Values.nxCache.enabled }}
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: nx-cache
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: nx-cache
+spec:
+  storageClassName: {{ .Values.nxCache.storageClassName | default "app-obj-s3" }}
+  generateBucketName: nx-cache
+  additionalConfig:
+    maxObjects: "{{ .Values.nxCache.maxObjects | default 100000 }}"
+    maxSize: "{{ .Values.nxCache.maxSize | default "10G" }}"
+{{- end }}

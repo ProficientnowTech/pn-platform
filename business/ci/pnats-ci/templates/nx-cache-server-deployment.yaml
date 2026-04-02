@@ -1,0 +1,86 @@
+{{/*
+  Deployment: nx-cache-server
+  Self-hosted Nx remote cache server backed by S3 (Rook-Ceph via ObjectBucketClaim).
+
+  Serves PUT/GET requests for Nx task cache artifacts. Workflow pods connect to
+  this server to read/write build cache, eliminating the need for Nx Cloud registration.
+
+  Dependencies:
+    - Secret: nx-cache-server-token (nx-cache-server-token.yaml) — auth token (NX_CACHE_ACCESS_TOKEN)
+    - Secret: nx-cache (auto-created by OBC) — AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+    - ConfigMap: nx-cache (auto-created by OBC) — BUCKET_NAME
+    - ObjectBucketClaim: nx-cache (obc-nx-cache.yaml) — provisions the S3 bucket
+    - Service: nx-cache-server (nx-cache-server-service.yaml) — exposes this deployment
+*/}}
+{{- if .Values.nxCacheServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nx-cache-server
+  labels:
+    app.kubernetes.io/name: nx-cache-server
+    app.kubernetes.io/component: ci-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nx-cache-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nx-cache-server
+    spec:
+      containers:
+        - name: nx-cache-server
+          image: {{ .Values.nxCacheServer.image }}
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "3000"
+            - name: NX_CACHE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nx-cache-server-token
+                  key: password
+            - name: AWS_REGION
+              value: {{ .Values.nxCacheServer.s3Region | quote }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: nx-cache
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nx-cache
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: nx-cache
+                  key: BUCKET_NAME
+            - name: S3_ENDPOINT_URL
+              value: {{ .Values.nxCacheServer.s3Endpoint | quote }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+{{- end }}

@@ -1,0 +1,28 @@
+{{/*
+  Service: nx-cache-server (ClusterIP)
+  Exposes the nx-cache-server Deployment within the cluster on port 3000.
+
+  Workflow pods connect to this service at:
+    http://nx-cache-server.<namespace>.svc:3000
+
+  Dependencies:
+    - Deployment: nx-cache-server (nx-cache-server-deployment.yaml)
+*/}}
+{{- if .Values.nxCacheServer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: nx-cache-server
+  labels:
+    app.kubernetes.io/name: nx-cache-server
+    app.kubernetes.io/component: ci-cache
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: nx-cache-server
+{{- end }}

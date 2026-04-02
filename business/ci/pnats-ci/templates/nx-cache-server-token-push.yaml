@@ -1,0 +1,41 @@
+{{/*
+  PushSecret: nx-cache-server-token-push
+  Syncs the generated auth token to Vault at ci/nx-cache-server. One-time seed
+  operation — after this, Vault becomes the source of truth for the token.
+
+  Part of the Generate-Push-Pull bootstrap pattern (step 2 of 3):
+    1.  Password generator + ExternalSecret (generates and materializes token)
+    2.  This PushSecret seeds the token into Vault
+    3.  ExternalSecret (nx-cache-server-token.yaml) pulls from Vault
+
+  Notes:
+    - Sync wave -5 (after -6 for the generated secret, before -4 for the pull).
+    - Uses ClusterSecretStore: vault-backend for Vault connectivity.
+
+  Dependencies:
+    - Secret: nx-cache-server-token-generated (nx-cache-server-token-generated.yaml)
+    - Vault policy: eso-ci-secrets-policy (vault-policy.yaml) — write access
+    - Vault auth role: external-secrets-ci (vault-auth-role.yaml)
+*/}}
+{{- if .Values.nxCacheServer.enabled }}
+# Push the generated token to Vault (one-time seed)
+apiVersion: external-secrets.io/v1alpha1
+kind: PushSecret
+metadata:
+  name: nx-cache-server-token-push
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  secretStoreRefs:
+    - name: vault-backend
+      kind: ClusterSecretStore
+  selector:
+    secret:
+      name: nx-cache-server-token-generated
+  data:
+    - match:
+        secretKey: password
+        remoteRef:
+          remoteKey: ci/nx-cache-server
+          property: password
+{{- end }}

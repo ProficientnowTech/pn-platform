@@ -1,3 +1,22 @@
+{{/*
+  Sensor: ci-trigger
+  Argo Events Sensor that filters GitHub webhook events and triggers Argo Workflows.
+
+  Event routing:
+    - PR opened/synchronize/reopened --> pr-validation WorkflowTemplate
+    - PR merged to develop           --> post-merge-build (staging)
+    - PR merged to main              --> post-merge-build (production)
+
+  The Sensor subscribes to the "default" EventBus and listens for events from
+  the "github-webhook" EventSource, filtering on the "pnow-ats-v2" event name.
+
+  Dependencies:
+    - EventBus: default (eventbus.yaml) — event transport
+    - EventSource: github-webhook (eventsource.yaml) — event producer
+    - ServiceAccount: argo-events-sa (sa-argo-events.yaml) — Sensor pod identity
+    - WorkflowTemplate: pr-validation (workflow-pr-validation.yaml)
+    - WorkflowTemplate: post-merge-build (workflow-post-merge-build.yaml)
+*/}}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:

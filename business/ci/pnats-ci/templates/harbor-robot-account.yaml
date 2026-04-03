@@ -18,6 +18,7 @@ metadata:
   name: pnats-ci-robot
   annotations:
     crossplane.io/external-name: pnats-ci-robot
+    argocd.argoproj.io/sync-wave: "-7"
 spec:
   providerConfigRef:
     name: harbor-default

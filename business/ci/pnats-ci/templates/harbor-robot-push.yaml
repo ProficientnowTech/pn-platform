@@ -2,10 +2,8 @@
   PushSecret: harbor-robot-credentials-push
   Syncs the Crossplane-generated Harbor robot account password to Vault.
 
-  The Crossplane RobotAccount writes credentials to harbor-robot-credentials
-  K8s Secret. This PushSecret pushes the password to Vault at
-  applications/developer-platform/harbor/robot so other components can
-  consume it via ExternalSecrets.
+  The Crossplane RobotAccount writes only the password to the K8s Secret
+  (key: attribute.secret). The username is deterministic (robot$<name>).
 
   Dependencies:
     - Secret: harbor-robot-credentials (created by Crossplane RobotAccount)
@@ -30,8 +28,3 @@ spec:
         remoteRef:
           remoteKey: applications/developer-platform/harbor/robot
           property: password
-    - match:
-        secretKey: attribute.full_name
-        remoteRef:
-          remoteKey: applications/developer-platform/harbor/robot
-          property: username

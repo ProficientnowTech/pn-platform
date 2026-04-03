@@ -7,7 +7,7 @@
 # Creates a bucket in Ceph Object Store for Harbor registry storage
 objectBucket:
   enabled: true
-  name: harbor-s3-creds
+  name: harbor-registry
   bucketName: harbor
   storageClassName: app-obj-s3
   maxObjects: 1000000

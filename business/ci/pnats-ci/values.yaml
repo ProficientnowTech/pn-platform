@@ -90,16 +90,8 @@ secrets:
         remoteRef:
           key: ci/github
           property: secret
-  harborDockerConfig:
-    enabled: true
-    target: harbor-docker-config
-    template:
-      type: kubernetes.io/dockerconfigjson
-    data:
-      - secretKey: .dockerconfigjson
-        remoteRef:
-          key: ci/harbor
-          property: .dockerconfigjson
+  # harborDockerConfig: handled by dedicated template (externalsecret-harbor.yaml)
+  # Pulls robot creds from Vault (synced by Crossplane RobotAccount → PushSecret)
   slackWebhook:
     enabled: true
     target: slack-webhook

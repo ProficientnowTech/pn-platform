@@ -1,0 +1,45 @@
+{{/*
+  RobotAccount: pnats-ci-robot
+  Crossplane-managed Harbor robot account for CI image pull/push.
+
+  Crossplane creates the robot account in Harbor and writes the credentials
+  to a K8s Secret via writeConnectionSecretToRef. The PushSecret then syncs
+  the password to Vault, and the ExternalSecret pulls it back as a
+  dockerconfigjson secret for imagePullSecrets.
+
+  Dependencies:
+    - ProviderConfig: harbor-default (existing Crossplane Harbor provider)
+    - Harbor project: pnats (must exist)
+    - Consumed by: harbor-robot-push.yaml → harbor-docker-config ExternalSecret
+*/}}
+apiVersion: robotaccount.harbor.crossplane.io/v1alpha1
+kind: RobotAccount
+metadata:
+  name: pnats-ci-robot
+  annotations:
+    crossplane.io/external-name: pnats-ci-robot
+spec:
+  providerConfigRef:
+    name: harbor-default
+  forProvider:
+    name: pnats-ci-robot
+    description: "CI robot account for pnats image pull/push"
+    level: project
+    duration: -1
+    permissions:
+      - kind: project
+        namespace: pnats
+        access:
+          - resource: repository
+            action: pull
+          - resource: repository
+            action: push
+          - resource: artifact
+            action: read
+          - resource: tag
+            action: create
+          - resource: tag
+            action: list
+  writeConnectionSecretToRef:
+    name: harbor-robot-credentials
+    namespace: argo

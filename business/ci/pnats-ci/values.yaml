@@ -69,7 +69,7 @@ secrets:
     data:
       - secretKey: token
         remoteRef:
-          key: ci/github
+          key: applications/ci/github
           property: token
   githubTokenEvents:
     enabled: true
@@ -79,7 +79,7 @@ secrets:
     data:
       - secretKey: token
         remoteRef:
-          key: ci/github
+          key: applications/ci/github
           property: token
   githubWebhookSecret:
     enabled: true
@@ -88,7 +88,7 @@ secrets:
     data:
       - secretKey: secret
         remoteRef:
-          key: ci/github
+          key: applications/ci/github
           property: secret
   # harborDockerConfig: handled by dedicated template (externalsecret-harbor.yaml)
   # Pulls robot creds from Vault (synced by Crossplane RobotAccount → PushSecret)
@@ -98,7 +98,7 @@ secrets:
     data:
       - secretKey: url
         remoteRef:
-          key: ci/slack
+          key: applications/ci/slack
           property: url
   # verdaccioToken: handled by dedicated template (externalsecret-verdaccio.yaml)
   # Pulls username+password from Vault, templates into base64 auth token

@@ -64,7 +64,7 @@ The nx-cache-server auth token uses the Generate-Push-Pull bootstrap pattern —
 |----------|----------|-----------|---------|
 | nx-cache-server-token-generator.yaml | Password | — | ESO Password generator (64-char alphanumeric) |
 | nx-cache-server-token-generated.yaml | ExternalSecret | -6 | Materializes generated token as K8s Secret (one-time) |
-| nx-cache-server-token-push.yaml | PushSecret | -5 | Seeds token into Vault at ci/nx-cache-server |
+| nx-cache-server-token-push.yaml | PushSecret | -5 | Seeds token into Vault at applications/ci/nx-cache-server |
 | nx-cache-server-token.yaml | ExternalSecret | -4 | Pulls token from Vault (source of truth, 1h refresh) |
 
 ### Other Secrets
@@ -85,7 +85,7 @@ The nx-cache-server auth token uses the Generate-Push-Pull bootstrap pattern —
 ### Vault (Crossplane-managed)
 | Template | Resource | Purpose |
 |----------|----------|---------|
-| vault-policy.yaml | Policy | Vault policy for ci/* path access |
+| vault-policy.yaml | Policy | Vault policy for applications/ci/* path access |
 | vault-auth-role.yaml | AuthBackendRole | Kubernetes auth role for ci-workflow SA |
 
 ### Storage
@@ -151,7 +151,7 @@ secrets:
     data:
       - secretKey: token
         remoteRef:
-          key: ci/github
+          key: applications/ci/github
           property: token
 ```
 
@@ -162,7 +162,7 @@ secrets:
 - Rook-Ceph with app-obj-s3 StorageClass and app-blk-hdd-repl StorageClass
 - Vault with External Secrets Operator and ClusterSecretStore `vault-backend`
 - Harbor registry with ci-tools image pushed
-- Vault secrets provisioned at ci/github (token, secret, ssh-privatekey, app-id, installation-id, app-private-key)
+- Vault secrets provisioned at applications/ci/github (token, secret, ssh-privatekey, app-id, installation-id, app-private-key)
 
 ## PVC Immutability Note
 

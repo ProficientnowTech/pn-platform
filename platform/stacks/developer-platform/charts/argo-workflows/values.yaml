@@ -71,9 +71,9 @@ secrets:
     data:
       - secretKey: access-key
         remoteRef:
-          key: ci/rook-ceph
+          key: applications/ci/rook-ceph
           property: access-key
       - secretKey: secret-key
         remoteRef:
-          key: ci/rook-ceph
+          key: applications/ci/rook-ceph
           property: secret-key

@@ -1,13 +1,13 @@
 {{/*
   ExternalSecret: nx-cache-server-token
-  Pulls the nx-cache-server auth token from Vault (ci/nx-cache-server).
+  Pulls the nx-cache-server auth token from Vault (applications/ci/nx-cache-server).
   This is the Secret consumed by both the nx-cache-server Deployment and workflow pods.
 
   The token is manually bootstrapped in Vault once. This ExternalSecret keeps the
   K8s Secret in sync with Vault.
 
   Dependencies:
-    - Vault path: ci/nx-cache-server (property: password)
+    - Vault path: applications/ci/nx-cache-server (property: password)
     - Consumed by: nx-cache-server Deployment (nx-cache-server-deployment.yaml)
     - Consumed by: workflow-pr-validation.yaml and workflow-post-merge-build.yaml
 */}}
@@ -30,7 +30,7 @@ spec:
       remoteRef:
         conversionStrategy: Default
         decodingStrategy: None
-        key: ci/nx-cache-server
+        key: applications/ci/nx-cache-server
         metadataPolicy: None
         property: password
 {{- end }}

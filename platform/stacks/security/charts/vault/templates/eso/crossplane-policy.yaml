@@ -42,12 +42,4 @@ spec:
       path "secret/metadata/platform-config/*" {
         capabilities = ["create", "update", "read", "list"]
       }
-
-      # CI secrets (Argo Workflows, nx-cache-server, Verdaccio, GitHub, etc.)
-      path "secret/data/ci/*" {
-        capabilities = ["read", "list"]
-      }
-      path "secret/metadata/ci/*" {
-        capabilities = ["read", "list"]
-      }
 {{- end }}

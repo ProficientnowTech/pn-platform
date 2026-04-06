@@ -1,6 +1,6 @@
 dependencies:
-- name: everest
-  repository: https://percona.github.io/percona-helm-charts/
-  version: 1.10.0
-digest: sha256:c63a42897b286563e096a3a27bb3672c5a88c3394b279b8030a57330a737ff7a
-generated: "2026-01-05T16:00:11.903198317+05:30"
+- name: openeverest
+  repository: https://openeverest.github.io/helm-charts/
+  version: 1.14.0
+digest: sha256:1bd447fea0a183d1c9b493d932083534dc4e99c4dfc55bdea8ca17cb0b76a183
+generated: "2026-04-07T00:23:49.024850777+05:30"

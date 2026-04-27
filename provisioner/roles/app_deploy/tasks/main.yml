@@ -1,0 +1,586 @@
+---
+- name: Validate deploy mode
+  assert:
+    that:
+      - app_deploy_state in ['present', 'absent']
+      - app_deploy_source_mode in ['git', 'local_sync']
+      - app_deploy_compose_files is sequence
+      - app_deploy_compose_files | length > 0
+      - app_deploy_target_compose_files is sequence
+      - app_deploy_env_files is sequence
+    fail_msg: "Invalid app_deploy_* configuration."
+
+- name: Normalize selector input
+  set_fact:
+    app_deploy_selectors_normalized: >-
+      {{
+        (
+          app_deploy_selectors.split(',')
+          if (app_deploy_selectors is string and app_deploy_selectors | length > 0)
+          else app_deploy_selectors
+        )
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+  when: app_deploy_selectors is defined
+
+- name: Validate selectors are known
+  assert:
+    that:
+      - item in app_deploy_selector_map
+    fail_msg: "Unknown app_deploy selector '{{ item }}'. Add it to app_deploy_selector_map."
+  loop: "{{ app_deploy_selectors_normalized | default([]) }}"
+  when:
+    - app_deploy_selectors_normalized is defined
+    - app_deploy_selectors_normalized | length > 0
+
+- name: Build compose/services from selectors
+  set_fact:
+    app_deploy_target_compose_files: "{{ (app_deploy_target_compose_files + [selector_cfg.compose]) | unique }}"
+    app_deploy_services_by_compose: >-
+      {{
+        app_deploy_services_by_compose
+        | combine(
+            {
+              selector_cfg.compose: (
+                (app_deploy_services_by_compose[selector_cfg.compose] | default([]))
+                + selector_cfg.services
+              ) | unique
+            },
+            recursive=True
+          )
+      }}
+  vars:
+    selector_cfg: "{{ app_deploy_selector_map[item] }}"
+  loop: "{{ app_deploy_selectors_normalized | default([]) }}"
+  when:
+    - app_deploy_selectors_normalized is defined
+    - app_deploy_selectors_normalized | length > 0
+
+- name: Resolve effective compose file list
+  set_fact:
+    app_deploy_effective_compose_files: >-
+      {{
+        app_deploy_target_compose_files
+        if (app_deploy_target_compose_files | length > 0)
+        else app_deploy_compose_files
+      }}
+
+- name: Decide if external network discovery from env files is needed
+  set_fact:
+    app_deploy_needs_external_network_discovery: >-
+      {{
+        (
+          app_deploy_effective_compose_files
+          | intersect(app_deploy_external_network_env_compose_files | default([]))
+          | length
+        ) > 0
+      }}
+
+- name: Validate requested compose files are configured
+  assert:
+    that:
+      - app_deploy_effective_compose_files | difference(app_deploy_compose_files) | length == 0
+    fail_msg: "app_deploy_target_compose_files contains entries not present in app_deploy_compose_files."
+  when: app_deploy_target_compose_files | length > 0
+
+- name: Verify source repository exists on controller
+  delegate_to: localhost
+  become: false
+  stat:
+    path: "{{ app_deploy_src_local_path }}"
+  register: app_deploy_src_path
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_source_mode == 'local_sync'
+
+- name: Fail when source repository path is missing
+  assert:
+    that:
+      - app_deploy_src_path.stat.exists
+      - app_deploy_src_path.stat.isdir
+    fail_msg: "Source repository not found: {{ app_deploy_src_local_path }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_source_mode == 'local_sync'
+
+- name: Check docker availability
+  command: docker --version
+  register: app_deploy_docker_version
+  changed_when: false
+  when: app_deploy_state == 'present'
+
+- name: Check docker compose availability
+  command: docker compose version
+  register: app_deploy_compose_version
+  changed_when: false
+  when: app_deploy_state == 'present'
+
+- name: Require WireGuard interface for private-network deployment
+  command: "ip -4 addr show {{ app_deploy_wireguard_interface }}"
+  register: app_deploy_wireguard_check
+  changed_when: false
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_require_wireguard | bool
+
+- name: Ensure deployment directory exists
+  file:
+    path: "{{ app_deploy_dest_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: app_deploy_state == 'present'
+
+- name: Ensure SSH directory exists for private repo access
+  file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_source_mode == 'git'
+
+- name: Install GitHub deploy key
+  copy:
+    dest: "{{ app_deploy_repo_key_path }}"
+    content: "{{ app_deploy_repo_ssh_key }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_source_mode == 'git'
+    - app_deploy_repo_ssh_key | default('') | length > 0
+
+- name: Clone or update private repository
+  git:
+    repo: "{{ app_deploy_repo_url }}"
+    dest: "{{ app_deploy_dest_path }}"
+    version: "{{ app_deploy_repo_version }}"
+    update: true
+    accept_hostkey: true
+    key_file: "{{ app_deploy_repo_key_path if app_deploy_repo_key_path | default('') | length > 0 else omit }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_source_mode == 'git'
+
+- name: Sync local repository to target
+  ansible.posix.synchronize:
+    src: "{{ app_deploy_src_local_path }}/"
+    dest: "{{ app_deploy_dest_path }}/"
+    archive: true
+    compress: true
+    delete: "{{ app_deploy_sync_delete }}"
+    rsync_opts: "{{ app_deploy_sync_excludes | map('regex_replace', '^(.*)$', '--exclude=\\1') | list }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_source_mode == 'local_sync'
+
+- name: Ensure env file parent directory exists
+  file:
+    path: "{{ app_deploy_dest_path }}/{{ app_deploy_env_dest_relpath | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_content | default('') | length > 0 or app_deploy_env_src_local_path | default('') | length > 0
+
+- name: Resolve primary env source path on controller
+  set_fact:
+    app_deploy_env_src_local_path_resolved: >-
+      {{
+        (
+          app_deploy_env_src_local_path
+          if (app_deploy_env_src_local_path | regex_search('^/'))
+          else (app_deploy_src_local_path ~ '/' ~ app_deploy_env_src_local_path)
+        )
+        if (app_deploy_env_src_local_path | default('') | length > 0)
+        else ''
+      }}
+  when: app_deploy_state == 'present'
+
+- name: Initialize resolved extra env file list
+  set_fact:
+    app_deploy_env_files_resolved: []
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Resolve extra env file source paths on controller
+  set_fact:
+    app_deploy_env_files_resolved: >-
+      {{
+        (app_deploy_env_files_resolved | default([]))
+        + [
+            item
+            | combine(
+                {
+                  'src_resolved': (
+                    item.src
+                    if (item.src | regex_search('^/'))
+                    else (app_deploy_src_local_path ~ '/' ~ item.src)
+                  )
+                },
+                recursive=True
+              )
+          ]
+      }}
+  loop: "{{ app_deploy_env_files }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Check local env file sources exist on controller
+  delegate_to: localhost
+  become: false
+  stat:
+    path: "{{ item.src_resolved }}"
+  loop: "{{ app_deploy_env_files_resolved | default([]) }}"
+  register: app_deploy_env_file_stats
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Fail when required env file source is missing
+  assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "Required env source file is missing: {{ item.item.src }} (resolved: {{ item.item.src_resolved }})"
+  loop: "{{ app_deploy_env_file_stats.results | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+    - item.item.required | default(true) | bool
+
+- name: Build effective env file list (existing local sources)
+  set_fact:
+    app_deploy_effective_env_files: >-
+      {{
+        app_deploy_env_file_stats.results
+        | default([])
+        | selectattr('stat.exists')
+        | selectattr('stat.isreg')
+        | map(attribute='item')
+        | list
+      }}
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+
+- name: Log skipped optional env files
+  debug:
+    msg: "Skipping optional missing env file: {{ item.item.src }} (resolved: {{ item.item.src_resolved }})"
+  loop: "{{ app_deploy_env_file_stats.results | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_files | length > 0
+    - not (item.stat.exists and item.stat.isreg)
+    - not (item.item.required | default(true) | bool)
+
+- name: Ensure extra env file parent directories exist
+  file:
+    path: "{{ app_deploy_dest_path }}/{{ item.dest | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_effective_env_files | default([]) | length > 0
+
+- name: Write environment file from inventory or vault content
+  copy:
+    dest: "{{ app_deploy_dest_path }}/{{ app_deploy_env_dest_relpath }}"
+    content: "{{ app_deploy_env_content }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_content | default('') | length > 0
+
+- name: Sync environment file to target
+  ansible.posix.synchronize:
+    src: "{{ app_deploy_env_src_local_path_resolved }}"
+    dest: "{{ app_deploy_dest_path }}/{{ app_deploy_env_dest_relpath }}"
+    archive: false
+    perms: true
+  no_log: true
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_content | default('') | length == 0
+    - app_deploy_env_src_local_path_resolved | default('') | length > 0
+
+- name: Set secure permissions on env file
+  file:
+    path: "{{ app_deploy_dest_path }}/{{ app_deploy_env_dest_relpath }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_content | default('') | length > 0 or app_deploy_env_src_local_path_resolved | default('') | length > 0
+
+- name: Sync extra local environment files to target
+  ansible.posix.synchronize:
+    src: "{{ item.src_resolved }}"
+    dest: "{{ app_deploy_dest_path }}/{{ item.dest }}"
+    archive: false
+    perms: true
+  no_log: true
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_effective_env_files | default([]) | length > 0
+
+- name: Set secure permissions on extra env files
+  file:
+    path: "{{ app_deploy_dest_path }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0600') }}"
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_effective_env_files | default([]) | length > 0
+
+- name: Apply env overrides into target env files
+  lineinfile:
+    path: "{{ app_deploy_dest_path }}/{{ item.file }}"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  loop: "{{ app_deploy_env_overrides }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_env_overrides | length > 0
+
+- name: Discover DOCKER_NETWORK_NAME values from env files
+  shell: "awk -F= '/^DOCKER_NETWORK_NAME=/{print $2}' {{ app_deploy_dest_path }}/{{ item.dest }} | tail -n 1"
+  register: app_deploy_network_name_discovery
+  changed_when: false
+  failed_when: false
+  loop: "{{ app_deploy_effective_env_files | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_effective_env_files | default([]) | length > 0
+    - app_deploy_needs_external_network_discovery | bool
+
+- name: Build effective external Docker network list
+  set_fact:
+    app_deploy_effective_external_networks: >-
+      {{
+        (
+          app_deploy_external_networks +
+          (
+            app_deploy_network_name_discovery.results
+            | default([])
+            | selectattr('stdout', 'defined')
+            | map(attribute='stdout')
+            | map('trim')
+            | reject('equalto', '')
+            | list
+          )
+        ) | unique
+      }}
+  when: app_deploy_state == 'present'
+
+- name: Ensure required external Docker networks exist
+  shell: |
+    if docker network inspect {{ item | quote }} >/dev/null 2>&1; then
+      echo exists
+    else
+      if [ {{ item | quote }} = 'pnow-ats-v2_pnats_network' ]; then
+        docker network create \
+          --label com.docker.compose.network=pnats_network \
+          --label com.docker.compose.project=pnow-ats-v2 \
+          {{ item | quote }} >/dev/null
+      else
+        docker network create {{ item | quote }} >/dev/null
+      fi
+      echo created
+    fi
+  register: app_deploy_network_create_result
+  changed_when: "'created' in app_deploy_network_create_result.stdout"
+  loop: "{{ app_deploy_effective_external_networks | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_effective_external_networks | default([]) | length > 0
+
+- name: Inspect existing pnats compose network metadata
+  shell: |
+    set -euo pipefail
+    if docker network inspect pnow-ats-v2_pnats_network >/dev/null 2>&1; then
+      docker network inspect pnow-ats-v2_pnats_network --format '{% raw %}{{ index .Labels "com.docker.compose.network" }}|{{ len .Containers }}{% endraw %}'
+    else
+      echo "missing|0"
+    fi
+  args:
+    executable: /bin/bash
+  register: app_deploy_pnats_network_meta
+  changed_when: false
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+
+- name: Set pnats network facts
+  set_fact:
+    app_deploy_pnats_network_label: "{{ (app_deploy_pnats_network_meta.stdout | default('missing|0')).split('|')[0] }}"
+    app_deploy_pnats_network_container_count: "{{ ((app_deploy_pnats_network_meta.stdout | default('missing|0')).split('|')[1] | int) }}"
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+
+- name: Fail when pnats network has wrong label and active containers
+  fail:
+    msg: >-
+      Docker network pnow-ats-v2_pnats_network has label '{{ app_deploy_pnats_network_label }}'
+      but docker/docker-compose.yml requires 'pnats_network'. Active containers attached: {{ app_deploy_pnats_network_container_count }}.
+      Stop dependent stacks first, then rerun deployment.
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+    - app_deploy_pnats_network_label not in ['missing', 'pnats_network']
+    - app_deploy_pnats_network_container_count | int > 0
+
+- name: Remove stale pnats network with wrong label
+  command: docker network rm pnow-ats-v2_pnats_network
+  register: app_deploy_remove_stale_pnats_network
+  changed_when: app_deploy_remove_stale_pnats_network.rc == 0
+  when:
+    - app_deploy_state == 'present'
+    - "'docker/docker-compose.yml' in app_deploy_effective_compose_files"
+    - app_deploy_pnats_network_label not in ['missing', 'pnats_network']
+    - app_deploy_pnats_network_container_count | int == 0
+
+- name: Discover host bind mount directories from compose files
+  shell: |
+    set -euo pipefail
+    f="{{ app_deploy_dest_path }}/{{ item }}"
+    awk '
+      {
+        line=$0
+        gsub(/["'\'']/, "", line)
+      }
+      match(line, /^[[:space:]]*device:[[:space:]]*(\/[^[:space:]#]+)/, m) {
+        print m[1]
+      }
+      match(line, /^[[:space:]]*-[[:space:]]*(\/[^:]+):[^[:space:]#]+/, m) {
+        print m[1]
+      }
+    ' "$f" | sed "/^$/d"
+  args:
+    executable: /bin/bash
+  register: app_deploy_bind_dir_discovery
+  changed_when: false
+  failed_when: false
+  loop: "{{ app_deploy_effective_compose_files }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_create_prereq_dirs | bool
+
+- name: Build effective prerequisite directory list
+  set_fact:
+    app_deploy_effective_prereq_dirs: >-
+      {{
+        (
+          app_deploy_prereq_dirs
+          +
+          (
+            app_deploy_bind_dir_discovery.results
+            | default([])
+            | map(attribute='stdout_lines')
+            | list
+            | flatten
+          )
+        )
+        | map('trim')
+        | reject('equalto', '')
+        | unique
+      }}
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_create_prereq_dirs | bool
+
+- name: Ensure prerequisite host directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ (app_deploy_prereq_dir_attrs[item].owner if (item in app_deploy_prereq_dir_attrs and (app_deploy_prereq_dir_attrs[item].owner is defined)) else app_deploy_prereq_dir_owner) }}"
+    group: "{{ (app_deploy_prereq_dir_attrs[item].group if (item in app_deploy_prereq_dir_attrs and (app_deploy_prereq_dir_attrs[item].group is defined)) else app_deploy_prereq_dir_group) }}"
+    mode: "{{ (app_deploy_prereq_dir_attrs[item].mode if (item in app_deploy_prereq_dir_attrs and (app_deploy_prereq_dir_attrs[item].mode is defined)) else app_deploy_prereq_dir_mode) }}"
+  loop: "{{ app_deploy_effective_prereq_dirs | default([]) }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_create_prereq_dirs | bool
+    - app_deploy_effective_prereq_dirs | default([]) | length > 0
+
+- name: Pull container images
+  command: "docker compose -f {{ item | basename }} pull"
+  args:
+    chdir: "{{ app_deploy_dest_path }}/{{ item | dirname }}"
+  register: app_deploy_pull_result
+  changed_when: >-
+    ('Downloaded' in app_deploy_pull_result.stdout) or
+    ('Pull complete' in app_deploy_pull_result.stdout)
+  loop: "{{ app_deploy_effective_compose_files }}"
+  when:
+    - app_deploy_state == 'present'
+    - app_deploy_pull_images | bool
+
+- name: Start or update services
+  command: >-
+    docker compose -f {{ item | basename }} up -d --build
+    {{
+      (
+        app_deploy_services_by_compose[item]
+        if (app_deploy_services_by_compose is mapping and item in app_deploy_services_by_compose)
+        else app_deploy_services
+      ) | join(' ')
+    }}
+  args:
+    chdir: "{{ app_deploy_dest_path }}/{{ item | dirname }}"
+  register: app_deploy_up_result
+  changed_when: >-
+    ('Creating ' in app_deploy_up_result.stdout) or
+    ('Recreating ' in app_deploy_up_result.stdout) or
+    ('Starting ' in app_deploy_up_result.stdout) or
+    ('Building ' in app_deploy_up_result.stdout)
+  loop: "{{ app_deploy_effective_compose_files }}"
+  when: app_deploy_state == 'present'
+
+- name: Show running services
+  command: "docker compose -f {{ item | basename }} ps"
+  args:
+    chdir: "{{ app_deploy_dest_path }}/{{ item | dirname }}"
+  register: app_deploy_ps_result
+  changed_when: false
+  loop: "{{ app_deploy_effective_compose_files }}"
+  when: app_deploy_state == 'present'
+
+- name: Stop services
+  command: "docker compose -f {{ item | basename }} down"
+  args:
+    chdir: "{{ app_deploy_dest_path }}/{{ item | dirname }}"
+  register: app_deploy_down_result
+  changed_when: >-
+    ('Stopping ' in app_deploy_down_result.stdout) or
+    ('Removing ' in app_deploy_down_result.stdout) or
+    ('Network ' in app_deploy_down_result.stdout)
+  loop: "{{ app_deploy_effective_compose_files }}"
+  when: app_deploy_state == 'absent'

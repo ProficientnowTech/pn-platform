@@ -72,3 +72,77 @@ provisioner/
 ## Integration
 - **Depends On**: Infrastructure (VMs must exist), API (generates config)
 - **Consumed By**: Container Orchestration (expects configured hosts)
+
+---
+
+## Deploying PNow ATS Services
+
+Use the dedicated playbook to deploy Docker Compose services from your private GitHub repo to `app_server` hosts. The playbook checks WireGuard health first and only runs the `wireguard` role if the WG interface/service is missing or inactive.
+
+```bash
+cd provisioner
+ansible-playbook -i inventory/production/hosts.yml playbooks/app_services_deploy.yml
+```
+
+To stop all deployed services:
+
+```bash
+cd provisioner
+ansible-playbook -i inventory/production/hosts.yml playbooks/app_services_teardown.yml
+```
+
+### Short Service Flags
+
+Use the wrapper script for short selectors instead of long `-e` JSON:
+
+```bash
+cd provisioner
+./scripts/deploy-app-services.sh --host app-server-01 --pi-scrape
+./scripts/deploy-app-services.sh --host app-server-01 --pi-scrape kafka-broker-1 redis
+./scripts/deploy-app-services.sh --host app-server-01 --teardown --pi-scrape
+```
+
+Pass extra Ansible args after `--`:
+
+```bash
+./scripts/deploy-app-services.sh --host app-server-01 --pi-scrape -- --check
+```
+
+Deployment variables live in `inventory/production/group_vars/app_server.yml`:
+- `app_deploy_source_mode` (`git` or `local_sync`)
+- `app_deploy_repo_url`
+- `app_deploy_repo_version`
+- `app_deploy_repo_key_path`
+- `app_deploy_repo_ssh_key` (recommended via Ansible Vault)
+- `app_deploy_dest_path`
+- `app_deploy_compose_files` (one or more compose stacks)
+  - Example: `docker/docker-compose.yml`, `apps/backend/tasks-reminders/docker-compose.yml`
+- `app_deploy_target_compose_files` (optional runtime filter for partial deploys)
+- `app_deploy_env_src_local_path`
+- `app_deploy_env_content` (recommended via Ansible Vault)
+- `app_deploy_env_dest_relpath`
+- `app_deploy_env_files` (additional local `.env` sync list with `src`, `dest`, optional `required: false`)
+- `app_deploy_src_local_path` (controller-side app repo path; relative env `src` values are resolved from here)
+- `app_deploy_env_overrides` (force specific env keys after sync, e.g. missing required vars)
+- `app_deploy_require_wireguard`
+- `app_deploy_manage_wireguard` (auto-remediate WG only when needed)
+- `app_deploy_services` (optional subset)
+- `app_deploy_services_by_compose` (optional per-compose subset)
+- `app_deploy_selectors` (short selector list for playbook-only targeting)
+- `app_deploy_external_network_env_compose_files` (which compose files should trigger auto-create of env-driven external networks)
+- `app_deploy_create_prereq_dirs` (auto-create host bind mount directories before compose up)
+- `app_deploy_prereq_dirs` (extra directories to create explicitly)
+- `app_deploy_prereq_dir_attrs` (optional per-directory owner/group/mode overrides, useful for services like Kafka running as uid 1000)
+
+### Playbook-Only Short Targeting
+
+Use selectors without long JSON:
+
+```bash
+cd provisioner
+ansible-playbook -i inventory/production/hosts.yml playbooks/app_services_deploy.yml --limit app-server-01 -e app_deploy_selectors=pi-scrape
+ansible-playbook -i inventory/production/hosts.yml playbooks/app_services_deploy.yml --limit app-server-01 -e app_deploy_selectors=kafka-broker-1,redis
+ansible-playbook -i inventory/production/hosts.yml playbooks/app_services_deploy.yml --limit app-server-01 -e app_deploy_selectors=pi-scrape,audit-api-service
+```
+
+`app_deploy_selector_map` now includes all services discovered from the repository compose files plus convenience aliases (for example `pi-scrape`, `audit-service`, `tasks-reminders`).

@@ -1,0 +1,331 @@
+---
+app_deploy_state: present
+app_deploy_project_name: pnow-ats-v2
+app_deploy_source_mode: git
+app_deploy_src_local_path: "{{ lookup('env', 'HOME') }}/pnow-ats-v2"
+app_deploy_repo_url: git@github.com:YOUR_ORG/pnow-ats-v2.git
+app_deploy_repo_version: main
+app_deploy_repo_key_path: /root/.ssh/id_ed25519_pnow_ats
+app_deploy_repo_ssh_key: ""
+app_deploy_dest_path: /opt/pnow-ats-v2
+app_deploy_compose_file: docker/docker-compose.yml
+app_deploy_compose_files:
+  - docker/docker-compose.yml
+  - docker/pi-scrape.docker-compose.yml
+  - apps/backend/audit-service/docker-compose.yml
+  - apps/backend/tasks-reminders/docker-compose.yml
+  - apps/backend/pi-boolgen/docker-compose.yml
+  - apps/backend/pi-mailsum/docker-compose.yml
+  - apps/backend/mailer/docker-compose.yml
+  - apps/legacy/automation-service/docker-compose.yml
+  - apps/legacy/dbt-pipelines/docker-compose.yml
+  - apps/legacy/leads-gen-service/docker-compose.yml
+  - apps/legacy/notify/docker-compose.yml
+  - docker/dev.docker-compose.yml
+  - docker/postgres.docker-compose.yml
+  - docs/v2/dev-docs/docker-compose.yml
+app_deploy_target_compose_files: []
+app_deploy_services: []
+app_deploy_services_by_compose: {}
+app_deploy_selectors: []
+app_deploy_selector_map:
+  db:
+    compose: docker/docker-compose.yml
+    services:
+      - db
+  tenant_db:
+    compose: docker/docker-compose.yml
+    services:
+      - tenant_db
+  pgbouncer_transaction:
+    compose: docker/docker-compose.yml
+    services:
+      - pgbouncer_transaction
+  pgbouncer_direct:
+    compose: docker/docker-compose.yml
+    services:
+      - pgbouncer_direct
+  frontend-web:
+    compose: docker/docker-compose.yml
+    services:
+      - frontend-web
+  api-gateway:
+    compose: docker/docker-compose.yml
+    services:
+      - api-gateway
+  backend-main:
+    compose: docker/docker-compose.yml
+    services:
+      - backend-main
+  auth-service:
+    compose: docker/docker-compose.yml
+    services:
+      - auth-service
+  integrations-service:
+    compose: docker/docker-compose.yml
+    services:
+      - integrations-service
+  mailer:
+    compose: docker/docker-compose.yml
+    services:
+      - mailer
+  pi-analysis:
+    compose: docker/docker-compose.yml
+    services:
+      - pi-analysis
+  kafka-controller-1:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-controller-1
+  kafka-controller-2:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-controller-2
+  kafka-controller-3:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-controller-3
+  kafka-broker-1:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-broker-1
+  kafka-broker-2:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-broker-2
+  kafka-broker-3:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-broker-3
+  kafka-ui:
+    compose: docker/docker-compose.yml
+    services:
+      - kafka-ui
+  debezium:
+    compose: docker/docker-compose.yml
+    services:
+      - debezium
+  debezium-init:
+    compose: docker/docker-compose.yml
+    services:
+      - debezium-init
+  minio:
+    compose: docker/docker-compose.yml
+    services:
+      - minio
+  redis:
+    compose: docker/docker-compose.yml
+    services:
+      - redis
+  api:
+    compose: docker/pi-scrape.docker-compose.yml
+    services:
+      - api
+  worker:
+    compose: docker/pi-scrape.docker-compose.yml
+    services:
+      - worker
+  temporal-worker:
+    compose: docker/pi-scrape.docker-compose.yml
+    services:
+      - temporal-worker
+  audit-clickhouse:
+    compose: apps/backend/audit-service/docker-compose.yml
+    services:
+      - audit-clickhouse
+  audit-cdc-service:
+    compose: apps/backend/audit-service/docker-compose.yml
+    services:
+      - audit-cdc-service
+  tabix:
+    compose: apps/backend/audit-service/docker-compose.yml
+    services:
+      - tabix
+  audit-api-service:
+    compose: apps/backend/audit-service/docker-compose.yml
+    services:
+      - audit-api-service
+  audit-activity-timeline-service:
+    compose: apps/backend/audit-service/docker-compose.yml
+    services:
+      - audit-activity-timeline-service
+  tasks:
+    compose: apps/backend/tasks-reminders/docker-compose.yml
+    services:
+      - tasks
+  tasks_automation:
+    compose: apps/backend/tasks-reminders/docker-compose.yml
+    services:
+      - tasks_automation
+  reminders:
+    compose: apps/backend/tasks-reminders/docker-compose.yml
+    services:
+      - reminders
+  reminders_worker:
+    compose: apps/backend/tasks-reminders/docker-compose.yml
+    services:
+      - reminders_worker
+  parser:
+    compose: apps/backend/pi-boolgen/docker-compose.yml
+    services:
+      - parser
+  validator:
+    compose: apps/backend/pi-boolgen/docker-compose.yml
+    services:
+      - validator
+  generator:
+    compose: apps/backend/pi-boolgen/docker-compose.yml
+    services:
+      - generator
+  orchestrator:
+    compose: apps/backend/pi-boolgen/docker-compose.yml
+    services:
+      - orchestrator
+  orchestrator-worker:
+    compose: apps/backend/pi-boolgen/docker-compose.yml
+    services:
+      - orchestrator-worker
+  flower:
+    compose: apps/backend/pi-boolgen/docker-compose.yml
+    services:
+      - flower
+  ollama:
+    compose: apps/backend/mailer/docker-compose.yml
+    services:
+      - ollama
+  redis-exporter:
+    compose: apps/backend/mailer/docker-compose.yml
+    services:
+      - redis-exporter
+  node-exporter:
+    compose: apps/backend/mailer/docker-compose.yml
+    services:
+      - node-exporter
+  bull-monitor:
+    compose: apps/backend/mailer/docker-compose.yml
+    services:
+      - bull-monitor
+  prometheus:
+    compose: apps/backend/mailer/docker-compose.yml
+    services:
+      - prometheus
+  grafana:
+    compose: apps/backend/mailer/docker-compose.yml
+    services:
+      - grafana
+  kafka:
+    compose: apps/legacy/automation-service/docker-compose.yml
+    services:
+      - kafka
+  automation_db:
+    compose: apps/legacy/automation-service/docker-compose.yml
+    services:
+      - automation_db
+  airflow-apiserver:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-apiserver
+  airflow-scheduler:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-scheduler
+  airflow-dag-processor:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-dag-processor
+  airflow-worker:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-worker
+  airflow-triggerer:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-triggerer
+  airflow-flower:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-flower
+  airflow-init:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - airflow-init
+  kafka-airflow-bridge:
+    compose: apps/legacy/dbt-pipelines/docker-compose.yml
+    services:
+      - kafka-airflow-bridge
+  app:
+    compose: apps/legacy/leads-gen-service/docker-compose.yml
+    services:
+      - app
+  duplicati:
+    compose: docker/dev.docker-compose.yml
+    services:
+      - duplicati
+  pgadmin:
+    compose: docker/postgres.docker-compose.yml
+    services:
+      - pgadmin
+  dev-docs:
+    compose: docs/v2/dev-docs/docker-compose.yml
+    services:
+      - dev-docs
+  pi-scrape:
+    compose: docker/pi-scrape.docker-compose.yml
+    services:
+      - api
+      - worker
+      - temporal-worker
+  pi-scrape-api:
+    compose: docker/pi-scrape.docker-compose.yml
+    services:
+      - api
+  pi-mailsum:
+    compose: apps/backend/pi-mailsum/docker-compose.yml
+    services:
+      - api
+      - worker
+  pi-mailsum-api:
+    compose: apps/backend/pi-mailsum/docker-compose.yml
+    services:
+      - api
+  audit-service:
+    compose: apps/backend/audit-service/docker-compose.yml
+    services:
+      - audit-api-service
+      - audit-cdc-service
+      - audit-activity-timeline-service
+  tasks-reminders:
+    compose: apps/backend/tasks-reminders/docker-compose.yml
+    services:
+      - tasks
+      - tasks_automation
+      - reminders
+      - reminders_worker
+app_deploy_sync_delete: false
+app_deploy_pull_images: false
+app_deploy_env_src_local_path: docker/.env
+app_deploy_env_content: ""
+app_deploy_env_dest_relpath: docker/.env
+app_deploy_env_files: []
+app_deploy_env_overrides: []
+app_deploy_external_networks: []
+app_deploy_external_network_env_compose_files:
+  - docker/pi-scrape.docker-compose.yml
+app_deploy_create_prereq_dirs: true
+app_deploy_prereq_dirs: []
+app_deploy_prereq_dir_owner: root
+app_deploy_prereq_dir_group: root
+app_deploy_prereq_dir_mode: "0755"
+app_deploy_prereq_dir_attrs: {}
+app_deploy_require_wireguard: true
+app_deploy_wireguard_interface: wg0
+app_deploy_sync_excludes:
+  - .git/
+  - .nx/
+  - node_modules/
+  - dist/
+  - coverage/
+  - .venv/
+  - .pytest_cache/
+  - .ruff_cache/
+  - .DS_Store

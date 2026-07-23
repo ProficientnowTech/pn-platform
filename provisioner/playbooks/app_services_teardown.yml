@@ -1,0 +1,11 @@
+---
+- name: Stop PNow ATS services
+  hosts: app_server
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: app_deploy
+      vars:
+        app_deploy_state: absent
+

@@ -72,3 +72,4 @@ kubeconfig
 platform/bootstrap/.generated/
 platform/bootstrap/secrets/chart/files/manifests/
 platform/bootstrap/secrets/.env.local
+.pi/

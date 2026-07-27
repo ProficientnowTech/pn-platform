@@ -240,3 +240,18 @@ git -c credential.helper='!gh auth git-credential' push https://github.com/Profi
 - **Spec coverage:** delete api-CLI ✓ (T2), speculative bits ✓ (T3), migrate business ✓ (T4), scaffold clusters ✓ (T5) / app-factory ✓ (T6) / cli ✓ (T7); old factory preserved (constraint). Gap: `platform/bootstrap` AKV→ESO seed is **P2/P3 scope**, not P0 — intentionally deferred.
 - **Placeholders:** none — every scaffold has real content; registry files are complete data.
 - **Consistency:** paths match the directory-structure design; registry fields match the taxonomy's `cluster`/`stacks` values.
+
+---
+
+## Execution notes (P0 done 2026-07-28)
+
+Deviations from the plan as-written, discovered during execution:
+- **Task 2 expanded (user-approved "A"):** the api-CLI monorepo was **not** cleanly isolated — `platform/run.sh` shelled into `container-orchestration/`, and 3 platform READMEs documented the `api→…→container-orchestration` flow. So the delete also removed **`platform/run.sh`** and repointed those 3 READMEs to the Talos+kapp+ArgoCD model. `infrastructure/deploy.sh` was verified **unaffected** (it calls the Proxmox templates/pools/nodes subdir `run.sh`, not `platform/run.sh`).
+- **Task 4 needed a follow-up fix commit:** 4 files had stale `business/` paths (ArgoCD `source.path` + Tekton overlay paths) — repointed to `application/`. Tekton `pipelines/` were **moved** (not deleted) to `developer-platform/`; consolidation intent is to eventually replace them with Argo Workflows (deferred to the CI/CD-stack decision).
+- **Task 5:** registry has **3 clusters** (onprem-primary, contabo-standby, azure-dr) — `ovh-proving-ground` dropped per the user's "remove OVH."
+- **Added:** a scoped `git clean -fdx` of the deleted dirs' `.gitignore`'d leftovers (caches/outputs/inventories; no creds) so the working tree matches HEAD.
+
+**FLAGGED — not done in P0 (need a decision):**
+- The design doc (`directory-structure-and-cluster-registry.md` D5 + §line-102) also lists **`infrastructure/platforms/{baremetal,cloud}`** for deletion (old Packer/cloud stubs that reference the now-deleted API CLI) — the P0 plan omitted it.
+- The broader **`infrastructure/`** old Proxmox-Packer provisioning (`deploy.sh` + `platforms/proxmox/terraform/{templates,pools,nodes}`) **overlaps with P3's new bpg/Talos approach** — a reconciliation to settle at P3 time, not P0.
+- `README.md` (root) + `docs/{cni-architecture,multi-cluster-network-architecture}.md` still cite the deleted `./run.sh` — stale docs, not breaking.

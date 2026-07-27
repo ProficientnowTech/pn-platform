@@ -14,7 +14,7 @@
 - Foundation chain is EXACTLY, in order: **`10-cilium → 20-proxmox-csi → 30-external-secrets → 40-argocd`**. **Vault is NOT in the foundation** (it is an ArgoCD-managed platform app — design §10).
 - Foundation charts/values are **vendored verbatim** from ovh-infra `onprem/platform-live:infrastructure/talos/platform/` (Cilium `cilium/values.yaml` + `cilium-lb`, `proxmox-csi/charts` + CCM, `external-secrets`, `argocd`). Do not hand-author manifests that already exist there.
 - **Secrets during bootstrap come from the ephemeral Vault (P3)** — the bootstrap `ClusterSecretStore` is `vault-backend` pointing at `$EPHEMERAL_VAULT_ADDR`, **NOT** the live `azure-kv` store.
-- **First target = OVH proving-ground** (a new cluster). The live on-prem cluster (`onprem/platform-live`) is untouched.
+- **No execution target is assigned.** The plan is parameterized on the cluster-registry entry; CI/unit tests render against the fixture `clusters/example.env`. Real execution is **gated on the on-prem-primary milestone** — no target cluster is available yet, and there is no interim target. The live on-prem cluster (`onprem/platform-live`) is untouched.
 - kapp invocation is always: `kapp deploy -y -a foundation -f <rendered> -f config.yaml --wait-timeout=20m --wait-resource-timeout=10m --apply-exit-status`.
 - change-group names: `foundation.pnats.cloud/<layer>`; change-rule grammar: `upsert after upserting foundation.pnats.cloud/<prev-layer>`.
 - Per-cluster inputs (cluster name, Vault addr, PVE endpoint) come from `infrastructure/bootstrap/foundation/clusters/<cluster>.env` — never hard-coded.
@@ -23,16 +23,16 @@
 
 ### Task 1: Scaffold + the render pipeline
 
-**Files:** Create `infrastructure/bootstrap/foundation/{render.sh,deploy.sh,clusters/ovh-proving-ground.env}`; `infrastructure/bootstrap/foundation/README.md`
+**Files:** Create `infrastructure/bootstrap/foundation/{render.sh,deploy.sh,clusters/example.env}`; `infrastructure/bootstrap/foundation/README.md`
 
 **Interfaces:** Produces `render.sh <cluster>` → a single valid multi-doc YAML stream on stdout (all 4 layers, digest-pinned), consumed by Task 5's `deploy.sh` and every validation step.
 
-- [ ] **Step 1:** `clusters/ovh-proving-ground.env`
+- [ ] **Step 1:** `clusters/example.env`
 ```bash
-CLUSTER_NAME=ovh-proving-ground
+CLUSTER_NAME=example
 EPHEMERAL_VAULT_ADDR=http://ephemeral-vault.bootstrap.svc:8200   # provided by P3
-PVE_API_URL=https://PLACEHOLDER:8006/api2/json                    # set per proving-ground PVE
-PVE_REGION=ovh-proving-ground
+PVE_API_URL=https://PLACEHOLDER:8006/api2/json                    # set per target PVE at execution
+PVE_REGION=example
 ```
 - [ ] **Step 2:** `render.sh` (renders each layer with its values, concatenates, pins via kbld)
 ```bash
@@ -71,7 +71,7 @@ git -C "$SRC" archive "$REF" infrastructure/talos/platform/proxmox-csi/charts | 
 - [ ] **Step 3:** proxmox-csi `values.yaml` — the live `valuesObject` (SC `proxmox-zfs-r1`, `existingConfigSecret: proxmox-cloud-config`) parameterised on `$PVE_REGION`.
 - [ ] **Step 4: Validate all layers render + are valid k8s**
 ```bash
-./render.sh ovh-proving-ground | kubeconform -strict -ignore-missing-schemas -
+./render.sh example | kubeconform -strict -ignore-missing-schemas -
 ```
 Expected: exit 0, no invalid resources.
 - [ ] **Step 5:** Commit — `feat(bootstrap): vendor cilium/csi/eso/argocd foundation layers`
@@ -103,7 +103,7 @@ spec:
 - [ ] **Step 3:** add `envsubst '${EPHEMERAL_VAULT_ADDR} ${PVE_REGION}'` into `render.sh` before `kbld` so the env vars land.
 - [ ] **Step 4: Validate**
 ```bash
-EPHEMERAL_VAULT_ADDR=http://x:8200 ./render.sh ovh-proving-ground | yq 'select(.kind=="ClusterSecretStore") | .spec.provider.vault.server'
+EPHEMERAL_VAULT_ADDR=http://x:8200 ./render.sh example | yq 'select(.kind=="ClusterSecretStore") | .spec.provider.vault.server'
 ```
 Expected: prints `http://x:8200` (proves substitution + that it's the vault provider, not azurekv).
 - [ ] **Step 5:** Commit — `feat(bootstrap): ephemeral-Vault ClusterSecretStore + foundation ExternalSecrets`
@@ -121,7 +121,7 @@ set -euo pipefail
 kind create cluster --name p2-order --wait 60s
 trap 'kind delete cluster --name p2-order' EXIT
 # dry-run: kapp prints the change-set grouped by change-group in dependency order
-EPHEMERAL_VAULT_ADDR=http://x:8200 ../render.sh ovh-proving-ground \
+EPHEMERAL_VAULT_ADDR=http://x:8200 ../render.sh example \
   | kapp deploy -a foundation -f - -f ../config.yaml --dry-run --diff-changes 2>&1 \
   | tee /tmp/p2-order.txt
 # cilium must be ordered before argocd:
@@ -186,8 +186,8 @@ set -euo pipefail
 kind create cluster --name p2-idem --wait 90s
 trap 'kind delete cluster --name p2-idem' EXIT
 export EPHEMERAL_VAULT_ADDR=http://x:8200
-STUB=1 ./deploy.sh ovh-proving-ground || true        # STUB swaps proxmox-csi for a dummy Ready DaemonSet
-./deploy.sh ovh-proving-ground; rc=$?               # 2nd apply
+STUB=1 ./deploy.sh example || true        # STUB swaps proxmox-csi for a dummy Ready DaemonSet
+./deploy.sh example; rc=$?               # 2nd apply
 [ "$rc" -eq 2 ] && echo "PASS: re-apply is a no-op (exit 2)" || { echo "FAIL: rc=$rc (expected 2)"; exit 1; }
 ```
 - [ ] **Step 3:** add a `STUB` branch in `render.sh` that, when `STUB=1`, replaces `20-proxmox-csi` with `tests/stubs/proxmox-csi-ready.yaml` (a DaemonSet that reports Ready — lets the cluster-agnostic layers + ordering + wait-rules run on kind without PVE).
@@ -202,7 +202,7 @@ STUB=1 ./deploy.sh ovh-proving-ground || true        # STUB swaps proxmox-csi fo
 ```bash
 kind create cluster --name p2-smoke --wait 120s
 export EPHEMERAL_VAULT_ADDR=http://x:8200
-STUB=1 ./deploy.sh ovh-proving-ground
+STUB=1 ./deploy.sh example
 kubectl -n kube-system rollout status ds/cilium --timeout=180s
 kubectl wait --for=condition=Ready clustersecretstore/vault-backend --timeout=60s || true  # Ready only if ephemeral Vault reachable
 echo "PASS: foundation converged on kind (stubbed CSI)"
@@ -210,19 +210,19 @@ echo "PASS: foundation converged on kind (stubbed CSI)"
 - [ ] **Step 2:** Run → PASS (documents: ESO store shows `Ready=False` without a live Vault — expected on kind; the wait-rule wiring is what's under test, verified by Task 4).
 - [ ] **Step 3:** Commit — `test(bootstrap): kind smoke — converge + ordering`
 
-### Task 7: Real-cluster acceptance (OVH proving-ground) — the gate
+### Task 7: Real-cluster acceptance (the assigned target cluster) — the gate
 
 **Files:** Create `tests/acceptance-onprem.md` (runbook)
 
-> Requires the OVH proving-ground cluster (Talos up via P3) + the ephemeral Vault reachable. Cannot run in CI.
+> Requires an assigned target cluster (Talos up via P3) + the ephemeral Vault reachable. Cannot run in CI. **Gated on the on-prem-primary milestone — no cluster available yet.**
 
-- [ ] **Step 1:** Runbook: `./deploy.sh ovh-proving-ground` end-to-end; expected: kapp exits `0/3`, all 4 change-groups converged, `kubectl get clustersecretstore vault-backend` = `Ready=True`, `argocd-server` Deployment Available.
+- [ ] **Step 1:** Runbook (against the assigned target `$CLUSTER`): `./deploy.sh "$CLUSTER"` end-to-end; expected: kapp exits `0/3`, all 4 change-groups converged, `kubectl get clustersecretstore vault-backend` = `Ready=True`, `argocd-server` Deployment Available.
 - [ ] **Step 2:** Acceptance asserts (documented, run on the cluster): Cilium L2 VIP answers ARP (per the ingress handoff method), CSI provisions a test PVC on `proxmox-zfs-r1`, an `ExternalSecret` materialises its Secret from the ephemeral Vault, ArgoCD is reachable.
-- [ ] **Step 3:** Commit — `docs(bootstrap): OVH proving-ground acceptance runbook`
+- [ ] **Step 3:** Commit — `docs(bootstrap): target-cluster acceptance runbook`
 
 ### Task 8: Final gate + push
 
-- [ ] **Step 1:** `./render.sh ovh-proving-ground | kubeconform -strict -ignore-missing-schemas -` (exit 0); `bash -n render.sh deploy.sh`; run `tests/ordering_test.sh` + `tests/idempotency_test.sh` green.
+- [ ] **Step 1:** `./render.sh example | kubeconform -strict -ignore-missing-schemas -` (exit 0); `bash -n render.sh deploy.sh`; run `tests/ordering_test.sh` + `tests/idempotency_test.sh` green.
 - [ ] **Step 2:** `git add infrastructure/bootstrap/foundation && git commit && git push origin HEAD:main` (identity + gh cred as Global Constraints).
 - [ ] **Step 3:** Verify remote `main` == local `HEAD`.
 

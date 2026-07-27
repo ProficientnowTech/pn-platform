@@ -15,7 +15,7 @@
 - Apps are ordered ONLY by the `platform.pnats.cloud/dependency-layer` label → derived `sync-wave` (P1). No nested app hierarchy.
 - The test suite is the **authoritative gate**: P3 Phase 7 self-destructs iff `run-tests.sh` exits 0.
 - Sovereignty asserts are first-class tests (ESO → in-cluster Vault; zero Azure; ephemeral services gone).
-- First target = OVH proving-ground; cluster probes run there (documented acceptance), unit-testable parts run in CI.
+- **No execution target assigned** — cluster probes run against the assigned target when one is available; execution is **gated on the on-prem-primary milestone**; no interim target. Unit-testable parts run in CI now.
 
 ---
 
@@ -134,7 +134,7 @@ tests:
 **Files:** Create `provisioner/bootstrapper/tests/acceptance-suite.md`; Modify `provisioner/bootstrapper/orchestrator/phases/06-tests.sh` (from P3) to call `run-tests.sh`
 
 - [ ] **Step 1:** `06-tests.sh` → `exec "$HERE/../../tests/suite/run-tests.sh" "$HERE/../../tests/suite/probes"` (its exit code is the go/no-go P3 Phase 7 consumes).
-- [ ] **Step 2:** acceptance runbook (OVH proving-ground): after P3 phases 0–5, `run-tests.sh` must exit 0 → then and only then does the bootstrapper self-destruct. Enumerate each probe's expected on-cluster result.
+- [ ] **Step 2:** acceptance runbook (the assigned target cluster): after P3 phases 0–5, `run-tests.sh` must exit 0 → then and only then does the bootstrapper self-destruct. Enumerate each probe's expected on-cluster result.
 - [ ] **Step 3: Final gate** — `helm unittest platform/root/tests-consumer`; `helm template platform/root | kubeconform -strict -ignore-missing-schemas -`; `bats provisioner/bootstrapper/tests/`; `bash -n` all probes. Commit + push.
 - [ ] **Step 4:** Verify remote `main` == local `HEAD`.
 
@@ -146,4 +146,4 @@ tests:
 - **Sovereignty is tested, not assumed:** ESO→in-cluster Vault, no-Azure, ephemeral-gone are explicit failing/ passing probes (T4).
 - **Factory tie-in:** the root consumes P1 (T1) and the validation probe proves P1's render-time gate is live on-cluster (T5).
 - **Placeholders:** none — root/values, harness, and every probe are complete; `source.repoURL`/versions in `apps/values.yaml` are per-cluster config filled at execution, and cluster-only asserts are the documented T6 acceptance.
-- **Cluster-free testing:** factory render (helm-unittest/kubeconform), harness + every probe (bats with mocked `kubectl`/fixtures); the live cluster asserts are the T6 acceptance gate on the OVH proving-ground.
+- **Cluster-free testing:** factory render (helm-unittest/kubeconform), harness + every probe (bats with mocked `kubectl`/fixtures); the live cluster asserts are the T6 acceptance gate on the assigned target cluster.

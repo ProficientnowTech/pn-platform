@@ -4,14 +4,15 @@
 
 **Goal:** A **one-shot ephemeral runner** that provisions Talos VMs, runs the P2 kapp foundation against an **in-runner ephemeral Vault** (SOPS+age-seeded — zero Azure), hands off to ArgoCD (deploy the in-cluster Vault → **migrate** secrets → **repoint** ESO), runs the P4 test suite, then **self-destructs on success / persists on failure** — idempotent, resumable, operator-gated.
 
-**Architecture:** a container image (toolchain + pinned Talos/foundation images) runs inside a **provider-local vehicle** — a Proxmox **LXC** (bpg) for onprem/ovh, an **ACI** (`restart_policy=Never`) for cloud — sharing one vehicle-agnostic **entrypoint orchestrator**: a checkpointed phase state-machine that owns the 3 ephemeral-local services (Vault / registry / repo — design §10.1) and tears itself down only when the cluster is self-managing **and** tests pass.
+**Architecture:** a container image (toolchain + pinned Talos/foundation images) runs inside a **provider-local vehicle** — a Proxmox **LXC** (bpg) for Proxmox-based clusters, an **ACI** (`restart_policy=Never`) for cloud — sharing one vehicle-agnostic **entrypoint orchestrator**: a checkpointed phase state-machine that owns the 3 ephemeral-local services (Vault / registry / repo — design §10.1) and tears itself down only when the cluster is self-managing **and** tests pass.
 
 **Tech Stack:** bpg/proxmox **v0.111.x** (LXC + Talos VMs) · azurerm **~>4.0** (ACI variant) · terraform · talhelper/talosctl · kapp · helm · HashiCorp Vault (ephemeral + in-cluster) · sops/age · kubectl/argocd · bash + bats.
 
 ## Global Constraints
 - Repo `pn-platform` `main`; identity `Shaik Noorullah <snoorullah@proficientnow.com>`; push HTTPS + gh token.
 - Path: **`provisioner/bootstrapper/`** (`image/`, `vehicle/`, `orchestrator/`, `tests/`).
-- **Vehicle:** Proxmox LXC (`proxmox_virtual_environment_container`) for onprem/ovh (**first target OVH**); ACI (`azurerm_container_group`, `restart_policy="Never"`, self-destruct via `terraform destroy`) for `azure-dr`. Same entrypoint + lifecycle contract.
+- **Vehicle:** Proxmox LXC (`proxmox_virtual_environment_container`) for Proxmox-based clusters; ACI (`azurerm_container_group`, `restart_policy="Never"`, self-destruct via `terraform destroy`) for `azure-dr`. Same entrypoint + lifecycle contract.
+- **No execution target is assigned** — execution is **gated on the on-prem-primary milestone**; no interim target. Cluster-free steps (image build, `terraform validate`, bats, talhelper render) run now.
 - **Sole secret input = the operator age key** (decrypts SOPS); the **repo is mounted**; the **PVE token is SOPS-encrypted in-repo**. No standing cloud credential.
 - **Boundary (design §6):** provisioned at *substrate-ready → bootstrap* seam; owns ONLY the transient bootstrap; deprovisioned once self-managing **AND** tests pass; **persists on failure** (resumable with `--resume`).
 - **The 3 ephemeral services** (§10.1) are owned here and destroyed at cleanup; migration targets are in-cluster Vault / Harbor / GitHub.
@@ -199,13 +200,13 @@ Expected: `Success` + `PASS`; confirm a rendered VM name is dashed (`grep -r 'n-
 - [ ] **Step 4:** run → PASS.
 - [ ] **Step 5:** Commit — `feat+test(bootstrapper): phase 7 — self-destruct on success / persist on failure`
 
-### Task 8: End-to-end acceptance (OVH proving-ground) + final gate
+### Task 8: End-to-end acceptance (the assigned target cluster) + final gate
 
 **Files:** Create `provisioner/bootstrapper/tests/acceptance.md`
 
-> Requires the OVH proving-ground PVE (substrate-ready) + the operator age key + the mounted repo. Not CI.
+> Requires an assigned target PVE (substrate-ready) + the operator age key + the mounted repo. Not CI. **Gated on the on-prem-primary milestone — no target cluster is available yet; no interim target.**
 
-- [ ] **Step 1:** Runbook: build+push the image; `terraform apply` the LXC vehicle on the OVH PVE; inside it `run.sh --cluster ovh-proving-ground`; expected: phases 0–6 pass, phase 7 self-destructs; the cluster survives with in-cluster Vault + ESO→`vault-backend` (in-cluster) + no ephemeral artifacts and no Azure dependency.
+- [ ] **Step 1:** Runbook: build+push the image; `terraform apply` the LXC vehicle on the target PVE; inside it `run.sh --cluster "$CLUSTER"`; expected: phases 0–6 pass, phase 7 self-destructs; the cluster survives with in-cluster Vault + ESO→`vault-backend` (in-cluster) + no ephemeral artifacts and no Azure dependency.
 - [ ] **Step 2:** Assert (post-run): `kubectl get clustersecretstore vault-backend -o jsonpath={.spec.provider.vault.server}` = the in-cluster addr; the vehicle LXC is gone; ArgoCD Synced+Healthy.
 - [ ] **Step 3: Final gate** — `bats tests/`; `terraform validate` (all vehicle dirs); `bash -n` all scripts. Commit + push.
 - [ ] **Step 4:** Verify remote `main` == local `HEAD`.

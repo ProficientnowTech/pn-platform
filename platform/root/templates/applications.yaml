@@ -1,0 +1,13 @@
+{{- $cluster := .Values.cluster -}}
+{{- $env := .Values.environment -}}
+{{- $teams := .Values.factory.teams -}}
+{{- range $app := .Values.apps }}
+---
+{{ include "app-factory.application" (dict "app" $app "cluster" $cluster "environment" $env "destination" (dict "name" "in-cluster" "namespace" $app.name) "teams" $teams) -}}
+{{- end }}
+{{- $domains := list -}}
+{{- range .Values.apps -}}{{- $domains = append $domains .domain -}}{{- end -}}
+{{- range $d := ($domains | uniq) }}
+---
+{{ include "app-factory.appproject" (dict "domain" $d "destinations" (list (dict "name" "in-cluster" "namespace" "*"))) -}}
+{{- end }}

@@ -1,0 +1,12 @@
+suite: root
+templates: [applications.yaml]
+tests:
+  - it: cert-manager (core) gets sync-wave -5 at index 0
+    asserts:
+      - { equal: { path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-5" }, documentIndex: 0 }
+  - it: cert-manager renders before harbor (core wave < platform wave)
+    asserts:
+      - { isKind: { of: Application }, documentIndex: 0 }
+      - { equal: { path: metadata.name, value: cert-manager }, documentIndex: 0 }
+  - it: renders 4 Applications + 3 unique-domain AppProjects
+    asserts: [{ hasDocuments: { count: 7 } }]

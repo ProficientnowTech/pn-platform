@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-root
+  namespace: argocd
+  annotations: { argocd.argoproj.io/sync-wave: "-100" }
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ProficientnowTech/pn-platform.git
+    path: platform/root
+    targetRevision: main
+    helm: { valueFiles: [values.yaml] }
+  destination: { name: in-cluster, namespace: argocd }
+  syncPolicy: { automated: { prune: true, selfHeal: true } }

@@ -1,0 +1,11 @@
+# Context (stamped onto every app). Real values per cluster from the registry at execution.
+cluster: onprem-primary
+environment: prod
+factory:
+  teams: [platform, data, sre, ml, app]
+# The initial platform app set (P1 schema). repoURL/path are per-cluster config.
+apps:
+  - {name: cert-manager,           domain: security,            version: v1.16.2, team: platform, tier: critical, dependency-layer: core,     source: {repoURL: "https://github.com/ProficientnowTech/pn-platform.git", path: platform/stacks/security/charts/cert-manager, targetRevision: main}}
+  - {name: vault,                  domain: security,            version: "1.21.1", team: platform, tier: critical, dependency-layer: core,     source: {repoURL: "https://github.com/ProficientnowTech/pn-platform.git", path: platform/stacks/security/charts/vault, targetRevision: main}}
+  - {name: harbor,                 domain: developer-platform,  version: "2.11.0", team: platform, tier: standard, dependency-layer: platform, source: {repoURL: "https://github.com/ProficientnowTech/pn-platform.git", path: platform/stacks/developer-platform/charts/harbor, targetRevision: main}}
+  - {name: kube-prometheus-stack,  domain: monitoring,          version: "65.5.1", team: platform, tier: standard, dependency-layer: platform, source: {repoURL: "https://github.com/ProficientnowTech/pn-platform.git", path: platform/stacks/monitoring/charts/kube-prometheus-stack, targetRevision: main}}

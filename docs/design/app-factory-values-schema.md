@@ -16,8 +16,9 @@ Concrete values for the 9-label taxonomy so the factory validates **every app at
   `dr-role, lifecycle, contact, dependencies, source, syncPolicy` (optional).
 - **From context** (passed by the stamper, per cluster×env): `cluster, environment, destination`. These
   are placement facts — not repeated in every app entry.
-- **Derived** (factory computes, never authored): `app.kubernetes.io/instance` (`<name>-<cluster>`),
-  `argocd.argoproj.io/sync-wave` + `kapp.k14s.io/change-group|change-rule` (from `dependency-layer`).
+- **Derived** (factory computes, never authored): `argocd.argoproj.io/sync-wave` +
+  `kapp.k14s.io/change-group|change-rule` (all from `dependency-layer`). No `instance` label — the
+  taxonomy drops it; `metadata.name` (= `app.name`) already carries identity.
 
 ## 2. The enum definitions (the closed sets)
 

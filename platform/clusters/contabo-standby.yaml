@@ -1,0 +1,10 @@
+name:        contabo-standby
+provider:    contabo
+role:        standby
+region:      contabo
+lifecycle:   {status: planned}
+destination: {name: contabo-standby}
+envs:        [prod]
+stacks:      {include: [infrastructure, storage, databases, security, application, backup-dr]}
+values:      {ref: values/contabo-standby/}
+replication: {role: replica, source: onprem-primary}

@@ -1,0 +1,10 @@
+name:        onprem-primary
+provider:    onprem
+role:        primary
+region:      ap-south-2a
+lifecycle:   {status: building}   # the NEW cluster that replaces the interim onprem-s2a; 3-node HA at node-C join
+destination: {name: in-cluster}
+envs:        [dev, staging, prod, preview]
+stacks:      {include: all}
+values:      {ref: values/onprem-primary/}
+replication: {role: source, targets: [contabo-standby, azure-dr]}

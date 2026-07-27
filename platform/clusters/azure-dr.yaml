@@ -1,0 +1,10 @@
+name:        azure-dr
+provider:    azure
+role:        dr
+region:      centralindia
+lifecycle:   {status: cold}
+destination: {name: azure-dr}
+envs:        [prod]
+stacks:      {include: [databases, security, application, backup-dr]}
+values:      {ref: values/azure-dr/}
+replication: {role: replica, source: onprem-primary, mode: cold-restore-from-blob}

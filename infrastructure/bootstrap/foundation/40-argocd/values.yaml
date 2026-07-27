@@ -1,0 +1,26 @@
+# ArgoCD — the GitOps engine (Phase-8 P3.17). Installed by the onprem-k8s-bootstrap Ansible play (the only
+# imperative seed); thereafter ArgoCD reconciles everything (including adopting itself via apps/argocd.yaml).
+# Chart: argo/argo-cd. Minimal single-instance interim (→ HA at C-onboarding).
+global:
+  # pre-CCM node-init taint toleration (same reason as ESO — ArgoCD must schedule before the CCM untaints)
+  tolerations:
+    - key: node.cloudprovider.kubernetes.io/uninitialized
+      value: "true"
+      effect: NoSchedule
+
+configs:
+  params:
+    # TLS is terminated at Traefik/Gateway later (P3.14); run the API server plaintext behind it for now.
+    server.insecure: true
+  cm:
+    # repo credentials come from a Secret labelled argocd.argoproj.io/secret-type=repository, which ESO
+    # syncs from AKV (P3.8) — NOT hand-pasted. The ovh repo is private (ProficientNowTech).
+    timeout.reconciliation: 180s
+
+# single-instance interim (no Redis HA); scale at C-onboarding for 3-CP HA
+redis-ha: { enabled: false }
+controller: { replicas: 1 }
+repoServer: { replicas: 1 }
+server: { replicas: 1 }
+applicationSet: { replicas: 1 }
+dex: { enabled: false }   # SSO via Entra wired later; local admin for bootstrap

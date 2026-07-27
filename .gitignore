@@ -75,3 +75,4 @@ platform/bootstrap/secrets/.env.local
 .pi/
 platform/bootstrap/secrets/
 **/charts/*.tgz
+infrastructure/bootstrap/foundation/.charts/

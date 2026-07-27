@@ -1,0 +1,116 @@
+# Cilium 1.17.17 — on-prem Talos cluster `onprem-s2a` (Phase-8 P3.2). TOOLING.md-locked version.
+# Authority:
+#   * substrate/10-phase8-talos-bringup-plan.md §3.2 (G3 ambient-ready flags)
+#   * Talos v1.13 "Deploying Cilium" guide — the cgroup + securityContext + KubePrism block is MANDATORY on
+#     Talos (read-only rootfs, no auto cgroup mount) or cilium-agent will not start.
+#   * repo reference: onprem/platform-live/apigw-migration/scripts/stackA-cilium-ambient-spike.sh
+#
+# INSTALL (from B — it has kubectl + native cluster reach; nodes pull cilium/quay images via the per-host
+#          registry caches; the API is reached per-node via KubePrism, so no VIP dependency):
+#   helm repo add cilium https://helm.cilium.io && helm repo update
+#   helm install cilium cilium/cilium --version 1.17.17 -n kube-system -f cilium-values.yaml
+#
+# WHY these matter (do NOT silently change):
+
+# ── Talos MANDATORY: immutable/read-only rootfs + Talos-managed cgroup v2 ──
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+securityContext:
+  capabilities:
+    ciliumAgent: [CHOWN, KILL, NET_ADMIN, NET_RAW, IPC_LOCK, SYS_ADMIN, SYS_RESOURCE, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    cleanCiliumState: [NET_ADMIN, SYS_ADMIN, SYS_RESOURCE]
+
+# ── kube-proxy replacement via Talos KubePrism (local API proxy on 127.0.0.1:7445 on every node) ──
+# kube-proxy is disabled in talconfig (cluster.proxy.disabled). KPR needs to reach the apiserver WITHOUT a
+# Service; KubePrism gives each node a stable local endpoint, so Cilium never depends on the CP VIP.
+kubeProxyReplacement: true
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+# ── Local Redirect Policy — steers pod→kube-dns traffic to the per-node NodeLocal DNSCache pod (eBPF, no
+#    iptables). Required by platform/node-local-dns (the CiliumLocalRedirectPolicy is inert without this).
+#    NB: the chart 1.17.17 value is the top-level boolean `localRedirectPolicy` (verified via `helm show
+#    values`), NOT `localRedirectPolicies.enabled` (that key is silently ignored → renders the default). ──
+localRedirectPolicy: true
+
+# ── native L3 routing on the flat node subnet (10.10.10.0/24), no tunnel ──
+ipam:
+  mode: kubernetes            # pod CIDRs from node.spec.podCIDR (talconfig clusterPodNets = 10.244.0.0/16)
+routingMode: native
+autoDirectNodeRoutes: true     # all nodes share L2 (10.10.10.0/24) → direct routes to each node's podCIDR via its node IP
+ipv4NativeRoutingCIDR: 10.244.0.0/16
+# pod↔pod (inside 10.244/16) stays native/un-NAT'd. pod→anything-else (node subnet + internet) is masqueraded
+# to the LOCAL node IP (10.10.10.x) — which the per-host gateway (.1 on B / .2 on D) then MASQUERADEs to the
+# host mgmt IP → Sophos → internet. Two-layer NAT: Cilium(pod→node-IP) + per-host-gw(node-IP→host-IP). This is
+# why per-host NAT had to be live first (a node's egress must work before its pods' egress can).
+
+# ── G3 ambient-ready (keep — flipping any of these breaks the future Istio-ambient path; see G3) ──
+cni:
+  exclusive: false            # let a future istio-cni chain; Cilium-exclusive would strip it
+bpf:
+  masquerade: false           # iptables masq (not eBPF) — ambient probe requirement; two-layer NAT above still holds
+socketLB:
+  hostNamespaceOnly: true      # keep ClusterIP translation in the host netns (ambient requirement)
+
+# ── Transparent encryption (WireGuard): encrypts ALL pod-to-pod traffic node-to-node at the datapath.
+# Big security win on the shared rack behind the Sophos — makes Hubble/mesh mTLS defense-in-depth rather than
+# the only wire protection. Talos ships the wireguard kernel module; Cilium brings up a cilium_wg0 tunnel
+# between nodes. Works with native routing + KPR. nodeEncryption stays false (pod traffic only; host/node-to-
+# node encryption is a separate later toggle that needs host-firewall care). Enabling this needs an agent roll.
+encryption:
+  enabled: true
+  type: wireguard
+
+# ── L2 LoadBalancer announcement engine (the IP pool + L2AnnouncementPolicy land at P3.13) ──
+l2announcements:
+  enabled: true
+
+operator:
+  replicas: 1                  # single-CP interim; bump to 2 at C-onboarding (3-CP HA)
+
+# ── Hubble — network observability (Relay + web UI, for monitoring flows/policy/DNS). ──
+# tls.auto.method=certmanager: cert-manager issues ALL hubble certs (server, relay-client/-server,
+# ui-client, metrics) as deterministic Certificate CRs signed by the internal-ca ClusterIssuer — one shared
+# CA → consistent mTLS, renewed by cert-manager, and NO random-per-render Secret content (so ArgoCD stops
+# flagging cilium-ca/hubble-server-certs as drift; no ignoreDifferences hack, no helm-hook deadlock like
+# method=cronJob hits under ArgoCD). Requires the `internal-ca` ClusterIssuer (platform/cert-manager-config)
+# to be Ready FIRST. Relay + UI tolerate the uninitialized taint (present until Talos-CCM P3.11).
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+    tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: Exists
+        effect: NoSchedule
+  ui:
+    enabled: true
+    tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: Exists
+        effect: NoSchedule
+  tls:
+    auto:
+      method: certmanager           # verified chart string (lowercase); templates issue Certificate CRs
+      certManagerIssuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: internal-ca
+  # ── Hubble metrics → Prometheus/Grafana. Exposes flow/drop/dns/tcp/http/icmp metrics + ships the official
+  #    Grafana dashboards (ConfigMaps). serviceMonitor stays OFF until a Prometheus Operator (kube-prometheus-
+  #    stack) is deployed to provide the ServiceMonitor CRD; scrape via the prometheus.io/* annotations or
+  #    flip serviceMonitor.enabled=true then. ──
+  metrics:
+    enableOpenMetrics: true
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - httpV2
+    dashboards:
+      enabled: true                 # install the Cilium/Hubble Grafana dashboard ConfigMaps

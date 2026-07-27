@@ -1,0 +1,15 @@
+# Stand-in for proxmox-csi on kind (no PVE): a DaemonSet that goes Ready, so the cluster-agnostic
+# layers + kapp ordering + wait-rules can be exercised without a Proxmox backend.
+apiVersion: v1
+kind: Namespace
+metadata: { name: csi-proxmox }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: { name: proxmox-csi-stub, namespace: csi-proxmox }
+spec:
+  selector: { matchLabels: { app: proxmox-csi-stub } }
+  template:
+    metadata: { labels: { app: proxmox-csi-stub } }
+    spec:
+      containers: [{ name: pause, image: registry.k8s.io/pause:3.9 }]

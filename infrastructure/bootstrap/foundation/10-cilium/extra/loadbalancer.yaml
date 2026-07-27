@@ -1,0 +1,37 @@
+# Cilium LB-IPAM + L2 announcement for the on-prem ingress VLAN 116 (192.168.103.0/24).
+# A Service type=LoadBalancer draws a VIP from the pool; Cilium leader-elects an announcer node and
+# ARP-owns the VIP on eth1 (net1 = VLAN 116 on all nodes, verified 2026-07-19). See the ingress spec.
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: ingress-vlan116
+spec:
+  blocks:
+    - start: "192.168.103.100"
+      stop: "192.168.103.250"
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: ingress-vlan116
+spec:
+  # announce LB VIPs on the ingress NIC only (net1 = eth1 on VLAN 116). net0 (eth0, VLAN 100) is the
+  # isolated node subnet and must never carry ingress VIPs.
+  interfaces:
+    - "^eth1$"
+  loadBalancerIPs: true
+  externalIPs: false
+  nodeSelector:
+    matchLabels:
+      kubernetes.io/os: linux
+---
+# L4-service VIPs on the ingress VLAN (.40-.99) — pinned, stable addresses for non-HTTP services (DNS first).
+# Announced by the same CiliumL2AnnouncementPolicy `ingress-vlan116` (it selects on eth1 for ALL LB services).
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: l4-services-vlan116
+spec:
+  blocks:
+    - start: "192.168.103.40"
+      stop: "192.168.103.99"

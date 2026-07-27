@@ -1,0 +1,23 @@
+# External Secrets Operator — on-prem Talos cluster `onprem-s2a` (Phase-8 P3.5).
+# Install (render locally + apply from B; chart external-secrets/external-secrets, pinned in the commit msg):
+#   helm template external-secrets external-secrets/external-secrets --version <VER> -n external-secrets \
+#     -f values.yaml | kubectl apply --server-side --force-conflicts -f -
+#
+# WHY the tolerations: talconfig sets kubelet cloud-provider=external, so every node carries
+# node.cloudprovider.kubernetes.io/uninitialized:NoSchedule until the CCM (P3.11) initializes it. ESO is a
+# pre-CCM core component (it must be up to feed cert-manager/CSI/ArgoCD their secrets), so it tolerates that
+# specific node-init taint. The CCM still removes the taint from the nodes at P3.11 (this only lets ESO
+# schedule in the meantime); providerID/zones for CSI are unaffected.
+
+installCRDs: true
+
+# tolerate the cloud-provider node-init taint (pre-CCM scheduling) on all three ESO deployments
+tolerations: &uninit
+  - key: node.cloudprovider.kubernetes.io/uninitialized
+    value: "true"
+    effect: NoSchedule
+webhook:
+  port: 9443
+  tolerations: *uninit
+certController:
+  tolerations: *uninit

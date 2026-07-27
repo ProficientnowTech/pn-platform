@@ -1,0 +1,29 @@
+apiVersion: kapp.k14s.io/v1alpha1
+kind: Config
+# Cross-layer ordering by NAMESPACE (each foundation component owns one ns) — no per-manifest annotation.
+changeGroupBindings:
+  - name: foundation.pnats.cloud/cilium
+    resourceMatchers: [{ namespaceMatcher: { names: [kube-system] } }]
+  - name: foundation.pnats.cloud/proxmox-csi
+    resourceMatchers: [{ namespaceMatcher: { names: [csi-proxmox] } }]
+  - name: foundation.pnats.cloud/external-secrets
+    resourceMatchers: [{ namespaceMatcher: { names: [external-secrets] } }]
+  - name: foundation.pnats.cloud/argocd
+    resourceMatchers: [{ namespaceMatcher: { names: [argocd] } }]
+changeRuleBindings:
+  - rules: ["upsert after upserting foundation.pnats.cloud/cilium"]
+    resourceMatchers: [{ namespaceMatcher: { names: [csi-proxmox] } }]
+  - rules: ["upsert after upserting foundation.pnats.cloud/proxmox-csi"]
+    resourceMatchers: [{ namespaceMatcher: { names: [external-secrets] } }]
+  - rules: ["upsert after upserting foundation.pnats.cloud/external-secrets"]
+    resourceMatchers: [{ namespaceMatcher: { names: [argocd] } }]
+# Gate on REAL convergence of the ESO CRs (kapp has no built-in status for them) so ArgoCD,
+# which needs the repo-creds Secret, never applies before secrets actually exist.
+waitRules:
+  - supportsObservedGeneration: true
+    conditionMatchers:
+      - { type: Ready, status: "False", failure: true }
+      - { type: Ready, status: "True",  success: true }
+    resourceMatchers:
+      - apiVersionKindMatcher: { apiVersion: external-secrets.io/v1, kind: ClusterSecretStore }
+      - apiVersionKindMatcher: { apiVersion: external-secrets.io/v1, kind: ExternalSecret }

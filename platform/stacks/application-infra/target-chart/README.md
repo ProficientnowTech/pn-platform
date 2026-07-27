@@ -1,6 +1,6 @@
 # Target Chart - Platform Application Factory
 
-> **Note:** This stack depends on the upstream API/config/infrastructure/provisioner/container-orchestration flow. Make sure those phases succeed before templating this chart.
+> **Note:** This stack depends on the cluster foundation (Talos + kapp foundation → ArgoCD). Make sure the foundation is healthy before templating this chart.
 
 
 

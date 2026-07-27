@@ -1,6 +1,6 @@
 # Security Stack
 
-Enterprise security infrastructure providing identity management, secret management, and secure authentication/authorization for the ProficientNow platform. Apply after the core module pipeline (`api → config → infrastructure → provisioner → container-orchestration`) to ensure namespaces/secrets exist.
+Enterprise security infrastructure providing identity management, secret management, and secure authentication/authorization for the ProficientNow platform. Apply after the cluster foundation is up (Talos + kapp foundation → ArgoCD) so namespaces/secrets exist.
 
 ## Deployment Order
 

@@ -1,6 +1,8 @@
-# Platform Infrastructure (Template-Driven Deployment)
+# Platform Infrastructure (ArgoCD Deployment Factory)
 
-This directory contains the template-driven deployment system for platform infrastructure management. It now assumes clusters are provisioned via the `api → config → infrastructure → provisioner → container-orchestration` flow documented in the repo root; once Kubespray (or another provider) brings up Kubernetes, the platform layer can be applied as described below.
+> **⚠ SUPERSEDED (P0, 2026-07-28):** the imperative `api → config → infrastructure → provisioner → container-orchestration` deploy flow and its driver `platform/run.sh` have been **removed**. A cluster is now brought up by **Talos + the kapp foundation (P2)**, after which the **ArgoCD `app-factory` (P1)** is the interface — see `docs/design/cluster-bootstrap-orchestration.md`. Sections below that reference `api/outputs/`, `config/packages/`, or the old flow are **legacy** and are rebuilt by P1; treat them as historical.
+
+This directory contains the ArgoCD deployment factory (`stack-orchestrator` + `project-chart` + `stacks/`). Cluster provisioning is handled by the bootstrap orchestration (Talos → kapp foundation → ArgoCD), after which the platform layer reconciles as described below.
 
 ## Architecture Overview
 

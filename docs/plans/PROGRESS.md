@@ -6,7 +6,7 @@ Live tracker for the P0–P4 build. **Plans:** `docs/plans/2026-07-2{7,8}-P{0..4
 |---|---|---|
 | **P0** | Tree reconciliation | ✅ **DONE** (2026-07-28) |
 | **P1** | `app-factory` library chart | ✅ **DONE** (`964709b`) — 6 helpers, 13 helm-unittest tests, JSON schemas, kubeconform + lint green |
-| **P2** | kapp foundation | ⏳ **next** — cluster-free parts buildable; real-cluster acceptance **blocked on target** |
+| **P2** | kapp foundation | 🟡 **code done** (`d80e74e`) — render + kapp Config + vendored Cilium/CSI + ESO/ArgoCD values + ephemeral-Vault store + tests; scripts syntax-clean, kapp Config valid, static manifests kubeconform-clean. **kapp `--dry-run`/kind verification pending `kapp`/`kbld` install (slow download)**; real-cluster acceptance blocked on target |
 | **P3** | ephemeral bootstrapper | ⬜ cluster-free parts buildable; acceptance **blocked on target** |
 | **P4** | hand-off + test suite | ⬜ cluster-free parts buildable; live asserts **blocked on target** |
 

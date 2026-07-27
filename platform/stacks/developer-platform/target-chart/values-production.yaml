@@ -78,7 +78,7 @@ applications:
   - ServerSideApply=true
   - CreateNamespace=true
 
-# argo-ci: moved to business/ci/pnats-ci (managed by pnats-ci Application in business/apps/pnats/)
+# argo-ci: moved to application/ci/pnats-ci (managed by pnats-ci Application in application/pnats/)
 
 # DISABLED: ClusterAPI — not currently in use
 # - name: clusterapi

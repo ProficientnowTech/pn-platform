@@ -51,7 +51,7 @@ spec:
         git clone --depth 1 --branch "$(params.infra-repo-branch)" "$(params.infra-repo-url)" infra
         cd infra
 
-        OVERLAY_DIR="business/apps/pnats/overlays/$(params.environment)"
+        OVERLAY_DIR="application/pnats/overlays/$(params.environment)"
         KUSTOMIZATION="${OVERLAY_DIR}/kustomization.yaml"
 
         if [ ! -f "${KUSTOMIZATION}" ]; then
@@ -61,7 +61,7 @@ spec:
 
         # Sync base manifests from app workspace into infra repo
         APP_BASE="$(workspaces.output.path)/k8s/base"
-        INFRA_BASE="business/apps/pnats/base"
+        INFRA_BASE="application/pnats/base"
         if [ -d "${APP_BASE}" ]; then
           rm -rf "${INFRA_BASE}"
           cp -R "${APP_BASE}" "${INFRA_BASE}"

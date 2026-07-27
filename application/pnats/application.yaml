@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/ProficientnowTech/pn-infra.git
     targetRevision: v2
-    path: business/apps/pnats/overlays/staging
+    path: application/pnats/overlays/staging
 
   destination:
     server: https://kubernetes.default.svc
@@ -55,7 +55,7 @@ spec:
   source:
     repoURL: https://github.com/ProficientnowTech/pn-infra.git
     targetRevision: v2
-    path: business/apps/pnats/overlays/production
+    path: application/pnats/overlays/production
 
   destination:
     server: https://kubernetes.default.svc
@@ -93,7 +93,7 @@ spec:
   source:
     repoURL: https://github.com/ProficientnowTech/pn-infra.git
     targetRevision: v2
-    path: business/ci/pnats-ci
+    path: application/ci/pnats-ci
 
   destination:
     server: https://kubernetes.default.svc

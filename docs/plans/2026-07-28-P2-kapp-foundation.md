@@ -137,20 +137,20 @@ apiVersion: kapp.k14s.io/v1alpha1
 kind: Config
 changeGroupBindings:
   - name: foundation.pnats.cloud/cilium
-    resourceMatchers: [{ namespaceMatcher: { names: [kube-system] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [kube-system] } }]
   - name: foundation.pnats.cloud/proxmox-csi
-    resourceMatchers: [{ namespaceMatcher: { names: [csi-proxmox] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [csi-proxmox] } }]
   - name: foundation.pnats.cloud/external-secrets
-    resourceMatchers: [{ namespaceMatcher: { names: [external-secrets] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [external-secrets] } }]
   - name: foundation.pnats.cloud/argocd
-    resourceMatchers: [{ namespaceMatcher: { names: [argocd] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [argocd] } }]
 changeRuleBindings:
   - rules: ["upsert after upserting foundation.pnats.cloud/cilium"]
-    resourceMatchers: [{ namespaceMatcher: { names: [csi-proxmox] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [csi-proxmox] } }]
   - rules: ["upsert after upserting foundation.pnats.cloud/proxmox-csi"]
-    resourceMatchers: [{ namespaceMatcher: { names: [external-secrets] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [external-secrets] } }]
   - rules: ["upsert after upserting foundation.pnats.cloud/external-secrets"]
-    resourceMatchers: [{ namespaceMatcher: { names: [argocd] } }]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [argocd] } }]
 waitRules:
   # ESO ClusterSecretStore + ExternalSecret expose a Ready condition — gate on the REAL reconcile,
   # so ArgoCD (which needs the repo-creds Secret) never applies before secrets actually exist.

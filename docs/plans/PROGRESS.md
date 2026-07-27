@@ -6,9 +6,9 @@ Live tracker for the P0–P4 build. **Plans:** `docs/plans/2026-07-2{7,8}-P{0..4
 |---|---|---|
 | **P0** | Tree reconciliation | ✅ **DONE** (2026-07-28) |
 | **P1** | `app-factory` library chart | ✅ **DONE** (`964709b`) — 6 helpers, 13 helm-unittest tests, JSON schemas, kubeconform + lint green |
-| **P2** | kapp foundation | 🟡 **code done** (`d80e74e`) — render + kapp Config + vendored Cilium/CSI + ESO/ArgoCD values + ephemeral-Vault store + tests; scripts syntax-clean, kapp Config valid, static manifests kubeconform-clean. **kapp `--dry-run`/kind verification pending `kapp`/`kbld` install (slow download)**; real-cluster acceptance blocked on target |
-| **P3** | ephemeral bootstrapper | ⬜ cluster-free parts buildable; acceptance **blocked on target** |
-| **P4** | hand-off + test suite | ⬜ cluster-free parts buildable; live asserts **blocked on target** |
+| **P2** | kapp foundation | ✅ **DONE** (`46511e3`) — kapp Config **verified on kind** (ordering enforced, idempotent exit-2); `ordering_test.sh` passes; static manifests kubeconform-clean. Full-chart render + kind smoke = acceptance-gate (upstream chart pulls / target) |
+| **P3** | ephemeral bootstrapper | ⏳ **in progress** — image/terraform/orchestrator/bats buildable now; acceptance **blocked on target** |
+| **P4** | hand-off + test suite | ✅ **DONE** (`1cc0d41`) — root chart (3 helm-unittest) + 9 probes + 5 bats green (incl. real factory-validation); live asserts = acceptance-gate |
 
 ## Execution gate
 No execution/target cluster is assigned. The productized bootstrap builds the **new on-prem cluster that

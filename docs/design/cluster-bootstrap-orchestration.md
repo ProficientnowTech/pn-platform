@@ -70,44 +70,54 @@ factory (`app-factory` library chart) stamps each Application with `{AppProject,
 the full label taxonomy. Layer ordering in steady state is intentionally *soft* (ArgoCD reconciles;
 order barely matters post-bootstrap); the hard ordering was already done by kapp in Phase 1.
 
-## 6. The ephemeral Azure bootstrapper
+## 6. The ephemeral bootstrapper — provider-local vehicle, uniform lifecycle contract
 
-The one-shot orchestrator that runs Phases 1–2 and then removes itself.
+The one-shot orchestrator that runs Phases 1–2 and then removes itself. **The *vehicle* is
+provider-specific (it must reach the target cluster's API on a local path); the *lifecycle contract*
+is uniform.**
 
-- **Vehicle: Azure Container Instance (ACI)** — an ephemeral container (preferred over a VM: no OS to
-  manage, seconds to start, pay-per-second, trivial teardown). Image bakes the toolchain
-  (`kapp`, `terraform`/`bpg`, `ansible`, `talhelper`, `talosctl`, `argocd`/`kubectl`, the bootstrap logic).
-- **Identity: an Azure managed identity / bootstrap SP** with exactly: AKV read (the secret **anchor**),
-  target-cluster access (kubeconfig/talosconfig, from AKV), and permission to **create + destroy its own
-  ephemeral resources**. Nothing broader; time-boxed.
-- **Lifecycle (one-shot, self-destructing):**
-  1. **CREATE** — Terraform (`azurerm`) provisions an ephemeral resource group + ACI + identity + role
-     assignments.
-  2. **BOOTSTRAP** — run Phase 1 (kapp foundation, converge-gated) → Phase 2 (ArgoCD + factory) → wait
-     until the cluster is **self-managing** (ArgoCD Synced + Healthy, foundation Ready).
-  3. **TEST** — run the **test suites** (foundation health, ArgoCD app health, a smoke workload, and
-     the DR/failover smoke where applicable). Success is gated on these.
-  4. **VANISH (on success)** — revoke the one-time bootstrap privileges, delete the ephemeral RG / ACI /
-     identity (self-destruct). The permanent, ArgoCD-managed cluster remains, self-managing.
-  5. **On FAILURE — do NOT vanish.** Keep the scaffolding + logs for diagnosis; resume with `--resume`.
-- **Idempotent + resumable + gated** — re-runnable; resumes from the last step; physical/manual steps
-  (on-prem PVE install, wiring) pause as operator-confirmed gates.
+### Vehicle (where it runs)
+- **onprem / ovh (Proxmox):** an **ephemeral LXC or minimal VM ON the PVE cluster** — the RIGHT
+  primary, not a fallback. An Azure-hosted runner would have to tunnel into the on-prem cluster API
+  behind Sophos/the private net (a real reachability hassle); a Proxmox-local runner has direct
+  local access. It reaches the AKV secret anchor via the **PVE host's Azure Arc managed identity**
+  (the hosts are Arc-connected) → **no planted static credential.**
+- **contabo / azure (cloud):** a cloud-local container — **Azure Container Instance** for `azure-dr`
+  (co-located with AKV via workload identity); a Contabo-local container for `contabo-standby`.
+- Either way the image bakes the toolchain: `kapp`, `terraform`/`bpg`, `talhelper`, `talosctl`,
+  `argocd`/`kubectl`.
 
-### Why Azure + ephemeral
+### Boundary contract (uniform across vehicles — the crisp when / what / when)
+- **PROVISIONED — when:** the **substrate is DONE and verified** — PVE cluster (corosync/HA), host
+  networking + VLANs, switch config, storage (ZFS+CSI), hardening — all Ansible/GitOps. The **final
+  substrate step** provisions it. It lives exactly at the seam **substrate-ready → cluster-bootstrap.**
+- **OWNS / DOES — only the transient bootstrap:** Talos VMs (bpg + Image Factory + talhelper) →
+  `talosctl bootstrap` → kapp Phase-1 foundation (CNI→CSI→ESO/AKV→Vault→ArgoCD, converge-gated) →
+  Phase-2 hand-off to ArgoCD + factory → the **test suites**. It does **NOT** own the substrate (done
+  before it, by Ansible) or steady-state (ArgoCD, after it).
+- **DEPROVISIONED — when:** the cluster is **self-managing (ArgoCD Synced + Healthy) AND the test
+  suites pass** → it tears itself down (delete the LXC/VM/container, revoke transient access).
+  **On FAILURE it persists** (scaffolding + logs for diagnosis; resumable with `--resume`).
 
-- The **AKV bootstrap anchor lives in Azure** → co-locating the runner gives it **workload-identity**
-  access with **no secret handoff / no secrets on a laptop**.
-- **Self-destruct** = the elevated bootstrap privileges don't linger (security) and there's no
-  standing scaffolding to operate (maintainability).
+Clean seams: **Ansible owns *before* · the ephemeral bootstrapper owns *during* · ArgoCD owns *after*.**
+
+### Why ephemeral (both vehicles)
+- **Self-destruct** = the elevated bootstrap privileges don't linger (security) and there's no standing
+  scaffolding to operate (maintainability).
 - **Test-gated** = the cluster is proven workload-ready before success is declared and the runner leaves.
-- **Off-laptop + reproducible** = anyone can trigger a clean bootstrap; the process is one artifact.
+- **Reproducible** = the process is one artifact; anyone can trigger a clean bootstrap.
+- **Arc identity (Proxmox) / workload identity (cloud)** = the AKV anchor is reached without secret sprawl.
+- **Idempotent + resumable + gated** — physical/manual steps are operator-confirmed gates *before* the
+  substrate hand-off, so the ephemeral runner itself only ever does the automatable part.
 
 ## 7. Per-cluster applicability
 
 - **on-prem-primary / ovh-proving-ground (Proxmox):** the **physical substrate** (PVE/switch/wiring) is
-  operator-gated and outside this runner; the Azure bootstrapper drives from the cluster API onward
-  (Talos VMs via bpg → kapp foundation → ArgoCD). (OVH is Proxmox → same path as on-prem from k8s up.)
-- **contabo-standby / azure-dr:** the runner can drive the substrate too (Terraform), end to end.
+  operator-gated Ansible/GitOps, *before* the runner; the **Proxmox-local ephemeral LXC/VM** then drives
+  Talos-VM provisioning → kapp foundation → ArgoCD → tests → self-destruct. (OVH is Proxmox → identical
+  path from Talos up.)
+- **contabo-standby / azure-dr:** a cloud-local container (ACI for azure) drives the substrate too
+  (Terraform), end to end.
 
 ## 8. Relationship to the deferred `pn` CLI
 

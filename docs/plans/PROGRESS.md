@@ -1,13 +1,13 @@
 # Implementation Progress — pn-platform bootstrap & factory (P0–P4)
 
-Live tracker for the P0–P4 build. **Plans:** `docs/plans/2026-07-2{7,8}-P{0..4}-*.md`. **Design:** `docs/design/`.
+**P0–P4 all implemented + test-verified (2026-07-28).** Live tracker for the build. **Plans:** `docs/plans/2026-07-2{7,8}-P{0..4}-*.md`. **Design:** `docs/design/`.
 
 | Plan | Scope | Status |
 |---|---|---|
 | **P0** | Tree reconciliation | ✅ **DONE** (2026-07-28) |
 | **P1** | `app-factory` library chart | ✅ **DONE** (`964709b`) — 6 helpers, 13 helm-unittest tests, JSON schemas, kubeconform + lint green |
 | **P2** | kapp foundation | ✅ **DONE** (`46511e3`) — kapp Config **verified on kind** (ordering enforced, idempotent exit-2); `ordering_test.sh` passes; static manifests kubeconform-clean. Full-chart render + kind smoke = acceptance-gate (upstream chart pulls / target) |
-| **P3** | ephemeral bootstrapper | ⏳ **in progress** — image/terraform/orchestrator/bats buildable now; acceptance **blocked on target** |
+| **P3** | ephemeral bootstrapper | ✅ **DONE** (`d000e8d`) — orchestrator bats 3/3 (phase machine/resume/gate) + secrets/handoff/cleanup bats 4/4 against **real dev Vaults** (age-key-required, SOPS→Vault seed, ephemeral→in-cluster migrate + ESO repoint, destroy-on-success/persist-on-fail); vehicle terraform fmt-clean. docker-build/talos/e2e = target-cluster gate |
 | **P4** | hand-off + test suite | ✅ **DONE** (`1cc0d41`) — root chart (3 helm-unittest) + 9 probes + 5 bats green (incl. real factory-validation); live asserts = acceptance-gate |
 
 ## Execution gate

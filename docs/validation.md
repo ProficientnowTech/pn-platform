@@ -1,5 +1,7 @@
 # Validation Log – Modular Infra Refactor
 
+> **⚠ Historical (P0, 2026-07-28):** a 2024-12 validation log for the modular-infra-refactor (the api-CLI system), which has been **removed**. Retained for history only.
+
 **Date:** 2024-12-02  
 **Environment:** development  
 **Config Package:** core@v0.2.0

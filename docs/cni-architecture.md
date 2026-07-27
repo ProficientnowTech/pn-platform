@@ -1,5 +1,7 @@
 # CNI Architecture: Cilium Primary + Kube-OVN Secondary
 
+> **⚠ Partly superseded (P0, 2026-07-28):** the `./run.sh cni` provisioning flow and the Kube-OVN secondary CNI are removed. The current cluster runs **Cilium on Talos** (kubeProxyReplacement + L2 LB-IPAM on VLAN 116) — see `docs/design/cluster-bootstrap-orchestration.md` and ovh-infra `onprem/platform-live:infrastructure/talos/platform/cilium`. The Cilium content below is broadly accurate; the Kube-OVN + `run.sh` parts are historical.
+
 ## Architecture Overview
 
 This cluster uses a **multi-CNI architecture** with:

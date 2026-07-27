@@ -1,5 +1,7 @@
 # Multi-Cluster Network Architecture: On-Prem + Contabo + OVH
 
+> **⚠ Superseded (P0, 2026-07-28):** the `./run.sh`-driven Kubespray provisioning/scaling described here is removed. The current bootstrap is Talos + kapp foundation + ArgoCD (see `docs/design/cluster-bootstrap-orchestration.md`); the fleet is modelled as data in `platform/clusters/`. Kept for historical network-topology reference.
+
 ## Executive Summary
 
 This document defines the network architecture for a **multi-region, multi-cluster platform** spanning:

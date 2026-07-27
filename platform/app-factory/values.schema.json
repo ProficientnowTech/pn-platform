@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "factory": {
+      "type": "object",
+      "properties": {
+        "teams": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+          "default": ["platform", "data", "sre", "ml", "app"]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "app-factory app entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "domain", "version", "team", "tier", "dependency-layer", "source"],
+  "properties": {
+    "name":    { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+    "domain":  { "enum": ["infrastructure","storage","databases","security","monitoring","developer-platform","data-streaming","ml-infra","application","backup-dr"] },
+    "version": { "type": "string", "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$" },
+    "team":    { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+    "tier":    { "enum": ["critical","high","standard","low"] },
+    "dependency-layer": { "enum": ["foundation","core","platform","application"] },
+    "dr-role":   { "enum": ["none","source","replica"], "default": "none" },
+    "lifecycle": { "enum": ["active","experimental","deprecated"], "default": "active" },
+    "contact":   { "type": "string", "minLength": 1 },
+    "dependencies": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" } },
+    "source":    { "type": "object" },
+    "syncPolicy":{ "type": "object" }
+  }
+}

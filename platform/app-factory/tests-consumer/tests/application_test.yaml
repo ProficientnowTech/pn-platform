@@ -1,0 +1,10 @@
+suite: application
+templates: [render.yaml]
+tests:
+  - it: renders Application with project + wave + name
+    set: {aApp: {name: harbor, domain: developer-platform, version: "2.11.0", team: platform, tier: standard, dependency-layer: platform, source: {repoURL: x, path: p, targetRevision: main}}}
+    asserts:
+      - {isKind: {of: Application}}
+      - {equal: {path: metadata.name, value: harbor}}
+      - {equal: {path: spec.project, value: developer-platform}}
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "10"}}

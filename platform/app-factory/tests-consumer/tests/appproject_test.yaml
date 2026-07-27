@@ -1,0 +1,10 @@
+suite: appproject
+templates: [render.yaml]
+tests:
+  - it: renders AppProject with domain-scoped groups
+    set: {pDomain: security}
+    asserts:
+      - {isKind: {of: AppProject}}
+      - {equal: {path: metadata.name, value: security}}
+      - {equal: {path: "metadata.labels['app.kubernetes.io/part-of']", value: security}}
+      - {equal: {path: "spec.roles[0].groups[0]", value: pn-security-admin}}

@@ -1,0 +1,4 @@
+apiVersion: v2
+name: tests-consumer
+version: 0.0.0
+dependencies: [{name: app-factory, version: 0.0.0, repository: "file://.."}]

@@ -1,0 +1,21 @@
+{{- if .Values.tsLayer }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: sw}
+data: {wave: {{ include "app-factory.syncwave" (dict "layer" .Values.tsLayer) | quote }}}
+{{- end }}
+{{- if .Values.vApp }}{{ include "app-factory.validate" (dict "app" .Values.vApp "cluster" .Values.vCluster "environment" .Values.vEnv "teams" (list "platform" "data") "index" .Values.vIndex) }}{{- end }}
+{{- if .Values.lApp }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lbl
+  labels:
+    {{- include "app-factory.labels" (dict "app" .Values.lApp "cluster" "onprem-primary" "environment" "prod") | nindent 4 }}
+{{- end }}
+{{- if .Values.aApp }}
+{{ include "app-factory.application" (dict "app" .Values.aApp "cluster" "onprem-primary" "environment" "prod" "destination" (dict "name" "in-cluster" "namespace" "harbor")) }}
+{{- end }}
+{{- if .Values.pDomain }}
+{{ include "app-factory.appproject" (dict "domain" .Values.pDomain "destinations" (list (dict "name" "in-cluster" "namespace" "*"))) }}
+{{- end }}

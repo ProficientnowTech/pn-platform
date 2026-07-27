@@ -1,0 +1,21 @@
+suite: validate
+templates: [render.yaml]
+tests:
+  - it: missing tier fails
+    set: {vApp: {name: x, domain: security, version: "1.0.0", team: platform, dependency-layer: core}}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: app \"x\" missing required field \"tier\""}}]
+  - it: bad domain fails
+    set: {vApp: {name: x, domain: nope, version: "1.0.0", team: platform, tier: standard, dependency-layer: core}}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: app \"x\" invalid domain \"nope\" (allowed: infrastructure|storage|databases|security|monitoring|developer-platform|data-streaming|ml-infra|application|backup-dr)"}}]
+  - it: team not in allowed set fails
+    set: {vApp: {name: x, domain: security, version: "1.0.0", team: rogue, tier: standard, dependency-layer: core}}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: app \"x\" invalid team \"rogue\" (allowed: platform|data)"}}]
+  - it: bad cluster context fails
+    set: {vCluster: bogus, vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: core}}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: invalid cluster \"bogus\""}}]
+  - it: dependency on a later layer fails
+    set: {vIndex: {b: platform}, vApp: {name: a, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, dependencies: [b]}}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: app \"a\" (layer foundation) depends on \"b\" at a later layer platform"}}]
+  - it: valid app passes
+    set: {vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: core}}
+    asserts: [{hasDocuments: {count: 0}}]

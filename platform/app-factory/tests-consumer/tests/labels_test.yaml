@@ -1,0 +1,13 @@
+suite: labels
+templates: [render.yaml]
+tests:
+  - it: stamps the 9 labels
+    set: {lApp: {name: harbor, domain: developer-platform, version: "2.11.0", team: platform, tier: standard, dependency-layer: platform, dr-role: none}}
+    asserts:
+      - {equal: {path: "metadata.labels['app.kubernetes.io/part-of']", value: developer-platform}}
+      - {equal: {path: "metadata.labels['app.kubernetes.io/version']", value: "2.11.0"}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/team']", value: platform}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/environment']", value: prod}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/cluster']", value: onprem-primary}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/dependency-layer']", value: platform}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/lifecycle']", value: active}}

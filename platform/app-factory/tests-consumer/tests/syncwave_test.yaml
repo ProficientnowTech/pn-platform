@@ -1,0 +1,6 @@
+suite: syncwave
+templates: [render.yaml]
+tests:
+  - {it: foundation, set: {tsLayer: foundation}, asserts: [{equal: {path: data.wave, value: "-25"}}]}
+  - {it: application, set: {tsLayer: application}, asserts: [{equal: {path: data.wave, value: "30"}}]}
+  - {it: unknown fails, set: {tsLayer: bogus}, asserts: [{failedTemplate: {errorMessage: "app-factory: unknown dependency-layer \"bogus\""}}]}

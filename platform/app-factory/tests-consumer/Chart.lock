@@ -1,0 +1,6 @@
+dependencies:
+- name: app-factory
+  repository: file://..
+  version: 0.0.0
+digest: sha256:d1eac814aa2729f78502f993077e6e6dc4577d39ba05bbfe8939cdda73269984
+generated: "2026-07-28T02:34:52.638356413+05:30"

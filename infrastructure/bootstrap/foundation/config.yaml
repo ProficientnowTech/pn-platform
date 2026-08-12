@@ -2,6 +2,23 @@ apiVersion: kapp.k14s.io/v1alpha1
 kind: Config
 # Cross-layer ordering by NAMESPACE (each foundation component owns one ns) — no per-manifest annotation.
 changeGroupBindings:
+  # D1 FIX — every CustomResourceDefinition, applied before any workload.
+  #
+  # This binding is matched by KIND, not namespace, and that is the whole point: CRDs are CLUSTER-SCOPED,
+  # so `hasNamespaceMatcher` can never match them. The namespace-only ordering model below had no way to
+  # express "CRDs first" — which is exactly how the cert-manager CRD gap survived review. The Cilium
+  # render emits cert-manager.io/v1 Certificate objects (hubble.tls.auto.method=certmanager) while the
+  # cert-manager CONTROLLER only arrives later via ArgoCD; without its CRDs present, kapp applies an
+  # unknown kind, the CNI never installs, and no node reaches Ready.
+  #
+  # Matching ALL CRDs rather than enumerating cert-manager's six is deliberate: it cannot silently miss a
+  # CRD a chart adds later, and it cannot cycle, because CRDs never depend on the workloads that use them.
+  # Cilium/ESO/ArgoCD ship their own CRDs via `--include-crds`; those land here too, which is correct —
+  # all CRDs established, then all workloads.
+  - name: foundation.pnats.cloud/crds
+    resourceMatchers:
+      - apiVersionKindMatcher: { apiVersion: apiextensions.k8s.io/v1, kind: CustomResourceDefinition }
+
   - name: foundation.pnats.cloud/cilium
     resourceMatchers: [{ hasNamespaceMatcher: { names: [kube-system] } }]
   - name: foundation.pnats.cloud/proxmox-csi
@@ -11,6 +28,11 @@ changeGroupBindings:
   - name: foundation.pnats.cloud/argocd
     resourceMatchers: [{ hasNamespaceMatcher: { names: [argocd] } }]
 changeRuleBindings:
+  # D1 FIX — the CNI waits for the CRDs. This is the edge that was missing; the chain is now
+  # crds -> cilium -> proxmox-csi -> external-secrets -> argocd.
+  - rules: ["upsert after upserting foundation.pnats.cloud/crds"]
+    resourceMatchers: [{ hasNamespaceMatcher: { names: [kube-system] } }]
+
   - rules: ["upsert after upserting foundation.pnats.cloud/cilium"]
     resourceMatchers: [{ hasNamespaceMatcher: { names: [csi-proxmox] } }]
   - rules: ["upsert after upserting foundation.pnats.cloud/proxmox-csi"]

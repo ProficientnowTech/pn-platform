@@ -585,7 +585,7 @@ Depending on stack configuration:
 
 5. **Apply Platform Root Application**:
    ```bash
-   kubectl apply -f bootstrap/platform-root.yaml
+   kubectl apply -f root/root-app.yaml   # was bootstrap/platform-root.yaml (removed 2026-08-12)
    ```
 
 6. **Monitor Application Health**:

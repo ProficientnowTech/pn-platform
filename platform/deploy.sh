@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+# ⛔ SUPERSEDED — do not run.
+#
+# This is the imperative helm/kubectl bring-up that the kapp foundation replaces
+# (infrastructure/bootstrap/foundation/deploy.sh; design: docs/design/cluster-bootstrap-orchestration.md
+# §2, Phase 1). It also depended on files removed 2026-08-12:
+#   bootstrap/platform-root.yaml        targeted pn-infra.git @ v2 and platform/project-chart — a repo
+#                                       consolidated into pn-platform, an archived branch, and the
+#                                       REJECTED nested hierarchy. Superseded by platform/root/root-app.yaml.
+#   bootstrap/install-argo.sh           ArgoCD is installed by the kapp foundation (layer 40-argocd).
+#   bootstrap/install-sealed-secrets.sh sealed-secrets was cut; the path is ephemeral-Vault -> ESO -> Vault.
+#
+# Guarded rather than deleted so the logic stays readable while it is ported, and so nobody resurrects
+# the rejected model by running it. Delete once the kapp path passes its target-cluster acceptance gate.
+echo "REFUSING: $(basename "$0") is superseded by the kapp foundation." >&2
+echo "  use: infrastructure/bootstrap/foundation/deploy.sh <cluster>" >&2
+echo "  see: docs/design/cluster-bootstrap-orchestration.md section 2" >&2
+exit 1
+
+# ---------- original script preserved below, unreachable ----------
 
 # Platform Deployment Engine
 # Deploys platform applications using ArgoCD

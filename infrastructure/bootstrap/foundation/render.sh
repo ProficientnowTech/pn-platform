@@ -7,6 +7,14 @@ export EPHEMERAL_VAULT_ADDR PVE_API_URL PVE_REGION
 CH="$HERE/.charts"   # upstream charts land here via vendor-charts.sh (cilium, external-secrets, argo-cd)
 r(){ helm template "$1" "$2" -n "$3" -f "$4" --include-crds; }
 {
+    # D1 — cert-manager CRDs FIRST. The Cilium render below emits cert-manager.io/v1 Certificate objects
+    # (hubble.tls.auto.method=certmanager); nothing else here provides those CRDs and the controller only
+    # arrives later via ArgoCD. Without these, kapp applies an unknown kind, the CNI never installs, and
+    # no node reaches Ready — so nothing else in the foundation can schedule either. Ordering is enforced
+    # in config.yaml (the `crds` change group), not by position in this file; emitting them first is
+    # merely honest about intent.
+    cat "$CH/cert-manager.crds.yaml"
+    echo "---"
   r cilium            "$CH/cilium"                                  kube-system      "$HERE/10-cilium/values.yaml"
   r proxmox-csi       "$HERE/20-proxmox-csi/proxmox-csi-plugin"     csi-proxmox      "$HERE/20-proxmox-csi/proxmox-csi-plugin/values.talos.yaml"
   r proxmox-ccm       "$HERE/20-proxmox-csi/proxmox-cloud-controller-manager" csi-proxmox "$HERE/20-proxmox-csi/proxmox-cloud-controller-manager/values.talos.yaml"

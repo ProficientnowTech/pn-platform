@@ -17,5 +17,5 @@ metadata:
 {{ include "app-factory.application" (dict "app" .Values.aApp "cluster" "onprem-primary" "environment" "prod" "destination" (dict "name" "in-cluster" "namespace" "harbor")) }}
 {{- end }}
 {{- if .Values.pDomain }}
-{{ include "app-factory.appproject" (dict "domain" .Values.pDomain "destinations" (list (dict "name" "in-cluster" "namespace" "*"))) }}
+{{ include "app-factory.appproject" (dict "domain" .Values.pDomain "destinations" (list (dict "name" "in-cluster" "namespace" "*")) "clusterResources" (.Values.pClusterResources | default list) "namespaceResources" .Values.pNamespaceResources) }}
 {{- end }}

@@ -4,3 +4,17 @@ tests:
   - {it: foundation, set: {tsLayer: foundation}, asserts: [{equal: {path: data.wave, value: "-25"}}]}
   - {it: application, set: {tsLayer: application}, asserts: [{equal: {path: data.wave, value: "30"}}]}
   - {it: unknown fails, set: {tsLayer: bogus}, asserts: [{failedTemplate: {errorMessage: "app-factory: unknown dependency-layer \"bogus\""}}]}
+
+  - it: derives kapp change-group and both ordering rules from the same layer
+    set: {aApp: {name: cert-manager, domain: infrastructure, version: "1.20.3", team: platform, tier: critical, dependency-layer: core, source: {repoURL: r, path: p}}}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-5"}}
+      - {equal: {path: "metadata.annotations['kapp.k14s.io/change-group']", value: "pnats.cloud/layer-core"}}
+      - {equal: {path: "metadata.annotations['kapp.k14s.io/change-rule.create-order']", value: "upsert after upserting pnats.cloud/layer-foundation"}}
+      - {equal: {path: "metadata.annotations['kapp.k14s.io/change-rule.delete-order']", value: "delete before deleting pnats.cloud/layer-foundation"}}
+
+  - it: foundation has a change-group but no ordering rule (it is first)
+    set: {aApp: {name: cilium, domain: infrastructure, version: "1.17.17", team: platform, tier: critical, dependency-layer: foundation, source: {repoURL: r, path: p}}}
+    asserts:
+      - {equal: {path: "metadata.annotations['kapp.k14s.io/change-group']", value: "pnats.cloud/layer-foundation"}}
+      - {notExists: {path: "metadata.annotations['kapp.k14s.io/change-rule.create-order']"}}

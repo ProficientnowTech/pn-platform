@@ -8,3 +8,51 @@ tests:
       - {equal: {path: metadata.name, value: harbor}}
       - {equal: {path: spec.project, value: developer-platform}}
       - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "10"}}
+
+  # ── multi-source ────────────────────────────────────────────────────────────────────────────────
+  # Real platform apps need `sources`: the `$values` pattern (upstream chart + this git repo as
+  # `ref: values`) and apps rendering several paths under one Application. Six of the twelve proven
+  # live apps use it.
+  - it: renders spec.sources when `sources` is set, and omits spec.source
+    set:
+      aApp:
+        name: cilium
+        domain: infrastructure
+        version: "1.17.17"
+        team: platform
+        tier: critical
+        dependency-layer: foundation
+        sources:
+          - {repoURL: "https://github.com/ProficientnowTech/ovh-infra.git", targetRevision: onprem/platform-live, ref: values}
+          - {repoURL: "https://helm.cilium.io", chart: cilium, targetRevision: "1.17.17", helm: {valueFiles: ["$values/infrastructure/talos/platform/cilium/values.yaml"]}}
+    asserts:
+      - {isKind: {of: Application}}
+      - {equal: {path: "spec.sources[0].ref", value: values}}
+      - {equal: {path: "spec.sources[1].chart", value: cilium}}
+      - {equal: {path: "spec.sources[1].helm.valueFiles[0]", value: "$values/infrastructure/talos/platform/cilium/values.yaml"}}
+      - {notExists: {path: spec.source}}
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-25"}}
+
+  - it: still renders spec.source when only `source` is set
+    set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, source: {repoURL: r, path: p, targetRevision: main}}}
+    asserts:
+      - {equal: {path: spec.source.path, value: p}}
+      - {notExists: {path: spec.sources}}
+
+  - it: rejects an app that sets BOTH source and sources
+    set:
+      aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, source: {repoURL: r}, sources: [{repoURL: r}]}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" sets BOTH source and sources (mutually exclusive)'}
+
+  - it: rejects an app that sets neither source nor sources
+    set:
+      aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" must set exactly one of source or sources'}
+
+  - it: rejects sources that is not a list
+    set:
+      aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, sources: {repoURL: r}}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" sources must be a list'}

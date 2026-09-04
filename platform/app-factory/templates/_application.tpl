@@ -1,5 +1,12 @@
 {{- define "app-factory.application" -}}
 {{- $a := .app -}}
+{{- /* source/sources are mutually exclusive and exactly one is required. Checked HERE, not in
+     app-factory.validate: validate is metadata-only by contract and existing callers invoke it on
+     entries that carry no source at all. */ -}}
+{{- $hasSource := hasKey $a "source" -}}{{- $hasSources := hasKey $a "sources" -}}
+{{- if and $hasSource $hasSources -}}{{- fail (printf "app-factory: app %q sets BOTH source and sources (mutually exclusive)" $a.name) -}}{{- end -}}
+{{- if not (or $hasSource $hasSources) -}}{{- fail (printf "app-factory: app %q must set exactly one of source or sources" $a.name) -}}{{- end -}}
+{{- if $hasSources -}}{{- if not (kindIs "slice" $a.sources) -}}{{- fail (printf "app-factory: app %q sources must be a list" $a.name) -}}{{- end -}}{{- end -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -19,8 +26,19 @@ spec:
   project: {{ $a.domain }}
   destination:
     {{- .destination | toYaml | nindent 4 }}
+  {{- /* ArgoCD multi-source. Required by real platform apps: the `$values` pattern (an upstream
+       helm chart + this git repo as `ref: values` so valueFiles can be version-controlled apart
+       from the chart), and apps that render several paths under one Application. Six of the twelve
+       proven live apps need it, so single-source-only made the factory unable to express the
+       cluster it is meant to describe. `source` and `sources` are mutually exclusive — enforced in
+       app-factory.validate. */ -}}
+  {{- if hasKey $a "sources" }}
+  sources:
+    {{- $a.sources | toYaml | nindent 4 }}
+  {{- else }}
   source:
     {{- $a.source | toYaml | nindent 4 }}
+  {{- end }}
   syncPolicy:
     {{- $a.syncPolicy | default (dict "automated" (dict "prune" true "selfHeal" true)) | toYaml | nindent 4 }}
 {{- end -}}

@@ -19,3 +19,4 @@ tests:
   - it: valid app passes
     set: {vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: core}}
     asserts: [{hasDocuments: {count: 0}}]
+

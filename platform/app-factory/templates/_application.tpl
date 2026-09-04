@@ -12,6 +12,15 @@ kind: Application
 metadata:
   name: {{ $a.name }}
   namespace: argocd
+  {{- /* resources-finalizer makes deleting an Application cascade-delete the resources it owns.
+       In the FLAT model this is load-bearing, not decoration: there is no umbrella owning these
+       apps, so removing an entry from the catalogue prunes the Application — and without the
+       finalizer its workloads are silently ORPHANED, still running, owned by nothing.
+       Opt-in per app, because it is also the mechanism that makes a careless prune destructive. */ -}}
+  {{- if $a.finalizer }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   labels:
     {{- include "app-factory.labels" (dict "app" $a "cluster" .cluster "environment" .environment "teams" .teams) | nindent 4 }}
   annotations:

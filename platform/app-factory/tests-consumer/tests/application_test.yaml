@@ -56,3 +56,13 @@ tests:
       aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, sources: {repoURL: r}}
     asserts:
       - failedTemplate: {errorMessage: 'app-factory: app "bad" sources must be a list'}
+
+  - it: adds resources-finalizer when finalizer is true
+    set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, finalizer: true, source: {repoURL: r, path: p, targetRevision: main}}}
+    asserts:
+      - {equal: {path: "metadata.finalizers[0]", value: "resources-finalizer.argocd.argoproj.io"}}
+
+  - it: omits finalizers by default
+    set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, source: {repoURL: r, path: p, targetRevision: main}}}
+    asserts:
+      - {notExists: {path: metadata.finalizers}}

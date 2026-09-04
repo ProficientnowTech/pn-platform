@@ -94,6 +94,14 @@
         "type": "object"
       },
       "description": "ArgoCD multi-source list. Mutually exclusive with `source`."
+    },
+    "finalizer": {
+      "type": "boolean",
+      "description": "Add resources-finalizer so deleting the Application cascade-deletes its resources."
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Destination namespace (consumed by the catalogue, not by app-factory.application)."
     }
   },
   "oneOf": [

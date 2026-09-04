@@ -66,3 +66,26 @@ tests:
     set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, source: {repoURL: r, path: p, targetRevision: main}}}
     asserts:
       - {notExists: {path: metadata.finalizers}}
+
+  - it: emits ignoreDifferences when set
+    set:
+      aApp:
+        name: clickhouse-operator
+        domain: data-streaming
+        version: "0.24.1"
+        team: platform
+        tier: critical
+        dependency-layer: core
+        source: {repoURL: r, chart: c, targetRevision: "0.24.1"}
+        ignoreDifferences:
+          - group: apps
+            kind: Deployment
+            jqPathExpressions: [".spec.template.spec.nodeSelector"]
+    asserts:
+      - {equal: {path: "spec.ignoreDifferences[0].kind", value: Deployment}}
+      - {equal: {path: "spec.ignoreDifferences[0].jqPathExpressions[0]", value: ".spec.template.spec.nodeSelector"}}
+
+  - it: omits ignoreDifferences by default
+    set: {aApp: {name: dns, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, source: {repoURL: r, path: p}}}
+    asserts:
+      - {notExists: {path: spec.ignoreDifferences}}

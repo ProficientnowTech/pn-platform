@@ -51,4 +51,13 @@ spec:
   {{- end }}
   syncPolicy:
     {{- $a.syncPolicy | default (dict "automated" (dict "prune" true "selfHeal" true)) | toYaml | nindent 4 }}
+  {{- /* ignoreDifferences — required for charts that render EMPTY collections. Kubernetes strips
+       `imagePullSecrets: []`, `nodeSelector: {}`, `tolerations: []` etc. on apply, so the field is
+       present in desired and absent in live and the app reports OutOfSync forever while being
+       perfectly healthy. Observed on altinity-clickhouse-operator 0.24.1, 2026-09-04.
+       ServerSideApply does NOT fix this: the field never lands, so there is nothing to own. */ -}}
+  {{- with $a.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end -}}

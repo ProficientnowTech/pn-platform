@@ -102,6 +102,13 @@
     "namespace": {
       "type": "string",
       "description": "Destination namespace (consumed by the catalogue, not by app-factory.application)."
+    },
+    "ignoreDifferences": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "ArgoCD ignoreDifferences, for charts whose rendered empty collections are stripped by the API server."
     }
   },
   "oneOf": [

@@ -20,7 +20,14 @@
 {{- $mine := get $order (get $a "dependency-layer") -}}
 {{- range $d := $a.dependencies -}}
 {{- if not (hasKey $.index $d) -}}{{- fail (printf "app-factory: app %q depends on unknown %q" $n $d) -}}{{- end -}}
-{{- if gt (int (get $order (get $.index $d))) (int $mine) -}}{{- fail (printf "app-factory: app %q (layer %s) depends on %q at a later layer %s" $n (get $a "dependency-layer") $d (get $.index $d)) -}}{{- end -}}
+{{- /* A declared dependency must live in a STRICTLY EARLIER layer. `gt` (later-only) let
+     same-layer edges pass silently, which is how two real ordering bugs shipped on 2026-09-04:
+     ingress-gateway declared `dependencies: [envoy-gateway]` while BOTH sat at `platform`, so the
+     edge was documentation with no effect — the two synced concurrently and ingress-gateway failed
+     on "could not find GatewayClass". Per PLAN-P5 §4.B3: "An edge that does not cross a layer
+     boundary is documentation, not ordering." If two apps genuinely belong in the same layer, do
+     not declare an edge between them — say why in a comment instead. */ -}}
+{{- if ge (int (get $order (get $.index $d))) (int $mine) -}}{{- fail (printf "app-factory: app %q (layer %s) declares a dependency on %q at layer %s — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering" $n (get $a "dependency-layer") $d (get $.index $d)) -}}{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

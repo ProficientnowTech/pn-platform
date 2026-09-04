@@ -13,10 +13,24 @@ tests:
   - it: bad cluster context fails
     set: {vCluster: bogus, vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: core}}
     asserts: [{failedTemplate: {errorMessage: "app-factory: invalid cluster \"bogus\""}}]
-  - it: dependency on a later layer fails
+  - it: "dependency on a later layer fails (now: on any non-earlier layer)"
     set: {vIndex: {b: platform}, vApp: {name: a, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, dependencies: [b]}}
-    asserts: [{failedTemplate: {errorMessage: "app-factory: app \"a\" (layer foundation) depends on \"b\" at a later layer platform"}}]
+    asserts: [{failedTemplate: {errorMessage: "app-factory: app \"a\" (layer foundation) declares a dependency on \"b\" at layer platform — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering"}}]
   - it: valid app passes
     set: {vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: core}}
     asserts: [{hasDocuments: {count: 0}}]
 
+
+  - it: rejects a dependency edge that does not cross a layer boundary
+    set:
+      vApp: {name: ingress-gateway, domain: infrastructure, version: "1", team: platform, tier: critical, dependency-layer: platform, dependencies: [envoy-gateway], source: {repoURL: r}}
+      vIndex: {ingress-gateway: platform, envoy-gateway: platform}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "ingress-gateway" (layer platform) declares a dependency on "envoy-gateway" at layer platform — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering'}
+
+  - it: accepts a dependency edge that crosses a layer boundary
+    set:
+      vApp: {name: ingress-gateway, domain: infrastructure, version: "1", team: platform, tier: critical, dependency-layer: platform, dependencies: [envoy-gateway], source: {repoURL: r}}
+      vIndex: {ingress-gateway: platform, envoy-gateway: core}
+    asserts:
+      - {notFailedTemplate: {}}

@@ -18,9 +18,24 @@
 {{- /* dependency-layer-order — the intra-layer ordering primitive a same-layer dependency edge
      (below) compiles into. Validated unconditionally, not just when an edge uses it, so a typo'd
      or nonsensical value fails loudly here instead of silently landing on app-factory.syncwave
-     (which enforces the upper bound against the ACTUAL next-layer gap; this only guards the shape). */ -}}
+     (which enforces the upper bound against the ACTUAL next-layer gap; this only guards the shape).
+
+     kindIs BEFORE any int conversion — Sprig's `int` (cast.ToInt) coerces instead of erroring: a
+     bool silently becomes 0/1, a non-numeric string silently becomes 0. That is precisely the
+     silent-no-op failure mode this field exists to prevent, so it is checked here, not assumed.
+     A real values-file integer arrives as Go kind "float64" (Helm's YAML loader round-trips
+     through JSON, which has no distinct integer type) — "int"/"int64" can still occur via --set
+     or a caller-built dict, so both are accepted; the float64 case is then required to have no
+     fractional part. */ -}}
 {{- if hasKey $a "dependency-layer-order" -}}
 {{- $rawOrder := get $a "dependency-layer-order" -}}
+{{- $k := kindOf $rawOrder -}}
+{{- if not (or (eq $k "float64") (eq $k "int") (eq $k "int64")) -}}
+{{- fail (printf "app-factory: app %q dependency-layer-order must be a non-negative integer, got %s %v" $n $k $rawOrder) -}}
+{{- end -}}
+{{- if and (eq $k "float64") (ne $rawOrder (floor $rawOrder)) -}}
+{{- fail (printf "app-factory: app %q dependency-layer-order must be a whole number, got %v" $n $rawOrder) -}}
+{{- end -}}
 {{- if lt (int $rawOrder) 0 -}}{{- fail (printf "app-factory: app %q dependency-layer-order must be a non-negative integer (got %v)" $n $rawOrder) -}}{{- end -}}
 {{- end -}}
 {{- if and (hasKey $a "dependencies") (hasKey . "index") -}}
@@ -44,13 +59,28 @@
      proxmox-csi-config renders, both `foundation`) back into a prose comment in
      values-onprem.yaml — declared nowhere, enforced by nobody, correct by luck (t33).
 
-     So: a same-layer edge is DECLARABLE here, but ONLY when it is also ENFORCED — this app must
-     carry a positive `dependency-layer-order`, which app-factory.syncwave compiles into an actual,
-     later sync-wave than the layer's base (where an undeclared dependency sits by default, order
-     0). Without that, the edge still fails: it would still be a silent no-op, the exact bug this
-     rule exists to prevent. */ -}}
+     So: a same-layer edge is DECLARABLE here, but ONLY when it is also ENFORCED. "This app's
+     order is merely positive" is NOT enough on its own — that still lets two defects through:
+     equal orders (A=1, B=1) still render the IDENTICAL wave, and an inverted edge (depender=1,
+     dependency=5) passes and renders BACKWARDS — worse than the old unenforced no-op, because it
+     now looks ordered while running the wrong way. The only real check is pairwise: this app's
+     order must be STRICTLY GREATER than the SPECIFIC dependency's own order.
+
+     That comparison needs the dependency's order, not just its layer — an `orderIndex`
+     (name -> order), built by the consumer alongside its existing name -> layer `index` and
+     passed in the same way (`platform/catalogue/templates/apps.yaml` does, in this repo). When a
+     caller passes one, it is enforced pairwise. When it doesn't (a consumer that hasn't been
+     updated yet, or a caller exercising the base library on its own), this falls back to the
+     weaker "just be positive" check so the library stays usable without it. */ -}}
 {{- $mineOrder := int (get $a "dependency-layer-order" | default 0) -}}
-{{- if le $mineOrder 0 -}}
+{{- if hasKey $ "orderIndex" -}}
+{{- $depOrder := int (get $.orderIndex $d | default 0) -}}
+{{- if eq $mineOrder $depOrder -}}
+{{- fail (printf "app-factory: app %q (layer %s) same-layer dependency-layer-order %d is not strictly greater than %q's dependency-layer-order %d — equal orders render the IDENTICAL sync-wave, which is the no-op this rule exists to prevent" $n (get $a "dependency-layer") $mineOrder $d $depOrder) -}}
+{{- else if lt $mineOrder $depOrder -}}
+{{- fail (printf "app-factory: app %q (layer %s) same-layer dependency-layer-order %d is not strictly greater than %q's dependency-layer-order %d — %s would sync BEFORE the dependency it declares, which is backwards" $n (get $a "dependency-layer") $mineOrder $d $depOrder $n) -}}
+{{- end -}}
+{{- else if le $mineOrder 0 -}}
 {{- fail (printf "app-factory: app %q (layer %s) declares a same-layer dependency on %q — set dependency-layer-order to a positive integer (and leave %q's at the default 0) so the edge compiles to a real, later sync-wave, or it is documentation and not ordering" $n (get $a "dependency-layer") $d $d) -}}
 {{- end -}}
 {{- end -}}

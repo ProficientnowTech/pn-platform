@@ -39,3 +39,18 @@ tests:
   - it: a negative order is rejected
     set: {tsLayer: foundation, tsOrder: -1}
     asserts: [{failedTemplate: {errorMessage: "app-factory: dependency-layer-order -1 must be >= 0"}}]
+
+  # ── type-guard, defense-in-depth: syncwave is called directly by app-factory.application, not
+  # just reached through app-factory.validate, so it must reject the same bad kinds on its own
+  # rather than trust a caller who might skip validate entirely. ─────────────────────────────────
+  - it: a boolean order is rejected, not silently coerced to 1
+    set: {tsLayer: foundation, tsOrder: true}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: dependency-layer-order must be a non-negative integer, got bool true"}}]
+
+  - it: a non-whole float order is rejected, not silently truncated
+    set: {tsLayer: foundation, tsOrder: 1.5}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: dependency-layer-order must be a whole number, got 1.5"}}]
+
+  - it: a non-numeric string order is rejected, not silently coerced to 0
+    set: {tsLayer: foundation, tsOrder: abc}
+    asserts: [{failedTemplate: {errorMessage: "app-factory: dependency-layer-order must be a non-negative integer, got string abc"}}]

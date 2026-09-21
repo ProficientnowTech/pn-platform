@@ -4,7 +4,14 @@ kind: ConfigMap
 metadata: {name: sw}
 data: {wave: {{ include "app-factory.syncwave" (dict "layer" .Values.tsLayer "order" .Values.tsOrder) | quote }}}
 {{- end }}
-{{- if .Values.vApp }}{{ include "app-factory.validate" (dict "app" .Values.vApp "cluster" .Values.vCluster "environment" .Values.vEnv "teams" (list "platform" "data") "index" .Values.vIndex) }}{{- end }}
+{{- if .Values.vApp }}
+{{- $vArgs := dict "app" .Values.vApp "cluster" .Values.vCluster "environment" .Values.vEnv "teams" (list "platform" "data") "index" .Values.vIndex -}}
+{{- /* orderIndex is only added to the args when the test explicitly sets it, so the "no
+     orderIndex passed" fallback path (today's behaviour, for a consumer that hasn't been
+     updated) stays reachable in tests. A key present-but-nil would defeat `hasKey`. */ -}}
+{{- if .Values.vOrderIndex -}}{{- $_ := set $vArgs "orderIndex" .Values.vOrderIndex -}}{{- end -}}
+{{ include "app-factory.validate" $vArgs }}
+{{- end }}
 {{- if .Values.lApp }}
 apiVersion: v1
 kind: ConfigMap

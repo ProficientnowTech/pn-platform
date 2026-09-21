@@ -8,8 +8,20 @@
      instead of two Applications syncing at the identical wave. The upper bound is derived from the
      ACTUAL gap to the next layer's base — not a hardcoded constant — so a future change to the
      layer spacing fails loudly here instead of silently letting an intra-layer app's wave collide
-     with (or leapfrog past) the next layer. */ -}}
-{{- $order := int (.order | default 0) -}}
+     with (or leapfrog past) the next layer.
+
+     Type-guarded the same way as app-factory.validate, and independently: app-factory.application
+     calls this directly, so a caller that skips validate (or a future one) must not be able to
+     silently coerce a bool/float/string into an order via Sprig's `int`. */ -}}
+{{- $rawOrder := .order | default 0 -}}
+{{- $k := kindOf $rawOrder -}}
+{{- if not (or (eq $k "float64") (eq $k "int") (eq $k "int64")) -}}
+{{- fail (printf "app-factory: dependency-layer-order must be a non-negative integer, got %s %v" $k $rawOrder) -}}
+{{- end -}}
+{{- if and (eq $k "float64") (ne $rawOrder (floor $rawOrder)) -}}
+{{- fail (printf "app-factory: dependency-layer-order must be a whole number, got %v" $rawOrder) -}}
+{{- end -}}
+{{- $order := int $rawOrder -}}
 {{- if lt $order 0 -}}{{- fail (printf "app-factory: dependency-layer-order %d must be >= 0" $order) -}}{{- end -}}
 {{- $wave := add (get $bases $layer) $order -}}
 {{- range $idx, $l := $layers -}}

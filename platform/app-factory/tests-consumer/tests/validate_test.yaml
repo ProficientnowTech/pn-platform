@@ -69,3 +69,61 @@ tests:
       vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, "dependency-layer-order": -1}
     asserts:
       - failedTemplate: {errorMessage: 'app-factory: app "x" dependency-layer-order must be a non-negative integer (got -1)'}
+
+  # ── type-guard: kindIs on the raw value BEFORE any int conversion, so a bool/float/non-numeric
+  # string fails loudly instead of silently coercing (bool->1, 1.5->1 truncated, "abc"->0). ──────
+  - it: rejects a boolean dependency-layer-order (does not silently become 1)
+    set:
+      vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, "dependency-layer-order": true}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "x" dependency-layer-order must be a non-negative integer, got bool true'}
+
+  - it: rejects a non-whole float dependency-layer-order (does not silently truncate)
+    set:
+      vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, "dependency-layer-order": 1.5}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "x" dependency-layer-order must be a whole number, got 1.5'}
+
+  - it: rejects a non-numeric string dependency-layer-order with an explicit message (not the incidental positivity catch)
+    set:
+      vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, "dependency-layer-order": abc}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "x" dependency-layer-order must be a non-negative integer, got string abc'}
+
+  # ── orderIndex (name -> order, built by the consumer catalogue alongside its name -> layer
+  # index): once passed, a same-layer edge must have a STRICTLY GREATER order than the specific
+  # dependency it names — not merely "> 0". Without this, two defects both pass a validator that
+  # reads as enforced and isn't: (1) equal orders still render the IDENTICAL wave (the original
+  # concurrent-apply bug, just hidden behind a green check); (2) an inverted edge (depender's order
+  # LOWER than its dependency's) passes and renders backwards — worse than the old unenforced
+  # no-op, because it now looks ordered while running in the wrong direction. ────────────────────
+  - it: "DEFECT 1 — rejects same-layer equal orders (identical wave is still reachable)"
+    set:
+      vApp: {name: proxmox-storage, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, dependencies: [proxmox-csi-config], "dependency-layer-order": 1, source: {repoURL: r}}
+      vIndex: {proxmox-storage: foundation, proxmox-csi-config: foundation}
+      vOrderIndex: {proxmox-storage: 1, proxmox-csi-config: 1}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "proxmox-storage" (layer foundation) same-layer dependency-layer-order 1 is not strictly greater than "proxmox-csi-config"''s dependency-layer-order 1 — equal orders render the IDENTICAL sync-wave, which is the no-op this rule exists to prevent'}
+
+  - it: "DEFECT 2 — rejects an inverted same-layer edge (depender's order lower than its dependency's)"
+    set:
+      vApp: {name: a, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, dependencies: [b], "dependency-layer-order": 1}
+      vIndex: {a: foundation, b: foundation}
+      vOrderIndex: {a: 1, b: 5}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "a" (layer foundation) same-layer dependency-layer-order 1 is not strictly greater than "b"''s dependency-layer-order 5 — a would sync BEFORE the dependency it declares, which is backwards'}
+
+  - it: accepts a same-layer edge when orderIndex confirms a strictly greater order
+    set:
+      vApp: {name: proxmox-storage, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, dependencies: [proxmox-csi-config], "dependency-layer-order": 1, source: {repoURL: r}}
+      vIndex: {proxmox-storage: foundation, proxmox-csi-config: foundation}
+      vOrderIndex: {proxmox-storage: 1, proxmox-csi-config: 0}
+    asserts:
+      - {notFailedTemplate: {}}
+
+  - it: without an orderIndex, today's weaker "just be positive" behaviour is preserved (library stays usable by consumers that don't pass it)
+    set:
+      vApp: {name: proxmox-storage, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, dependencies: [proxmox-csi-config], "dependency-layer-order": 1, source: {repoURL: r}}
+      vIndex: {proxmox-storage: foundation, proxmox-csi-config: foundation}
+    asserts:
+      - {notFailedTemplate: {}}

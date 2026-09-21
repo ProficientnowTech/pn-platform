@@ -1,6 +1,6 @@
 {{- define "app-factory.enums" -}}
 {{ dict
-  "domain" (list "infrastructure" "storage" "databases" "security" "monitoring" "developer-platform" "data-streaming" "ml-infra" "application" "backup-dr")
+  "domain" (list "infrastructure" "storage" "databases" "security" "monitoring" "developer-platform" "data-streaming" "ml-infra" "application" "backup-dr" "delivery")
   "environment" (list "dev" "staging" "prod" "preview")
   "tier" (list "critical" "high" "standard" "low")
   "dr-role" (list "none" "source" "replica")

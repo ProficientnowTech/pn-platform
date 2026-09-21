@@ -15,19 +15,45 @@
 {{- if not (has $a.team $teams) -}}{{- fail (printf "app-factory: app %q invalid team %q (allowed: %s)" $n $a.team (join "|" $teams)) -}}{{- end -}}
 {{- if .cluster -}}{{- if not (has .cluster (get $e "cluster")) -}}{{- fail (printf "app-factory: invalid cluster %q" .cluster) -}}{{- end -}}{{- end -}}
 {{- if .environment -}}{{- if not (has .environment (get $e "environment")) -}}{{- fail (printf "app-factory: invalid environment %q" .environment) -}}{{- end -}}{{- end -}}
+{{- /* dependency-layer-order — the intra-layer ordering primitive a same-layer dependency edge
+     (below) compiles into. Validated unconditionally, not just when an edge uses it, so a typo'd
+     or nonsensical value fails loudly here instead of silently landing on app-factory.syncwave
+     (which enforces the upper bound against the ACTUAL next-layer gap; this only guards the shape). */ -}}
+{{- if hasKey $a "dependency-layer-order" -}}
+{{- $rawOrder := get $a "dependency-layer-order" -}}
+{{- if lt (int $rawOrder) 0 -}}{{- fail (printf "app-factory: app %q dependency-layer-order must be a non-negative integer (got %v)" $n $rawOrder) -}}{{- end -}}
+{{- end -}}
 {{- if and (hasKey $a "dependencies") (hasKey . "index") -}}
 {{- $order := dict "foundation" 0 "core" 1 "platform" 2 "application" 3 -}}
 {{- $mine := get $order (get $a "dependency-layer") -}}
 {{- range $d := $a.dependencies -}}
 {{- if not (hasKey $.index $d) -}}{{- fail (printf "app-factory: app %q depends on unknown %q" $n $d) -}}{{- end -}}
-{{- /* A declared dependency must live in a STRICTLY EARLIER layer. `gt` (later-only) let
-     same-layer edges pass silently, which is how two real ordering bugs shipped on 2026-09-04:
-     ingress-gateway declared `dependencies: [envoy-gateway]` while BOTH sat at `platform`, so the
-     edge was documentation with no effect — the two synced concurrently and ingress-gateway failed
-     on "could not find GatewayClass". Per PLAN-P5 §4.B3: "An edge that does not cross a layer
-     boundary is documentation, not ordering." If two apps genuinely belong in the same layer, do
-     not declare an edge between them — say why in a comment instead. */ -}}
-{{- if ge (int (get $order (get $.index $d))) (int $mine) -}}{{- fail (printf "app-factory: app %q (layer %s) declares a dependency on %q at layer %s — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering" $n (get $a "dependency-layer") $d (get $.index $d)) -}}{{- end -}}
+{{- $depLayer := get $.index $d -}}
+{{- $depLayerIdx := int (get $order $depLayer) -}}
+{{- if gt $depLayerIdx (int $mine) -}}
+{{- /* A declared dependency must live in a STRICTLY EARLIER layer, or a STRICTLY LATER layer's
+     dependency (the case this branch rejects). This is unchanged monotonicity: an app can never
+     depend on something that syncs after it. */ -}}
+{{- fail (printf "app-factory: app %q (layer %s) declares a dependency on %q at layer %s — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering" $n (get $a "dependency-layer") $d $depLayer) -}}
+{{- else if eq $depLayerIdx (int $mine) -}}
+{{- /* Same-layer edge. `ge` used to reject this outright (PLAN-P5 §4.B3, 2026-09-04): an edge
+     that doesn't cross a layer boundary produces the IDENTICAL sync-wave for both apps, ArgoCD
+     applies them concurrently, and the edge is a comment, not ordering — exactly how
+     ingress-gateway->envoy-gateway shipped broken that day. But banning same-layer edges outright
+     just pushed the real, load-bearing order (proxmox-storage MOUNTS the secret
+     proxmox-csi-config renders, both `foundation`) back into a prose comment in
+     values-onprem.yaml — declared nowhere, enforced by nobody, correct by luck (t33).
+
+     So: a same-layer edge is DECLARABLE here, but ONLY when it is also ENFORCED — this app must
+     carry a positive `dependency-layer-order`, which app-factory.syncwave compiles into an actual,
+     later sync-wave than the layer's base (where an undeclared dependency sits by default, order
+     0). Without that, the edge still fails: it would still be a silent no-op, the exact bug this
+     rule exists to prevent. */ -}}
+{{- $mineOrder := int (get $a "dependency-layer-order" | default 0) -}}
+{{- if le $mineOrder 0 -}}
+{{- fail (printf "app-factory: app %q (layer %s) declares a same-layer dependency on %q — set dependency-layer-order to a positive integer (and leave %q's at the default 0) so the edge compiles to a real, later sync-wave, or it is documentation and not ordering" $n (get $a "dependency-layer") $d $d) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

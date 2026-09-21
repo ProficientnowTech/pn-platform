@@ -89,3 +89,27 @@ tests:
     set: {aApp: {name: dns, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, source: {repoURL: r, path: p}}}
     asserts:
       - {notExists: {path: spec.ignoreDifferences}}
+
+  # ── t33: a same-layer dependent actually renders a LATER sync-wave than its dependency ──────────
+  # This is the real proxmox-storage/proxmox-csi-config incident (both `foundation`, -25): without
+  # dependency-layer-order they render byte-identical waves and ArgoCD applies them concurrently.
+  - it: the dependency (no order set) keeps the plain layer-base wave
+    set: {aApp: {name: proxmox-csi-config, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, source: {repoURL: r, path: p}}}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-25"}}
+
+  - it: the dependent (dependency-layer-order 1) renders a strictly later wave in the SAME layer
+    set:
+      aApp:
+        name: proxmox-storage
+        domain: storage
+        version: "1"
+        team: platform
+        tier: critical
+        dependency-layer: foundation
+        dependencies: [proxmox-csi-config]
+        dependency-layer-order: 1
+        source: {repoURL: r, path: p}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-24"}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/dependency-layer']", value: "foundation"}}

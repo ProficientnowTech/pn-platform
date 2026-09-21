@@ -81,6 +81,12 @@
         "pattern": "^[a-z][a-z0-9-]{0,40}$"
       }
     },
+    "dependency-layer-order": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Intra-layer ordering offset added to dependency-layer's base sync-wave (t33). Required to be a positive integer whenever `dependencies` includes an app in the SAME dependency-layer — app-factory.validate rejects a same-layer edge without it, since without a real wave difference ArgoCD applies both apps concurrently and the edge is documentation, not ordering. app-factory.syncwave rejects a value that reaches the next layer's base."
+    },
     "source": {
       "type": "object"
     },

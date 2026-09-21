@@ -24,7 +24,7 @@ metadata:
   labels:
     {{- include "app-factory.labels" (dict "app" $a "cluster" .cluster "environment" .environment "teams" .teams) | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: {{ include "app-factory.syncwave" (dict "layer" (get $a "dependency-layer")) | quote }}
+    argocd.argoproj.io/sync-wave: {{ include "app-factory.syncwave" (dict "layer" (get $a "dependency-layer") "order" (get $a "dependency-layer-order")) | quote }}
     {{- include "app-factory.kappordering" (dict "layer" (get $a "dependency-layer")) | nindent 4 }}
     {{- with $a.dependencies }}
     platform.pnats.cloud/dependencies: {{ join "," . | quote }}

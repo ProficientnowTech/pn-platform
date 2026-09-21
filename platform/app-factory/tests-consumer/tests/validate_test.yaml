@@ -21,12 +21,12 @@ tests:
     asserts: [{hasDocuments: {count: 0}}]
 
 
-  - it: rejects a dependency edge that does not cross a layer boundary
+  - it: rejects a dependency edge that does not cross a layer boundary and has no dependency-layer-order
     set:
       vApp: {name: ingress-gateway, domain: infrastructure, version: "1", team: platform, tier: critical, dependency-layer: platform, dependencies: [envoy-gateway], source: {repoURL: r}}
       vIndex: {ingress-gateway: platform, envoy-gateway: platform}
     asserts:
-      - failedTemplate: {errorMessage: 'app-factory: app "ingress-gateway" (layer platform) declares a dependency on "envoy-gateway" at layer platform — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering'}
+      - failedTemplate: {errorMessage: 'app-factory: app "ingress-gateway" (layer platform) declares a same-layer dependency on "envoy-gateway" — set dependency-layer-order to a positive integer (and leave "envoy-gateway"''s at the default 0) so the edge compiles to a real, later sync-wave, or it is documentation and not ordering'}
 
   - it: accepts a dependency edge that crosses a layer boundary
     set:
@@ -34,3 +34,38 @@ tests:
       vIndex: {ingress-gateway: platform, envoy-gateway: core}
     asserts:
       - {notFailedTemplate: {}}
+
+  # ── t33: same-layer dependencies can be DECLARED and ENFORCED via dependency-layer-order ────────
+  - it: rejects a same-layer dependency with no dependency-layer-order (still a no-op edge)
+    set:
+      vApp: {name: proxmox-storage, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, dependencies: [proxmox-csi-config], source: {repoURL: r}}
+      vIndex: {proxmox-storage: foundation, proxmox-csi-config: foundation}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "proxmox-storage" (layer foundation) declares a same-layer dependency on "proxmox-csi-config" — set dependency-layer-order to a positive integer (and leave "proxmox-csi-config"''s at the default 0) so the edge compiles to a real, later sync-wave, or it is documentation and not ordering'}
+
+  - it: rejects a same-layer dependency with dependency-layer-order explicitly 0
+    set:
+      vApp: {name: proxmox-storage, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, dependencies: [proxmox-csi-config], "dependency-layer-order": 0, source: {repoURL: r}}
+      vIndex: {proxmox-storage: foundation, proxmox-csi-config: foundation}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "proxmox-storage" (layer foundation) declares a same-layer dependency on "proxmox-csi-config" — set dependency-layer-order to a positive integer (and leave "proxmox-csi-config"''s at the default 0) so the edge compiles to a real, later sync-wave, or it is documentation and not ordering'}
+
+  - it: accepts a same-layer dependency once dependency-layer-order is positive
+    set:
+      vApp: {name: proxmox-storage, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, dependencies: [proxmox-csi-config], "dependency-layer-order": 1, source: {repoURL: r}}
+      vIndex: {proxmox-storage: foundation, proxmox-csi-config: foundation}
+    asserts:
+      - {notFailedTemplate: {}}
+
+  - it: dependency-layer-order does NOT relax the later-layer rejection (monotonicity still holds)
+    set:
+      vApp: {name: a, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, dependencies: [b], "dependency-layer-order": 5}
+      vIndex: {b: platform}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "a" (layer foundation) declares a dependency on "b" at layer platform — a dependency must be in a STRICTLY EARLIER layer, or it is documentation and not ordering'}
+
+  - it: rejects a negative dependency-layer-order outright
+    set:
+      vApp: {name: x, domain: security, version: "1.0.0", team: platform, tier: standard, dependency-layer: foundation, "dependency-layer-order": -1}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "x" dependency-layer-order must be a non-negative integer (got -1)'}

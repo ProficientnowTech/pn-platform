@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata: {name: sw}
-data: {wave: {{ include "app-factory.syncwave" (dict "layer" .Values.tsLayer) | quote }}}
+data: {wave: {{ include "app-factory.syncwave" (dict "layer" .Values.tsLayer "order" .Values.tsOrder) | quote }}}
 {{- end }}
 {{- if .Values.vApp }}{{ include "app-factory.validate" (dict "app" .Values.vApp "cluster" .Values.vCluster "environment" .Values.vEnv "teams" (list "platform" "data") "index" .Values.vIndex) }}{{- end }}
 {{- if .Values.lApp }}

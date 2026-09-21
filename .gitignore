@@ -76,3 +76,6 @@ platform/bootstrap/secrets/.env.local
 platform/bootstrap/secrets/
 **/charts/*.tgz
 infrastructure/bootstrap/foundation/.charts/
+
+# Vendored upstream foundation charts + CRDs — reproducible from vendor-charts.sh at pinned versions.
+infrastructure/bootstrap/foundation/.charts/

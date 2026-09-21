@@ -8,3 +8,19 @@ tests:
       - {equal: {path: metadata.name, value: security}}
       - {equal: {path: "metadata.labels['app.kubernetes.io/part-of']", value: security}}
       - {equal: {path: "spec.roles[0].groups[0]", value: pn-security-admin}}
+
+  - it: emits an explicit empty clusterResourceWhitelist when none are granted
+    set: {pDomain: application}
+    asserts:
+      - {equal: {path: spec.clusterResourceWhitelist, value: []}}
+      - {equal: {path: "spec.namespaceResourceWhitelist[0].group", value: "*"}}
+
+  - it: emits the granted cluster-scoped kinds
+    set:
+      pDomain: infrastructure
+      pClusterResources:
+        - {group: "apiextensions.k8s.io", kind: CustomResourceDefinition}
+        - {group: "", kind: Namespace}
+    asserts:
+      - {equal: {path: "spec.clusterResourceWhitelist[0].kind", value: CustomResourceDefinition}}
+      - {equal: {path: "spec.clusterResourceWhitelist[1].kind", value: Namespace}}

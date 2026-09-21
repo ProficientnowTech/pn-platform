@@ -8,3 +8,108 @@ tests:
       - {equal: {path: metadata.name, value: harbor}}
       - {equal: {path: spec.project, value: developer-platform}}
       - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "10"}}
+
+  # ── multi-source ────────────────────────────────────────────────────────────────────────────────
+  # Real platform apps need `sources`: the `$values` pattern (upstream chart + this git repo as
+  # `ref: values`) and apps rendering several paths under one Application. Six of the twelve proven
+  # live apps use it.
+  - it: renders spec.sources when `sources` is set, and omits spec.source
+    set:
+      aApp:
+        name: cilium
+        domain: infrastructure
+        version: "1.17.17"
+        team: platform
+        tier: critical
+        dependency-layer: foundation
+        sources:
+          - {repoURL: "https://github.com/ProficientnowTech/ovh-infra.git", targetRevision: onprem/platform-live, ref: values}
+          - {repoURL: "https://helm.cilium.io", chart: cilium, targetRevision: "1.17.17", helm: {valueFiles: ["$values/infrastructure/talos/platform/cilium/values.yaml"]}}
+    asserts:
+      - {isKind: {of: Application}}
+      - {equal: {path: "spec.sources[0].ref", value: values}}
+      - {equal: {path: "spec.sources[1].chart", value: cilium}}
+      - {equal: {path: "spec.sources[1].helm.valueFiles[0]", value: "$values/infrastructure/talos/platform/cilium/values.yaml"}}
+      - {notExists: {path: spec.source}}
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-25"}}
+
+  - it: still renders spec.source when only `source` is set
+    set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, source: {repoURL: r, path: p, targetRevision: main}}}
+    asserts:
+      - {equal: {path: spec.source.path, value: p}}
+      - {notExists: {path: spec.sources}}
+
+  - it: rejects an app that sets BOTH source and sources
+    set:
+      aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, source: {repoURL: r}, sources: [{repoURL: r}]}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" sets BOTH source and sources (mutually exclusive)'}
+
+  - it: rejects an app that sets neither source nor sources
+    set:
+      aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" must set exactly one of source or sources'}
+
+  - it: rejects sources that is not a list
+    set:
+      aApp: {name: bad, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, sources: {repoURL: r}}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" sources must be a list'}
+
+  - it: adds resources-finalizer when finalizer is true
+    set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, finalizer: true, source: {repoURL: r, path: p, targetRevision: main}}}
+    asserts:
+      - {equal: {path: "metadata.finalizers[0]", value: "resources-finalizer.argocd.argoproj.io"}}
+
+  - it: omits finalizers by default
+    set: {aApp: {name: dns, domain: infrastructure, version: "1.12.1", team: platform, tier: high, dependency-layer: core, source: {repoURL: r, path: p, targetRevision: main}}}
+    asserts:
+      - {notExists: {path: metadata.finalizers}}
+
+  - it: emits ignoreDifferences when set
+    set:
+      aApp:
+        name: clickhouse-operator
+        domain: data-streaming
+        version: "0.24.1"
+        team: platform
+        tier: critical
+        dependency-layer: core
+        source: {repoURL: r, chart: c, targetRevision: "0.24.1"}
+        ignoreDifferences:
+          - group: apps
+            kind: Deployment
+            jqPathExpressions: [".spec.template.spec.nodeSelector"]
+    asserts:
+      - {equal: {path: "spec.ignoreDifferences[0].kind", value: Deployment}}
+      - {equal: {path: "spec.ignoreDifferences[0].jqPathExpressions[0]", value: ".spec.template.spec.nodeSelector"}}
+
+  - it: omits ignoreDifferences by default
+    set: {aApp: {name: dns, domain: infrastructure, version: "1", team: platform, tier: low, dependency-layer: core, source: {repoURL: r, path: p}}}
+    asserts:
+      - {notExists: {path: spec.ignoreDifferences}}
+
+  # ── t33: a same-layer dependent actually renders a LATER sync-wave than its dependency ──────────
+  # This is the real proxmox-storage/proxmox-csi-config incident (both `foundation`, -25): without
+  # dependency-layer-order they render byte-identical waves and ArgoCD applies them concurrently.
+  - it: the dependency (no order set) keeps the plain layer-base wave
+    set: {aApp: {name: proxmox-csi-config, domain: storage, version: "1", team: platform, tier: critical, dependency-layer: foundation, source: {repoURL: r, path: p}}}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-25"}}
+
+  - it: the dependent (dependency-layer-order 1) renders a strictly later wave in the SAME layer
+    set:
+      aApp:
+        name: proxmox-storage
+        domain: storage
+        version: "1"
+        team: platform
+        tier: critical
+        dependency-layer: foundation
+        dependencies: [proxmox-csi-config]
+        dependency-layer-order: 1
+        source: {repoURL: r, path: p}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-24"}}
+      - {equal: {path: "metadata.labels['platform.pnats.cloud/dependency-layer']", value: "foundation"}}

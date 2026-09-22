@@ -85,7 +85,7 @@
       "type": "integer",
       "minimum": 0,
       "default": 0,
-      "description": "Intra-layer ordering offset added to dependency-layer's base sync-wave (t33). Required to be a positive integer whenever `dependencies` includes an app in the SAME dependency-layer — app-factory.validate rejects a same-layer edge without it, since without a real wave difference ArgoCD applies both apps concurrently and the edge is documentation, not ordering. app-factory.syncwave rejects a value that reaches the next layer's base."
+      "description": "Intra-layer ordering offset added to dependency-layer's base sync-wave (t33). Required to be a positive integer whenever `dependencies` includes an app in the SAME dependency-layer \u2014 app-factory.validate rejects a same-layer edge without it, since without a real wave difference ArgoCD applies both apps concurrently and the edge is documentation, not ordering. app-factory.syncwave rejects a value that reaches the next layer's base."
     },
     "source": {
       "type": "object"
@@ -115,6 +115,13 @@
         "type": "object"
       },
       "description": "ArgoCD ignoreDifferences, for charts whose rendered empty collections are stripped by the API server."
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Extra Application metadata.annotations, rendered after the factory's own. Values must be strings: an unquoted number renders as a YAML int and the API server rejects the object. Keys the factory derives (argocd.argoproj.io/sync-wave, kapp.k14s.io/change-*, platform.pnats.cloud/*) are rejected rather than overwritten. Needed for ArgoCD settings that exist only as annotations, e.g. argocd.argoproj.io/compare-options: ServerSideDiff=true."
     }
   },
   "oneOf": [

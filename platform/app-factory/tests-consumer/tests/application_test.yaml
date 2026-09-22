@@ -113,3 +113,62 @@ tests:
     asserts:
       - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-24"}}
       - {equal: {path: "metadata.labels['platform.pnats.cloud/dependency-layer']", value: "foundation"}}
+
+  # ── per-app annotations ─────────────────────────────────────────────────────────────────────────
+  # Several ArgoCD per-Application settings exist ONLY as annotations and have no spec field, so an
+  # app that needs one previously had to be lifted out of the factory entirely. The motivating case
+  # is `argocd.argoproj.io/compare-options: ServerSideDiff=true`.
+  - it: renders per-app annotations alongside the ones the factory derives
+    set:
+      aApp:
+        name: kyverno
+        domain: security
+        version: "3.9.1"
+        team: platform
+        tier: high
+        dependency-layer: platform
+        annotations:
+          argocd.argoproj.io/compare-options: ServerSideDiff=true
+        source: {repoURL: r, path: p}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/compare-options']", value: "ServerSideDiff=true"}}
+      # the derived ones must survive the addition — this is the whole risk of a passthrough
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "10"}}
+      - {equal: {path: "metadata.annotations['kapp.k14s.io/change-group']", value: "pnats.cloud/layer-platform"}}
+
+  # Overwriting a derived key is rejected, not merged. A silent overwrite still renders valid YAML
+  # and simply applies in the wrong order, which is the failure this guard exists to make impossible.
+  - it: rejects an app whose annotations overwrite the derived sync-wave
+    set:
+      aApp:
+        name: bad
+        domain: security
+        version: "1"
+        team: platform
+        tier: low
+        dependency-layer: core
+        annotations: {argocd.argoproj.io/sync-wave: "99"}
+        source: {repoURL: r, path: p}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" sets annotation "argocd.argoproj.io/sync-wave", which app-factory derives from dependency-layer'}
+
+  # kapp rule keys carry an arbitrary `.suffix`, so they are matched by prefix rather than by name.
+  - it: rejects an app whose annotations overwrite a kapp change-rule
+    set:
+      aApp:
+        name: bad
+        domain: security
+        version: "1"
+        team: platform
+        tier: low
+        dependency-layer: platform
+        annotations: {kapp.k14s.io/change-rule.create-order: "upsert after upserting whatever"}
+        source: {repoURL: r, path: p}
+    asserts:
+      - failedTemplate: {errorMessage: 'app-factory: app "bad" sets annotation "kapp.k14s.io/change-rule.create-order", which app-factory derives from dependency-layer'}
+
+  - it: an app with no annotations key is unaffected
+    set: {aApp: {name: plain, domain: security, version: "1", team: platform, tier: low, dependency-layer: core, source: {repoURL: r, path: p}}}
+    asserts:
+      - {equal: {path: "metadata.annotations['argocd.argoproj.io/sync-wave']", value: "-5"}}
+      - {notExists: {path: "metadata.annotations['argocd.argoproj.io/compare-options']"}}

@@ -7,6 +7,16 @@
 {{- if and $hasSource $hasSources -}}{{- fail (printf "app-factory: app %q sets BOTH source and sources (mutually exclusive)" $a.name) -}}{{- end -}}
 {{- if not (or $hasSource $hasSources) -}}{{- fail (printf "app-factory: app %q must set exactly one of source or sources" $a.name) -}}{{- end -}}
 {{- if $hasSources -}}{{- if not (kindIs "slice" $a.sources) -}}{{- fail (printf "app-factory: app %q sources must be a list" $a.name) -}}{{- end -}}{{- end -}}
+{{- /* Per-app annotations may not overwrite the ones the factory DERIVES. A silent overwrite here
+     would be the worst kind: sync-wave and the kapp change-rules are the single authored ordering
+     fact (see _kapp.tpl), so losing one still renders valid YAML and simply applies in the wrong
+     order. Rejected loudly instead. The kapp family is matched by PREFIX because its rule keys carry
+     an arbitrary `.suffix`. */ -}}
+{{- range $k, $_ := ($a.annotations | default dict) -}}
+{{- if or (has $k (list "argocd.argoproj.io/sync-wave" "platform.pnats.cloud/dependencies" "platform.pnats.cloud/contact")) (hasPrefix "kapp.k14s.io/change-" $k) -}}
+{{- fail (printf "app-factory: app %q sets annotation %q, which app-factory derives from dependency-layer" $a.name $k) -}}
+{{- end -}}
+{{- end -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -31,6 +41,15 @@ metadata:
     {{- end }}
     {{- with $a.contact }}
     platform.pnats.cloud/contact: {{ . | quote }}
+    {{- end }}
+    {{- /* Settings ArgoCD exposes ONLY as an annotation, with no spec field to carry them. The one
+         that forced this: `argocd.argoproj.io/compare-options: ServerSideDiff=true`, without which a
+         123-650 KB CRD cannot be baselined by client-side diff and its Application reports OutOfSync
+         forever while being perfectly Healthy. The controller-wide flag is not a substitute — it
+         panicked four unrelated apps on this estate (2026-09-22) including three that never opted
+         in, because it changes the diff path for EVERY app at once. */ -}}
+    {{- with $a.annotations }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   project: {{ $a.domain }}

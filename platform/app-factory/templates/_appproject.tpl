@@ -8,6 +8,12 @@ metadata:
   labels:
     app.kubernetes.io/part-of: {{ $d | quote }}
 spec:
+  {{- /* `description` is optional and informational only (the ArgoCD UI's project list): a domain
+       name like `devex` does not say what it governs, the description does. Omitted when not
+       passed, so every existing project renders byte-identically. */ -}}
+  {{- with .description }}
+  description: {{ . | quote }}
+  {{- end }}
   sourceRepos:
     {{- .sourceRepos | default (list "*") | toYaml | nindent 4 }}
   destinations:

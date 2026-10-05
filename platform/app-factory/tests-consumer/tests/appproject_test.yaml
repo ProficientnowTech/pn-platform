@@ -24,3 +24,14 @@ tests:
     asserts:
       - {equal: {path: "spec.clusterResourceWhitelist[0].kind", value: CustomResourceDefinition}}
       - {equal: {path: "spec.clusterResourceWhitelist[1].kind", value: Namespace}}
+
+  - it: renders spec.description when one is passed
+    set: {pDomain: devex, pDescription: "DevEx — developer experience"}
+    asserts:
+      - {equal: {path: metadata.name, value: devex}}
+      - {equal: {path: spec.description, value: "DevEx — developer experience"}}
+
+  - it: omits spec.description when none is passed (existing projects render unchanged)
+    set: {pDomain: security}
+    asserts:
+      - {notExists: {path: spec.description}}
